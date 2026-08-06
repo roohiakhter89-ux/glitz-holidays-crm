@@ -1,0 +1,21 @@
+# Render Blueprint for the Glitz backend.
+# Push to GitHub, then in Render: New + -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: glitz-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false        # set this in the Render dashboard (Supabase URI)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "7d"
+      - key: CORS_ORIGIN
+        value: "*"

@@ -1,0 +1,16 @@
+# dependencies / build output anywhere in the tree
+**/node_modules
+**/dist
+**/.next
+**/build
+
+# secrets — never commit real env files (examples are kept)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# misc
+**/*.log
+**/coverage
+.DS_Store
+Thumbs.db
