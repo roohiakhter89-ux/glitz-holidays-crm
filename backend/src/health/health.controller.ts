@@ -1,13 +1,19 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Public } from '../common/decorators/public.decorator';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
   root() {
-    return { status: 'ok', service: 'glitz-backend', ts: new Date().toISOString() };
+    return {
+      status: 'ok',
+      service: 'glitz-backend',
+      ts: new Date().toISOString(),
+    };
   }
 
   @Get('db')
