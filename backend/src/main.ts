@@ -1,9 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Render/Vercel sit behind a proxy — without this every lead records the
+  // load balancer's IP and rate limiting would throttle all users as one.
+  app.set('trust proxy', 1);
 
   app.setGlobalPrefix('api');
 

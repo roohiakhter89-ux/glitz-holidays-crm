@@ -1,5 +1,5 @@
 // Glitz Holidays CRM — Prisma schema
-// Phase 1: User + Role only. Later phases add Lead, Vendor, Quotation, Booking.
+// Phase 1: User + Role.  Phase 3: Lead + Activity.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,7 +10,6 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
-
 
 enum Role {
   SUPER_ADMIN
@@ -25,6 +24,48 @@ enum Role {
   GUEST
 }
 
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  QUOTATION_SENT
+  NEGOTIATION
+  CONFIRMED
+  CANCELLED
+  LOST
+  FUTURE_FOLLOWUP
+}
+
+enum LeadSource {
+  GOOGLE_ADS
+  META_ADS
+  INSTAGRAM
+  FACEBOOK
+  LANDING_PAGE
+  WEBSITE
+  ORGANIC
+  REFERRAL
+  WALK_IN
+  PHONE
+  WHATSAPP
+  TRADE_FAIR
+  EMAIL
+  B2B_AGENT
+  OTHER
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  WHATSAPP
+  EMAIL
+  MEETING
+  STATUS_CHANGE
+  ASSIGNMENT
+  RE_ENQUIRY
+  SYSTEM
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -35,5 +76,87 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  assignedLeads Lead[]     @relation("LeadAssignee")
+  activities    Activity[]
+
   @@index([role])
+}
+
+model Lead {
+  id     String @id @default(cuid())
+
+  // --- who ---
+  name    String
+  phone   String
+  email   String?
+  city    String?
+  country String?
+
+  // --- what they want ---
+  destination String?
+  travelDate  DateTime?
+  nights      Int?
+  adults      Int?
+  children    Int?
+  budget      Int?
+  message     String?
+
+  // --- pipeline ---
+  status     LeadStatus @default(NEW)
+  source     LeadSource @default(OTHER)
+  score      Int        @default(0)
+  scoreNotes String?
+  lostReason String?
+
+  assignedToId String?
+  assignedTo   User?   @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // --- attribution (this is what makes ROAS possible later) ---
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  gclid       String?
+  fbclid      String?
+  landingPage String?
+  referrer    String?
+  keyword     String?
+
+  // --- context ---
+  device    String?
+  userAgent String?
+  ipAddress String?
+
+  enquiryCount Int       @default(1)
+  lastContact  DateTime?
+  nextFollowUp DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities Activity[]
+
+  @@index([status])
+  @@index([source])
+  @@index([phone])
+  @@index([assignedToId])
+  @@index([createdAt])
+}
+
+model Activity {
+  id      String       @id @default(cuid())
+  type    ActivityType @default(NOTE)
+  content String
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
 }
