@@ -9,7 +9,6 @@ import {
   Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
 import { LeadsService } from './leads.service';
 import { CaptureLeadDto } from './dto/capture-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -18,6 +17,7 @@ import { QueryLeadsDto } from './dto/query-leads.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Actor, LEAD_MODULE_ROLES } from '../common/access';
 
 function detectDevice(ua: string): string {
   const s = ua.toLowerCase();
@@ -30,10 +30,7 @@ function detectDevice(ua: string): string {
 export class LeadsController {
   constructor(private readonly leads: LeadsService) {}
 
-  /**
-   * PUBLIC + rate limited (10/min per IP).
-   * Landing pages, Google Ads forms, WhatsApp bots post here.
-   */
+  /** PUBLIC + rate limited. Landing pages / ads / WhatsApp post here. */
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('capture')
@@ -52,36 +49,41 @@ export class LeadsController {
     });
   }
 
+  @Roles(...LEAD_MODULE_ROLES)
   @Get()
-  findAll(@Query() q: QueryLeadsDto) {
-    return this.leads.findAll(q);
+  findAll(@Query() q: QueryLeadsDto, @CurrentUser() actor: Actor) {
+    return this.leads.findAll(q, actor);
   }
 
+  @Roles(...LEAD_MODULE_ROLES)
   @Get('stats')
-  stats() {
-    return this.leads.stats();
+  stats(@CurrentUser() actor: Actor) {
+    return this.leads.stats(actor);
   }
 
+  @Roles(...LEAD_MODULE_ROLES)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.leads.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
+    return this.leads.findOne(id, actor);
   }
 
+  @Roles(...LEAD_MODULE_ROLES)
   @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateLeadDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser() actor: Actor,
   ) {
-    return this.leads.update(id, dto, userId);
+    return this.leads.update(id, dto, actor);
   }
 
+  @Roles(...LEAD_MODULE_ROLES)
   @Post(':id/activities')
   addActivity(
     @Param('id') id: string,
     @Body() dto: CreateActivityDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser() actor: Actor,
   ) {
-    return this.leads.addActivity(id, dto, userId);
+    return this.leads.addActivity(id, dto, actor);
   }
 }

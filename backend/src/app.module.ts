@@ -7,6 +7,9 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { LeadsModule } from './leads/leads.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { SettingsModule } from './settings/settings.module';
+import { QuotesModule } from './quotes/quotes.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -21,6 +24,9 @@ import { RolesGuard } from './common/guards/roles.guard';
     AuthModule,
     UsersModule,
     LeadsModule,
+    VendorsModule,
+    SettingsModule,
+    QuotesModule,
   ],
   providers: [
     // Order: rate limit -> authenticate -> authorize.

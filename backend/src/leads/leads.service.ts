@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ActivityType,
   LeadSource,
@@ -11,6 +15,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { QueryLeadsDto } from './dto/query-leads.dto';
 import { scoreLead } from './lead-scoring';
+import { Actor, canSeeAllLeads } from '../common/access';
 
 /** Extra request context the controller extracts (not client-supplied). */
 export interface CaptureContext {
@@ -24,6 +29,17 @@ const DEDUPE_WINDOW_DAYS = 30;
 @Injectable()
 export class LeadsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Sales execs may only touch leads assigned to them.
+   * 404 (not 403) so they cannot probe which lead ids exist.
+   */
+  private assertCanTouch(lead: { assignedToId: string | null }, actor: Actor) {
+    if (canSeeAllLeads(actor.role)) return;
+    if (lead.assignedToId !== actor.id) {
+      throw new NotFoundException('Lead not found');
+    }
+  }
 
   /** Normalise a phone to digits so "+91 98184 34726" == "9818434726". */
   private normalisePhone(phone: string): string {
@@ -145,14 +161,22 @@ export class LeadsService {
     return { duplicate: false, leadId: lead.id, score };
   }
 
-  async findAll(q: QueryLeadsDto) {
+  async findAll(q: QueryLeadsDto, actor: Actor) {
     const page = q.page ?? 1;
     const limit = q.limit ?? 25;
 
     const where: Prisma.LeadWhereInput = {};
+
+    // Sales execs are hard-scoped to their own leads — a query param
+    // cannot widen this.
+    if (!canSeeAllLeads(actor.role)) {
+      where.assignedToId = actor.id;
+    } else if (q.assignedToId) {
+      where.assignedToId = q.assignedToId;
+    }
+
     if (q.status) where.status = q.status;
     if (q.source) where.source = q.source;
-    if (q.assignedToId) where.assignedToId = q.assignedToId;
     if (q.from || q.to) {
       where.createdAt = {};
       if (q.from) where.createdAt.gte = new Date(q.from);
@@ -183,7 +207,7 @@ export class LeadsService {
     return { total, page, limit, pages: Math.ceil(total / limit), data };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor: Actor) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
       include: {
@@ -195,12 +219,20 @@ export class LeadsService {
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
+    this.assertCanTouch(lead, actor);
     return lead;
   }
 
-  async update(id: string, dto: UpdateLeadDto, actorId?: string) {
+  async update(id: string, dto: UpdateLeadDto, actor: Actor) {
+    const actorId = actor.id;
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead not found');
+    this.assertCanTouch(lead, actor);
+
+    // Execs must not reassign leads away from themselves.
+    if (!canSeeAllLeads(actor.role) && dto.assignedToId !== undefined) {
+      throw new ForbiddenException('You cannot reassign leads');
+    }
 
     const data: Prisma.LeadUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -256,9 +288,11 @@ export class LeadsService {
     return updated;
   }
 
-  async addActivity(leadId: string, dto: CreateActivityDto, actorId?: string) {
+  async addActivity(leadId: string, dto: CreateActivityDto, actor: Actor) {
+    const actorId = actor.id;
     const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
+    this.assertCanTouch(lead, actor);
 
     const contactTypes: ActivityType[] = [
       ActivityType.CALL,
@@ -281,12 +315,24 @@ export class LeadsService {
     });
   }
 
-  async stats() {
+  async stats(actor: Actor) {
+    const scope: Prisma.LeadWhereInput = canSeeAllLeads(actor.role)
+      ? {}
+      : { assignedToId: actor.id };
+
     const [byStatus, bySource, total, unassigned] = await Promise.all([
-      this.prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
-      this.prisma.lead.groupBy({ by: ['source'], _count: { _all: true } }),
-      this.prisma.lead.count(),
-      this.prisma.lead.count({ where: { assignedToId: null } }),
+      this.prisma.lead.groupBy({
+        by: ['status'],
+        where: scope,
+        _count: { _all: true },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['source'],
+        where: scope,
+        _count: { _all: true },
+      }),
+      this.prisma.lead.count({ where: scope }),
+      this.prisma.lead.count({ where: { ...scope, assignedToId: null } }),
     ]);
 
     return {
