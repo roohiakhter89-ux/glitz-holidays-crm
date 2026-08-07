@@ -2,28 +2,26 @@
 # ==============================================================================
 # Glitz Holidays — FRONTEND  |  PHASE 9: Quotation builder
 # ------------------------------------------------------------------------------
-#   /quotes           every quotation, with each tier's price and margin dot
-#   /quotes/new       start one from a lead
-#   /quotes/[id]      the builder
+#   /quotes          every quotation, with the best margin of its tiers
+#   /quotes/new      create against a lead (seeds a first tier so the
+#                    builder is never an empty room)
+#   /quotes/[id]     THE BUILDER
 #
-# HOW THE BUILDER WORKS
-#   Tiers (Budget / Standard / Deluxe / anything) sit in a comparison strip at
-#   the top — price and margin health visible at a glance. Selecting one opens
-#   its full line editor below. Duplicate a tier to build the next one.
+# How it works:
+#   * Tiers as tabs, not columns. A comparison strip shows every tier's price
+#     and margin at a glance; you edit inside one tier at a time. Three columns
+#     of line items becomes unreadable past ~8 services.
+#   * Numbers commit on BLUR, not per keystroke — typing "6200" would
+#     otherwise fire four saves and four server recalculations.
+#   * After any change the whole quote refetches. The server owns the pricing
+#     chain (line -> tier -> totals); trusting local arithmetic to mirror it is
+#     how a displayed margin drifts from the real one.
+#   * "From supplier rates" pulls a stored net cost straight in, asking for
+#     rooms x nights at insert time.
+#   * The right rail shows margin AND markup separately, plus the price check:
+#     the least you should charge, and by how much you are short.
 #
-#   Lines come from your supplier book (search by city, room type and season,
-#   then set rooms x nights) or by hand. Quantity, units, net cost and markup
-#   are edited inline; Enter or blur commits, Escape reverts.
-#
-#   THE SERVER OWNS THE MATH. Every edit posts to the backend and the totals it
-#   returns are what render. The alternative — recalculating in the browser —
-#   means two implementations of your markup rules, and the day they disagree
-#   you quote a wrong price.
-#
-#   The right rail shows the margin ribbon, both margin% (profit/sell) and
-#   markup% (profit/cost) — different numbers — and the pricing advisory. Price
-#   a tier below your minimum margin or below your break-even per file and it
-#   tells you exactly how much to add.
+# Needs one new package: @radix-ui/react-dialog
 #
 # RUN FROM YOUR PROJECT ROOT (the folder containing frontend/):
 #   cd ~/Desktop/glitz
@@ -44,103 +42,20 @@ if [ -d frontend/src ]; then
 elif [ -d src/app ] && [ -f package.json ] && grep -q '"next"' package.json; then
   :
 else
-  die "Can't find the frontend. Run this from your project root (the folder containing frontend/)."
+  die "Can't find the frontend. Run from your project root (the folder containing frontend/)."
 fi
-[ -f 'src/app/(app)/leads/page.tsx' ] || die "Phase 8 files missing — run phase-8.sh first."
+[ -f src/components/timeline.tsx ] || die "Phase 8 files missing — run phase-8.sh first."
 ok "frontend found ($(pwd))"
 
+say "Installing @radix-ui/react-dialog"
+if [ -d node_modules/@radix-ui/react-dialog ]; then
+  ok "already installed"
+else
+  npm install @radix-ui/react-dialog || die "npm install failed"
+  ok "installed"
+fi
+
 say "Writing quotation builder"
-mkdir -p "src/lib"
-cat > 'src/lib/constants.ts' << 'GLITZEOF'
-export const LEAD_STATUSES = [
-  'NEW',
-  'CONTACTED',
-  'INTERESTED',
-  'QUOTATION_SENT',
-  'NEGOTIATION',
-  'CONFIRMED',
-  'FUTURE_FOLLOWUP',
-  'CANCELLED',
-  'LOST',
-] as const;
-
-export const LEAD_SOURCES = [
-  'GOOGLE_ADS',
-  'META_ADS',
-  'INSTAGRAM',
-  'FACEBOOK',
-  'LANDING_PAGE',
-  'WEBSITE',
-  'ORGANIC',
-  'REFERRAL',
-  'WALK_IN',
-  'PHONE',
-  'WHATSAPP',
-  'TRADE_FAIR',
-  'EMAIL',
-  'B2B_AGENT',
-  'OTHER',
-] as const;
-
-export const ACTIVITY_TYPES = [
-  'NOTE',
-  'CALL',
-  'WHATSAPP',
-  'EMAIL',
-  'MEETING',
-] as const;
-
-/** Turn NEGOTIATION into "Negotiation", QUOTATION_SENT into "Quotation sent". */
-export function humanise(value: string): string {
-  const s = value.replace(/_/g, ' ').toLowerCase();
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/** Digits only, with country code, for a wa.me link. */
-export function whatsappHref(phone: string, text?: string): string {
-  const digits = phone.replace(/\D/g, '');
-  const withCode = digits.length === 10 ? `91${digits}` : digits;
-  const q = text ? `?text=${encodeURIComponent(text)}` : '';
-  return `https://wa.me/${withCode}${q}`;
-}
-
-export const SERVICE_TYPES = [
-  'HOTEL',
-  'TRANSPORT',
-  'ACTIVITY',
-  'FLIGHT',
-  'GUIDE',
-  'MEAL',
-  'PERMIT',
-  'MISC',
-] as const;
-
-export const MARKUP_MODES = [
-  { value: 'INHERIT', label: 'Default markup' },
-  { value: 'PERCENT', label: 'Percent' },
-  { value: 'FIXED', label: 'Flat amount' },
-  { value: 'MANUAL', label: 'Set sell price' },
-] as const;
-
-export const SEASONS = ['PEAK', 'SHOULDER', 'OFF', 'FESTIVE'] as const;
-
-export const QUOTE_STATUSES = [
-  'DRAFT',
-  'SENT',
-  'ACCEPTED',
-  'REJECTED',
-  'EXPIRED',
-  'REVISED',
-] as const;
-
-/** What the markupValue field means for each mode. */
-export const MARKUP_HINT: Record<string, string> = {
-  INHERIT: 'Uses your settings for this service type',
-  PERCENT: '% on this line',
-  FIXED: '₹ added on top',
-  MANUAL: '₹ total sell for this line',
-};
-GLITZEOF
 mkdir -p "src/lib"
 cat > 'src/lib/api.ts' << 'GLITZEOF'
 /**
@@ -329,6 +244,101 @@ export interface LeadDetail extends LeadRow {
   activities: ActivityRow[];
 }
 
+export interface QuoteLine {
+  id: string;
+  serviceType: string;
+  description: string;
+  vendorId: string | null;
+  vendorRateId: string | null;
+  quantity: number;
+  units: number;
+  unitNet: number;
+  markupMode: string;
+  markupValue: number | null;
+  lineNet: number;
+  lineSell: number;
+  sortOrder: number;
+  notes: string | null;
+}
+
+export interface Advisory {
+  breakEvenPerFile: number | null;
+  minSellForPolicy: number;
+  minSellForBreakEven: number | null;
+  suggestedMinSell: number;
+  shortfall: number;
+  ok: boolean;
+  warnings: string[];
+}
+
+export interface QuoteOption {
+  id: string;
+  quoteId: string;
+  name: string;
+  sortOrder: number;
+  isRecommended: boolean;
+  adults: number;
+  children: number;
+  nights: number;
+  markupPercent: number | null;
+  totalNet: number;
+  totalSell: number;
+  totalMargin: number;
+  marginPercent: number;
+  markupPercentEffective: number;
+  perPersonSell: number;
+  lines: QuoteLine[];
+  advisory?: Advisory;
+}
+
+export interface QuoteRow {
+  id: string;
+  quoteNumber: string;
+  title: string | null;
+  status: string;
+  validUntil: string | null;
+  createdAt: string;
+  lead?: {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string | null;
+  } | null;
+  options: QuoteOption[];
+}
+
+export interface QuoteDetail extends QuoteRow {
+  notes: string | null;
+  terms: string | null;
+}
+
+export interface PricingSettings {
+  defaultMarkupPercent: number;
+  minMarginPercent: number;
+  monthlyOverhead: number | null;
+  filesPerMonth: number | null;
+  gstPercent: number;
+  roundTo: number;
+  currency: string;
+}
+
+export interface VendorRateRow {
+  id: string;
+  variant: string;
+  season: string;
+  mealPlan: string | null;
+  rateBasis: string;
+  netRate: number;
+  rackRate: number | null;
+  vendor: {
+    id: string;
+    name: string;
+    type: string;
+    city: string | null;
+    contactRedacted?: boolean;
+  };
+}
+
 export interface UserRow {
   id: string;
   name: string;
@@ -436,173 +446,380 @@ export interface PricingSettings {
   gstPercent: number;
 }
 GLITZEOF
+mkdir -p "src/app"
+cat > 'src/app/globals.css' << 'GLITZEOF'
+@import "tailwindcss";
+
+/*
+  GLITZ — instrument panel.
+  The interface is graphite. Saturated colour is reserved for financial
+  meaning only: margin health, cash position, overdue balance. If you see
+  colour on a screen, it is telling you something about money.
+*/
+@theme {
+  --color-ink-950: #0d1015;
+  --color-ink-900: #12151b;
+  --color-ink-850: #171b22;
+  --color-ink-800: #1c212a;
+  --color-ink-700: #262c38;
+  --color-ink-600: #333b4a;
+  --color-ink-500: #4a5566;
+  --color-ink-400: #6b7688;
+  --color-ink-300: #8b94a6;
+  --color-ink-200: #b4bcc9;
+  --color-ink-100: #dfe3ea;
+  --color-ink-50:  #f2f4f8;
+
+  --color-signal-600: #2c7a7d;
+  --color-signal-500: #359296;
+  --color-signal-400: #4bb0b3;
+  --color-signal-300: #7ccbcd;
+
+  --color-healthy-500: #3f9d6d;
+  --color-healthy-400: #52b981;
+  --color-warn-500:    #c08a2e;
+  --color-warn-400:    #dda63f;
+  --color-loss-500:    #b4483f;
+  --color-loss-400:    #d0594e;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-panel: 10px;
+}
+
+:root { color-scheme: dark; }
+html, body { height: 100%; }
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number in this product aligns. Money you misread is money you lose. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal-400);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--color-ink-950); }
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 6px;
+  border: 2px solid var(--color-ink-950);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-600); }
+
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.rise { animation: rise 380ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes sweep {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.sweep { animation: sweep 620ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: left; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translate3d(-50%, -48%, 0) scale(0.98); }
+  to   { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+GLITZEOF
+mkdir -p "src/components/ui"
+cat > 'src/components/ui/dialog.tsx' << 'GLITZEOF'
+'use client';
+
+import * as React from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+export const Dialog = DialogPrimitive.Root;
+export const DialogTrigger = DialogPrimitive.Trigger;
+export const DialogClose = DialogPrimitive.Close;
+
+export function DialogContent({
+  className,
+  children,
+  title,
+  description,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay
+        className={cn(
+          'fixed inset-0 z-50 bg-ink-950/80 backdrop-blur-[2px]',
+          'data-[state=open]:animate-[fadeIn_160ms_ease-out]',
+        )}
+      />
+      <DialogPrimitive.Content
+        className={cn(
+          'fixed left-1/2 top-1/2 z-50 w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2',
+          'max-h-[85vh] overflow-hidden rounded-[10px] border border-ink-700 bg-ink-900',
+          'shadow-[0_24px_64px_-16px_rgba(0,0,0,0.9)]',
+          'data-[state=open]:animate-[popIn_180ms_cubic-bezier(0.16,1,0.3,1)]',
+          className,
+        )}
+        {...props}
+      >
+        <div className="flex items-start justify-between border-b border-ink-800 px-5 py-3.5">
+          <div>
+            <DialogPrimitive.Title className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-200">
+              {title}
+            </DialogPrimitive.Title>
+            {description && (
+              <DialogPrimitive.Description className="mt-1 text-[12px] text-ink-500">
+                {description}
+              </DialogPrimitive.Description>
+            )}
+          </div>
+          <DialogPrimitive.Close className="rounded p-1 text-ink-500 transition-colors hover:bg-ink-800 hover:text-ink-200">
+            <X className="size-4" strokeWidth={1.75} />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        </div>
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+}
+GLITZEOF
 mkdir -p "src/components"
 cat > 'src/components/rate-picker.tsx' << 'GLITZEOF'
 'use client';
 
-import { useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Search, Plus } from 'lucide-react';
 import { api, type VendorRateRow } from '@/lib/api';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/badge';
-import { SEASONS, humanise } from '@/lib/constants';
 import { money } from '@/lib/format';
+import { humanise } from '@/lib/constants';
+
+const SEASONS = ['PEAK', 'SHOULDER', 'OFF', 'FESTIVE'];
+const TYPES = ['HOTEL', 'HOUSEBOAT', 'TRANSPORT', 'GUIDE', 'ACTIVITY'];
 
 /**
- * Pulls contracted rates straight out of the supplier book into a quote.
- * Retyping a net rate is how the wrong number ends up in a client's hands.
+ * Pulls a stored supplier rate straight into a quote so nobody retypes a net
+ * cost from memory. Quantity and units are asked for at insert time because
+ * "2 rooms x 3 nights" is the actual unit of thought, not a rate id.
  */
 export function RatePicker({
   onPick,
-  busy,
 }: {
-  onPick: (rate: VendorRateRow, quantity: number, units: number) => void;
-  busy?: boolean;
+  onPick: (rateId: string, quantity: number, units: number) => Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<VendorRateRow[]>([]);
   const [city, setCity] = useState('');
-  const [variant, setVariant] = useState('');
+  const [type, setType] = useState('');
   const [season, setSeason] = useState('PEAK');
-  const [rates, setRates] = useState<VendorRateRow[]>([]);
-  const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [qty, setQty] = useState('1');
+  const [units, setUnits] = useState('1');
 
-  async function search() {
+  const search = useCallback(async () => {
     setLoading(true);
-    const p = new URLSearchParams();
-    if (city.trim()) p.set('city', city.trim());
-    if (variant.trim()) p.set('variant', variant.trim());
-    if (season) p.set('season', season);
+    const params = new URLSearchParams();
+    if (city.trim()) params.set('city', city.trim());
+    if (type) params.set('type', type);
+    if (season) params.set('season', season);
     try {
-      setRates(await api.get<VendorRateRow[]>(`/vendors/rates/search?${p}`));
+      const res = await api.get<VendorRateRow[]>(
+        `/vendors/rates/search?${params}`,
+      );
+      setRows(res);
     } catch {
-      setRates([]);
+      setRows([]);
     } finally {
-      setSearched(true);
       setLoading(false);
+    }
+  }, [city, type, season]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(search, city ? 260 : 0);
+    return () => clearTimeout(t);
+  }, [open, search, city]);
+
+  async function pick(rate: VendorRateRow) {
+    setBusyId(rate.id);
+    try {
+      await onPick(rate.id, Number(qty) || 1, Number(units) || 1);
+      setOpen(false);
+    } finally {
+      setBusyId(null);
     }
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <Input
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && search()}
-          placeholder="City — Srinagar"
-          className="w-[160px]"
-          aria-label="City"
-        />
-        <Input
-          value={variant}
-          onChange={(e) => setVariant(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && search()}
-          placeholder="Room or vehicle"
-          className="w-[170px]"
-          aria-label="Variant"
-        />
-        <div className="w-[130px]">
-          <Select
-            value={season}
-            onChange={(e) => setSeason(e.target.value)}
-            aria-label="Season"
-          >
-            {SEASONS.map((s) => (
-              <option key={s} value={s}>
-                {humanise(s)}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <Button variant="secondary" size="md" onClick={search} disabled={loading}>
-          <Search className="size-4" strokeWidth={1.75} />
-          {loading ? 'Searching…' : 'Find rates'}
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="sm">
+          <Plus className="size-4" strokeWidth={1.75} />
+          From supplier rates
         </Button>
-      </div>
+      </DialogTrigger>
 
-      {searched && rates.length === 0 && (
-        <p className="text-[12px] text-ink-500">
-          No contracted rates match. Add the line by hand below, or add the rate
-          under Suppliers first.
-        </p>
-      )}
+      <DialogContent
+        title="Supplier rates"
+        description="Net costs from your rate book. Quantity x units is applied on insert."
+      >
+        <div className="border-b border-ink-800 px-5 py-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[160px] flex-1">
+              <Search
+                aria-hidden
+                strokeWidth={1.75}
+                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-500"
+              />
+              <Input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="City"
+                className="pl-8"
+                aria-label="Filter by city"
+              />
+            </div>
+            <div className="w-[136px]">
+              <Select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                aria-label="Supplier type"
+              >
+                <option value="">All types</option>
+                {TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {humanise(t)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="w-[124px]">
+              <Select
+                value={season}
+                onChange={(e) => setSeason(e.target.value)}
+                aria-label="Season"
+              >
+                {SEASONS.map((s) => (
+                  <option key={s} value={s}>
+                    {humanise(s)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
 
-      {rates.length > 0 && (
-        <div className="max-h-[240px] overflow-y-auto rounded-md border border-ink-800">
-          {rates.map((r) => (
-            <RateRow key={r.id} rate={r} onPick={onPick} busy={busy} />
-          ))}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
+              Insert as
+            </span>
+            <Input
+              type="number"
+              min={1}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className="h-8 w-16 text-center"
+              aria-label="Quantity, e.g. rooms"
+            />
+            <span className="text-[12px] text-ink-500">rooms/units ×</span>
+            <Input
+              type="number"
+              min={1}
+              value={units}
+              onChange={(e) => setUnits(e.target.value)}
+              className="h-8 w-16 text-center"
+              aria-label="Units, e.g. nights"
+            />
+            <span className="text-[12px] text-ink-500">nights/days</span>
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-function RateRow({
-  rate,
-  onPick,
-  busy,
-}: {
-  rate: VendorRateRow;
-  onPick: (r: VendorRateRow, q: number, u: number) => void;
-  busy?: boolean;
-}) {
-  const [quantity, setQuantity] = useState(1);
-  const [units, setUnits] = useState(1);
-
-  return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-ink-800/60 px-3 py-2.5 last:border-0 transition-colors hover:bg-ink-850">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] text-ink-100">
-          {rate.vendor.name}
-          <span className="text-ink-500"> · {rate.variant}</span>
-        </p>
-        <div className="mt-1 flex items-center gap-1.5">
-          <Chip>{humanise(rate.vendor.type)}</Chip>
-          {rate.mealPlan && <Chip>{rate.mealPlan}</Chip>}
-          {rate.vendor.city && (
-            <span className="text-[11px] text-ink-600">{rate.vendor.city}</span>
+        <div className="max-h-[46vh] overflow-y-auto">
+          {loading ? (
+            <p className="px-5 py-8 text-center text-[13px] text-ink-500">
+              Searching…
+            </p>
+          ) : rows.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-[13px] text-ink-300">No rates found</p>
+              <p className="mt-1 text-[12px] text-ink-500">
+                Add suppliers and their seasonal rates first, or widen the filters.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-ink-800/60">
+              {rows.map((rate) => (
+                <li
+                  key={rate.id}
+                  className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-ink-850"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] text-ink-100">
+                      {rate.vendor.name}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-500">
+                      <span>{rate.variant}</span>
+                      {rate.mealPlan && <Chip>{rate.mealPlan}</Chip>}
+                      <Chip>{humanise(rate.season)}</Chip>
+                      {rate.vendor.city && <span>· {rate.vendor.city}</span>}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="tabular text-[13px] text-ink-100">
+                      {money(rate.netRate)}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-[0.08em] text-ink-600">
+                      net
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={busyId === rate.id}
+                    onClick={() => pick(rate)}
+                  >
+                    {busyId === rate.id ? 'Adding…' : 'Add'}
+                  </Button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      </div>
-
-      <span className="tabular text-[13px] text-ink-200">
-        {money(rate.netRate)}
-      </span>
-
-      <div className="flex items-center gap-1.5">
-        <input
-          type="number"
-          min={1}
-          value={quantity}
-          onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-          className="tabular h-8 w-12 rounded border border-ink-700 bg-ink-950/60 px-1.5 text-center text-[12px] text-ink-100 focus:border-signal-500 focus:outline-none"
-          aria-label="Quantity"
-          title="Rooms / vehicles"
-        />
-        <span className="text-[11px] text-ink-600">×</span>
-        <input
-          type="number"
-          min={1}
-          value={units}
-          onChange={(e) => setUnits(Math.max(1, Number(e.target.value)))}
-          className="tabular h-8 w-12 rounded border border-ink-700 bg-ink-950/60 px-1.5 text-center text-[12px] text-ink-100 focus:border-signal-500 focus:outline-none"
-          aria-label="Units"
-          title="Nights / days"
-        />
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={busy}
-          onClick={() => onPick(rate, quantity, units)}
-        >
-          <Plus className="size-4" strokeWidth={1.75} />
-          Add
-        </Button>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 GLITZEOF
@@ -613,21 +830,20 @@ cat > 'src/app/(app)/quotes/page.tsx' << 'GLITZEOF'
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
-import { api, ApiError, type QuoteListRow } from '@/lib/api';
+import { api, ApiError, type QuoteRow } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
-import { Stage } from '@/components/ui/badge';
-import { marginHealth, money, relativeDate } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { Stage, Chip } from '@/components/ui/badge';
+import { money, percent, relativeDate, marginHealth, healthText } from '@/lib/format';
 
 export default function QuotesPage() {
-  const [rows, setRows] = useState<QuoteListRow[]>([]);
+  const [rows, setRows] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .get<QuoteListRow[]>('/quotes')
+      .get<QuoteRow[]>('/quotes')
       .then(setRows)
       .catch((e) =>
         setError(e instanceof ApiError ? e.message : 'Could not load quotations.'),
@@ -637,25 +853,28 @@ export default function QuotesPage() {
 
   return (
     <div className="mx-auto max-w-[1180px] px-8 py-8">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight text-ink-50">
-          Quotations
-        </h1>
-        <p className="mt-0.5 text-[13px] text-ink-400">
-          {rows.length} quotation{rows.length === 1 ? '' : 's'}
-        </p>
+      <header className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-ink-50">
+            Quotations
+          </h1>
+          <p className="mt-0.5 text-[13px] text-ink-400">
+            {rows.length} quotation{rows.length === 1 ? '' : 's'}
+          </p>
+        </div>
+        <Button asChild variant="secondary" size="sm">
+          <Link href="/leads">Start from a lead</Link>
+        </Button>
       </header>
 
       <Panel className="overflow-hidden">
         {error ? (
-          <div className="px-5 py-10 text-center text-[13px] text-loss-400">
-            {error}
-          </div>
+          <p className="px-5 py-10 text-center text-[13px] text-loss-400">{error}</p>
         ) : loading ? (
           <div className="divide-y divide-ink-800/60">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex gap-4 px-5 py-4">
-                <div className="h-3 w-44 animate-pulse rounded bg-ink-800" />
+              <div key={i} className="flex gap-4 px-5 py-3.5">
+                <div className="h-3 w-40 animate-pulse rounded bg-ink-800" />
                 <div className="ml-auto h-3 w-20 animate-pulse rounded bg-ink-850" />
               </div>
             ))}
@@ -671,9 +890,6 @@ export default function QuotesPage() {
             <p className="mt-1 text-[12px] text-ink-500">
               Open a lead and choose “Build quotation”.
             </p>
-            <Button asChild variant="secondary" size="sm" className="mt-4">
-              <Link href="/leads">Go to leads</Link>
-            </Button>
           </div>
         ) : (
           <table className="w-full text-left text-[13px]">
@@ -683,71 +899,73 @@ export default function QuotesPage() {
                 <th className="px-5 py-2.5 font-medium">Client</th>
                 <th className="px-5 py-2.5 font-medium">Tiers</th>
                 <th className="px-5 py-2.5 font-medium">Status</th>
+                <th className="px-5 py-2.5 text-right font-medium">Best margin</th>
                 <th className="px-5 py-2.5 text-right font-medium">Created</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((q, i) => (
-                <tr
-                  key={q.id}
-                  className="group rise border-b border-ink-800/60 transition-colors last:border-0 hover:bg-ink-850"
-                  style={{ animationDelay: `${Math.min(i, 12) * 18}ms` }}
-                >
-                  <td className="px-5 py-3">
-                    <Link
-                      href={`/quotes/${q.id}`}
-                      className="font-medium text-ink-100 transition-colors group-hover:text-signal-300"
-                    >
-                      {q.title || 'Untitled'}
-                    </Link>
-                    <div className="tabular mt-0.5 text-[11px] text-ink-500">
-                      {q.quoteNumber}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-ink-300">{q.lead?.name ?? '—'}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {q.options.length === 0 ? (
-                        <span className="text-[12px] text-ink-600">No tiers</span>
+              {rows.map((q, i) => {
+                const best = q.options.reduce<number | null>(
+                  (acc, o) =>
+                    acc === null || o.marginPercent > acc ? o.marginPercent : acc,
+                  null,
+                );
+                const top = q.options.reduce<number>(
+                  (acc, o) => Math.max(acc, o.totalSell),
+                  0,
+                );
+                return (
+                  <tr
+                    key={q.id}
+                    className="group rise border-b border-ink-800/60 transition-colors duration-150 last:border-0 hover:bg-ink-850"
+                    style={{ animationDelay: `${Math.min(i, 10) * 18}ms` }}
+                  >
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/quotes/${q.id}`}
+                        className="font-medium text-ink-100 transition-colors group-hover:text-signal-300"
+                      >
+                        {q.title ?? 'Untitled package'}
+                      </Link>
+                      <div className="tabular mt-0.5 text-[11px] text-ink-500">
+                        {q.quoteNumber}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-ink-300">
+                      {q.lead?.name ?? '—'}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {q.options.length === 0 ? (
+                          <span className="text-ink-600">none</span>
+                        ) : (
+                          q.options.map((o) => <Chip key={o.id}>{o.name}</Chip>)
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Stage value={q.status} />
+                    </td>
+                    <td className="tabular px-5 py-3 text-right">
+                      {best === null ? (
+                        <span className="text-ink-600">—</span>
                       ) : (
-                        q.options.map((o) => {
-                          const h = marginHealth(o.marginPercent);
-                          return (
-                            <span
-                              key={o.id}
-                              className="inline-flex items-center gap-1.5 rounded border border-ink-700 bg-ink-850 px-1.5 py-0.5"
-                            >
-                              <span
-                                aria-hidden
-                                className={cn(
-                                  'size-1.5 rounded-full',
-                                  h === 'healthy'
-                                    ? 'bg-healthy-500'
-                                    : h === 'warn'
-                                      ? 'bg-warn-500'
-                                      : 'bg-loss-500',
-                                )}
-                              />
-                              <span className="text-[11px] text-ink-300">
-                                {o.name}
-                              </span>
-                              <span className="tabular text-[11px] text-ink-500">
-                                {money(o.totalSell)}
-                              </span>
-                            </span>
-                          );
-                        })
+                        <>
+                          <span className={healthText[marginHealth(best)]}>
+                            {percent(best)}
+                          </span>
+                          <div className="text-[11px] text-ink-600">
+                            {money(top)}
+                          </div>
+                        </>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <Stage value={q.status} />
-                  </td>
-                  <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
-                    {relativeDate(q.createdAt)}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
+                      {relativeDate(q.createdAt)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -762,29 +980,16 @@ cat > 'src/app/(app)/quotes/new/page.tsx' << 'GLITZEOF'
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { api, ApiError, type LeadDetail, type QuoteDetail } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 
-export default function NewQuotePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-[560px] px-8 py-10">
-          <div className="h-4 w-40 animate-pulse rounded bg-ink-800" />
-        </div>
-      }
-    >
-      <NewQuoteForm />
-    </Suspense>
-  );
-}
-
 function NewQuoteForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const leadId = params.get('leadId') ?? '';
+  const leadId = params.get('leadId');
 
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [title, setTitle] = useState('');
@@ -804,10 +1009,10 @@ function NewQuoteForm() {
             : `Package for ${l.name}`,
         );
       })
-      .catch(() => setError('That lead could not be found.'));
+      .catch(() => setError('Could not load that lead.'));
   }, [leadId]);
 
-  // default validity: two weeks out, the usual shelf life of a hotel hold
+  // default validity: two weeks out, the usual life of a Kashmir quote
   useEffect(() => {
     const d = new Date();
     d.setDate(d.getDate() + 14);
@@ -815,6 +1020,7 @@ function NewQuoteForm() {
   }, []);
 
   async function create() {
+    if (!leadId) return;
     setBusy(true);
     setError(null);
     try {
@@ -822,6 +1028,14 @@ function NewQuoteForm() {
         leadId,
         title: title.trim() || undefined,
         validUntil: validUntil ? new Date(validUntil).toISOString() : undefined,
+      });
+      // seed a first tier so the builder is never an empty room
+      await api.post(`/quotes/${quote.id}/options`, {
+        name: 'Standard',
+        adults: lead?.adults ?? 2,
+        children: lead?.children ?? 0,
+        nights: lead?.nights ?? 0,
+        sortOrder: 0,
       });
       router.replace(`/quotes/${quote.id}`);
     } catch (e) {
@@ -832,13 +1046,12 @@ function NewQuoteForm() {
 
   if (!leadId) {
     return (
-      <div className="mx-auto max-w-[560px] px-8 py-10">
+      <div className="mx-auto max-w-[560px] px-8 py-8">
         <Panel>
           <PanelBody className="py-10 text-center">
             <p className="text-[13px] text-ink-300">Start from a lead</p>
             <p className="mt-1 text-[12px] text-ink-500">
-              Quotations belong to an enquiry. Open the lead and choose “Build
-              quotation”.
+              Quotations belong to a client, so open the lead first.
             </p>
             <Button
               variant="secondary"
@@ -855,41 +1068,50 @@ function NewQuoteForm() {
   }
 
   return (
-    <div className="mx-auto max-w-[560px] px-8 py-10">
-      <h1 className="text-xl font-semibold tracking-tight text-ink-50">
-        New quotation
-      </h1>
-      <p className="mt-0.5 text-[13px] text-ink-400">
-        {lead ? `for ${lead.name}` : 'Loading the enquiry…'}
-      </p>
+    <div className="mx-auto max-w-[560px] px-8 py-8">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4 -ml-3"
+        onClick={() => router.push(`/leads/${leadId}`)}
+      >
+        <ArrowLeft className="size-4" strokeWidth={1.75} />
+        Back to lead
+      </Button>
 
-      <Panel className="mt-6">
+      <Panel>
         <PanelHeader>
-          <PanelTitle>Details</PanelTitle>
+          <PanelTitle>New quotation</PanelTitle>
         </PanelHeader>
         <PanelBody className="space-y-4">
+          {lead && (
+            <p className="text-[13px] text-ink-400">
+              For <span className="text-ink-100">{lead.name}</span>
+              <span className="tabular"> · {lead.phone}</span>
+            </p>
+          )}
+
           <div className="space-y-1.5">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="t">Package name</Label>
             <Input
-              id="title"
+              id="t"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Kashmir 5N/6D — Sharma family"
+              placeholder="Kashmir 5N/6D — family"
             />
-            <p className="text-[11px] text-ink-600">
-              The client sees this. Name the trip, not the file.
-            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="valid">Hold prices until</Label>
+            <Label htmlFor="v">Valid until</Label>
             <Input
-              id="valid"
+              id="v"
               type="date"
               value={validUntil}
               onChange={(e) => setValidUntil(e.target.value)}
-              className="tabular"
             />
+            <p className="text-[11px] text-ink-600">
+              Rates move. Two weeks is the usual life of a quote.
+            </p>
           </div>
 
           {error && (
@@ -901,17 +1123,26 @@ function NewQuoteForm() {
             </p>
           )}
 
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="ghost" onClick={() => router.back()}>
-              Cancel
-            </Button>
-            <Button onClick={create} disabled={busy}>
-              {busy ? 'Creating…' : 'Create and add tiers'}
-            </Button>
-          </div>
+          <Button onClick={create} disabled={busy} className="w-full" size="lg">
+            {busy ? 'Creating…' : 'Create and start building'}
+          </Button>
         </PanelBody>
       </Panel>
     </div>
+  );
+}
+
+export default function NewQuotePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-[560px] px-8 py-8">
+          <div className="h-4 w-40 animate-pulse rounded bg-ink-800" />
+        </div>
+      }
+    >
+      <NewQuoteForm />
+    </Suspense>
   );
 }
 GLITZEOF
@@ -926,19 +1157,17 @@ import {
   ArrowLeft,
   Copy,
   Plus,
-  Send,
   Trash2,
   TriangleAlert,
-  Star,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   api,
   ApiError,
-  type PricingSettings,
   type QuoteDetail,
-  type QuoteLineRow,
-  type QuoteOptionRow,
-  type VendorRateRow,
+  type QuoteLine,
+  type QuoteOption,
+  type PricingSettings,
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
@@ -947,15 +1176,29 @@ import { Select } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
 import { MarginRibbon } from '@/components/margin-ribbon';
 import { RatePicker } from '@/components/rate-picker';
-import {
-  MARKUP_HINT,
-  MARKUP_MODES,
-  QUOTE_STATUSES,
-  SERVICE_TYPES,
-  humanise,
-} from '@/lib/constants';
-import { marginHealth, money, percent } from '@/lib/format';
+import { money, percent, marginHealth, healthText } from '@/lib/format';
+import { humanise } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+
+const SERVICE_TYPES = [
+  'HOTEL',
+  'TRANSPORT',
+  'ACTIVITY',
+  'FLIGHT',
+  'GUIDE',
+  'MEAL',
+  'PERMIT',
+  'MISC',
+];
+const MARKUP_MODES = ['INHERIT', 'PERCENT', 'FIXED', 'MANUAL'];
+const QUOTE_STATUSES = [
+  'DRAFT',
+  'SENT',
+  'ACCEPTED',
+  'REJECTED',
+  'EXPIRED',
+  'REVISED',
+];
 
 export default function QuoteBuilderPage() {
   const { id } = useParams<{ id: string }>();
@@ -963,44 +1206,45 @@ export default function QuoteBuilderPage() {
 
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [settings, setSettings] = useState<PricingSettings | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeTier, setActiveTier] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(
-    async (keepActive = true) => {
-      try {
-        const data = await api.get<QuoteDetail>(`/quotes/${id}`);
-        setQuote(data);
-        setActiveId((prev) => {
-          if (keepActive && prev && data.options.some((o) => o.id === prev)) {
-            return prev;
-          }
-          return data.options[0]?.id ?? null;
-        });
-      } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Could not load this quotation.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [id],
-  );
+  /**
+   * The server owns the pricing chain (line -> option -> totals), so every
+   * mutation refetches rather than patching local state. Slightly chattier,
+   * but the margin you see is always the margin the server computed.
+   */
+  const load = useCallback(async () => {
+    try {
+      const data = await api.get<QuoteDetail>(`/quotes/${id}`);
+      setQuote(data);
+      setActiveTier((cur) =>
+        cur && data.options.some((o) => o.id === cur)
+          ? cur
+          : (data.options[0]?.id ?? null),
+      );
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load this quotation.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     load();
     api.get<PricingSettings>('/settings/pricing').then(setSettings).catch(() => {});
   }, [load]);
 
-  async function act<T>(fn: () => Promise<T>) {
+  async function mutate(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
     try {
       await fn();
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'That did not save.');
+      setError(e instanceof ApiError ? e.message : 'That change did not save.');
     } finally {
       setBusy(false);
     }
@@ -1017,7 +1261,11 @@ export default function QuoteBuilderPage() {
   if (!quote) {
     return (
       <div className="mx-auto max-w-[1180px] px-8 py-8">
-        <Panel className="border-loss-500/40 bg-loss-500/5">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/quotes')}>
+          <ArrowLeft className="size-4" strokeWidth={1.75} />
+          Quotations
+        </Button>
+        <Panel className="mt-4 border-loss-500/40 bg-loss-500/5">
           <PanelBody>
             <p className="text-[13px] text-ink-100">{error ?? 'Not found.'}</p>
           </PanelBody>
@@ -1026,7 +1274,7 @@ export default function QuoteBuilderPage() {
     );
   }
 
-  const active = quote.options.find((o) => o.id === activeId) ?? null;
+  const tier = quote.options.find((o) => o.id === activeTier) ?? null;
   const minMargin = settings?.minMarginPercent ?? 15;
 
   return (
@@ -1045,20 +1293,22 @@ export default function QuoteBuilderPage() {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-semibold tracking-tight text-ink-50">
-              {quote.title || 'Untitled quotation'}
+              {quote.title ?? 'Untitled package'}
             </h1>
-            <Chip>{quote.quoteNumber}</Chip>
+            <Chip className="tabular">{quote.quoteNumber}</Chip>
           </div>
-          <p className="mt-1 text-[13px] text-ink-400">
-            for{' '}
-            <Link
-              href={`/leads/${quote.leadId}`}
-              className="text-signal-400 transition-colors hover:text-signal-300"
-            >
-              {quote.lead.name}
-            </Link>
-            <span className="tabular text-ink-500"> · {quote.lead.phone}</span>
-          </p>
+          {quote.lead && (
+            <p className="mt-1 text-[13px] text-ink-400">
+              for{' '}
+              <Link
+                href={`/leads/${quote.lead.id}`}
+                className="text-signal-400 transition-colors hover:text-signal-300"
+              >
+                {quote.lead.name}
+              </Link>
+              <span className="tabular"> · {quote.lead.phone}</span>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -1068,7 +1318,7 @@ export default function QuoteBuilderPage() {
               disabled={busy}
               aria-label="Quotation status"
               onChange={(e) =>
-                act(() => api.patch(`/quotes/${id}`, { status: e.target.value }))
+                mutate(() => api.patch(`/quotes/${id}`, { status: e.target.value }))
               }
             >
               {QUOTE_STATUSES.map((s) => (
@@ -1078,17 +1328,6 @@ export default function QuoteBuilderPage() {
               ))}
             </Select>
           </div>
-          {quote.status === 'DRAFT' && (
-            <Button
-              disabled={busy || quote.options.length === 0}
-              onClick={() =>
-                act(() => api.patch(`/quotes/${id}`, { status: 'SENT' }))
-              }
-            >
-              <Send className="size-4" strokeWidth={1.75} />
-              Mark as sent
-            </Button>
-          )}
         </div>
       </header>
 
@@ -1101,50 +1340,275 @@ export default function QuoteBuilderPage() {
         </p>
       )}
 
-      {/* Comparison strip — every tier's price and margin at a glance */}
+      {/* Comparison strip — every tier at a glance before you go editing one */}
       <div className="mb-4 flex flex-wrap gap-3">
         {quote.options.map((o) => (
           <TierCard
             key={o.id}
             option={o}
-            active={o.id === activeId}
+            active={o.id === activeTier}
             minMargin={minMargin}
-            onSelect={() => setActiveId(o.id)}
+            onSelect={() => setActiveTier(o.id)}
           />
         ))}
         <AddTier
-          busy={busy}
+          disabled={busy}
           onAdd={(name) =>
-            act(() => api.post(`/quotes/${id}/options`, { name, sortOrder: quote.options.length }))
+            mutate(async () => {
+              const created = await api.post<QuoteOption>(
+                `/quotes/${id}/options`,
+                { name, sortOrder: quote.options.length },
+              );
+              setActiveTier(created.id);
+            })
           }
         />
       </div>
 
-      {!active ? (
+      {!tier ? (
         <Panel>
-          <PanelBody className="py-12 text-center">
+          <PanelBody className="py-14 text-center">
             <p className="text-[13px] text-ink-300">No package tiers yet</p>
             <p className="mt-1 text-[12px] text-ink-500">
-              Add one above — “Standard” is a good first tier. You can copy it
-              later to build Deluxe.
+              Add one above — call it Budget, Standard, Deluxe, whatever you
+              quote.
             </p>
           </PanelBody>
         </Panel>
       ) : (
-        <TierEditor
-          key={active.id}
-          quoteId={quote.id}
-          option={active}
-          busy={busy}
-          minMargin={minMargin}
-          act={act}
-        />
+        <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+          <div className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>{tier.name} — services</PanelTitle>
+                <div className="flex gap-2">
+                  <RatePicker
+                    onPick={(rateId, quantity, units) =>
+                      mutate(() =>
+                        api.post(`/quotes/options/${tier.id}/lines/from-rate`, {
+                          rateId,
+                          quantity,
+                          units,
+                        }),
+                      )
+                    }
+                  />
+                </div>
+              </PanelHeader>
+
+              {tier.lines.length === 0 ? (
+                <PanelBody className="py-10 text-center">
+                  <p className="text-[13px] text-ink-300">No services yet</p>
+                  <p className="mt-1 text-[12px] text-ink-500">
+                    Pull rates from your supplier book, or add a line below.
+                  </p>
+                </PanelBody>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[13px]">
+                    <thead>
+                      <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
+                        <th className="px-4 py-2.5 font-medium">Service</th>
+                        <th className="w-14 px-2 py-2.5 text-center font-medium">
+                          Qty
+                        </th>
+                        <th className="w-14 px-2 py-2.5 text-center font-medium">
+                          Units
+                        </th>
+                        <th className="w-24 px-2 py-2.5 text-right font-medium">
+                          Net each
+                        </th>
+                        <th className="w-24 px-2 py-2.5 text-right font-medium">
+                          Cost
+                        </th>
+                        <th className="w-32 px-2 py-2.5 font-medium">Markup</th>
+                        <th className="w-24 px-2 py-2.5 text-right font-medium">
+                          Sell
+                        </th>
+                        <th className="w-8 px-2 py-2.5" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tier.lines.map((line) => (
+                        <LineRow
+                          key={line.id}
+                          line={line}
+                          busy={busy}
+                          onPatch={(body) =>
+                            mutate(() =>
+                              api.patch(`/quotes/lines/${line.id}`, body),
+                            )
+                          }
+                          onDelete={() =>
+                            mutate(() => api.del(`/quotes/lines/${line.id}`))
+                          }
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="border-t border-ink-800 p-4">
+                <AddLine
+                  disabled={busy}
+                  onAdd={(body) =>
+                    mutate(() =>
+                      api.post(`/quotes/options/${tier.id}/lines`, body),
+                    )
+                  }
+                />
+              </div>
+            </Panel>
+          </div>
+
+          {/* Right rail: the verdict */}
+          <div className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>What you make</PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-4">
+                <MarginRibbon
+                  sell={tier.totalSell}
+                  cost={tier.totalNet}
+                  minMargin={minMargin}
+                />
+
+                <dl className="space-y-2 border-t border-ink-800 pt-3 text-[13px]">
+                  <Fact label="Cost" value={money(tier.totalNet)} />
+                  <Fact label="Sell" value={money(tier.totalSell)} />
+                  <Fact
+                    label="Per person"
+                    value={money(tier.perPersonSell)}
+                  />
+                  <Fact
+                    label="Margin"
+                    value={percent(tier.marginPercent)}
+                    hint="profit ÷ sell"
+                  />
+                  <Fact
+                    label="Markup"
+                    value={percent(tier.markupPercentEffective)}
+                    hint="profit ÷ cost"
+                  />
+                </dl>
+              </PanelBody>
+            </Panel>
+
+            {tier.advisory && (
+              <Panel
+                className={cn(
+                  !tier.advisory.ok && 'border-warn-500/40 bg-warn-500/[0.04]',
+                )}
+              >
+                <PanelHeader>
+                  <PanelTitle>Price check</PanelTitle>
+                  {tier.advisory.ok ? (
+                    <CheckCircle2
+                      className="size-4 text-healthy-400"
+                      strokeWidth={1.75}
+                    />
+                  ) : (
+                    <TriangleAlert
+                      className="size-4 text-warn-400"
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </PanelHeader>
+                <PanelBody className="space-y-2.5">
+                  {tier.advisory.warnings.length === 0 ? (
+                    <p className="text-[12px] text-ink-400">
+                      This price clears your policy.
+                    </p>
+                  ) : (
+                    tier.advisory.warnings.map((w) => (
+                      <p key={w} className="text-[12px] leading-relaxed text-warn-400">
+                        {w}
+                      </p>
+                    ))
+                  )}
+
+                  {tier.advisory.shortfall > 0 && (
+                    <div className="border-t border-ink-800 pt-2.5">
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
+                        Least you should charge
+                      </p>
+                      <p className="tabular mt-0.5 text-[15px] text-ink-100">
+                        {money(tier.advisory.suggestedMinSell)}
+                      </p>
+                      <p className="tabular mt-0.5 text-[11px] text-warn-400">
+                        {money(tier.advisory.shortfall)} short
+                      </p>
+                    </div>
+                  )}
+
+                  {tier.advisory.breakEvenPerFile !== null && (
+                    <p className="tabular border-t border-ink-800 pt-2.5 text-[11px] text-ink-500">
+                      Break-even {money(tier.advisory.breakEvenPerFile)} per file
+                    </p>
+                  )}
+                </PanelBody>
+              </Panel>
+            )}
+
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Tier settings</PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-3">
+                <TierSettings
+                  tier={tier}
+                  busy={busy}
+                  defaultMarkup={settings?.defaultMarkupPercent ?? 20}
+                  onSave={(body) =>
+                    mutate(() => api.patch(`/quotes/options/${tier.id}`, body))
+                  }
+                />
+                <div className="flex gap-2 border-t border-ink-800 pt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    className="flex-1"
+                    onClick={() =>
+                      mutate(async () => {
+                        const copy = await api.post<QuoteOption>(
+                          `/quotes/options/${tier.id}/duplicate`,
+                          { name: `${tier.name} copy` },
+                        );
+                        setActiveTier(copy.id);
+                      })
+                    }
+                  >
+                    <Copy className="size-4" strokeWidth={1.75} />
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!confirm(`Delete the "${tier.name}" tier?`)) return;
+                      mutate(async () => {
+                        await api.del(`/quotes/options/${tier.id}`);
+                        setActiveTier(null);
+                      });
+                    }}
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.75} />
+                  </Button>
+                </div>
+              </PanelBody>
+            </Panel>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ tiers */
+/* ------------------------------------------------------------------ */
 
 function TierCard({
   option,
@@ -1152,44 +1616,32 @@ function TierCard({
   minMargin,
   onSelect,
 }: {
-  option: QuoteOptionRow;
+  option: QuoteOption;
   active: boolean;
   minMargin: number;
   onSelect: () => void;
 }) {
   const health = marginHealth(option.marginPercent, minMargin);
-  const dot =
-    health === 'healthy'
-      ? 'bg-healthy-500'
-      : health === 'warn'
-        ? 'bg-warn-500'
-        : 'bg-loss-500';
-
   return (
     <button
       onClick={onSelect}
       className={cn(
-        'group min-w-[190px] rounded-[10px] border px-4 py-3 text-left',
+        'min-w-[180px] flex-1 rounded-[10px] border px-4 py-3 text-left',
         'transition-[transform,border-color,background-color] duration-200 ease-out',
-        'hover:-translate-y-px',
         active
           ? 'border-signal-500/60 bg-ink-850'
-          : 'border-ink-700 bg-ink-900 hover:border-ink-600',
+          : 'border-ink-700/80 bg-ink-900 hover:-translate-y-px hover:border-ink-600',
       )}
     >
-      <div className="flex items-center gap-1.5">
-        {option.isRecommended && (
-          <Star className="size-3 text-ink-300" strokeWidth={2} fill="currentColor" />
-        )}
-        <span className="text-[13px] font-medium text-ink-100">{option.name}</span>
-        <span className={cn('ml-auto size-1.5 rounded-full', dot)} aria-hidden />
-      </div>
-      <p className="tabular mt-2 text-lg font-semibold leading-none text-ink-50">
+      <span className="text-[13px] font-medium text-ink-100">{option.name}</span>
+      <p className="tabular mt-1 text-[17px] font-semibold text-ink-50">
         {money(option.totalSell)}
       </p>
-      <p className="tabular mt-1.5 text-[11px] text-ink-500">
-        {percent(option.marginPercent)} margin
-        {option.perPersonSell > 0 && ` · ${money(option.perPersonSell)} pp`}
+      <p className="tabular mt-0.5 text-[11px]">
+        <span className={healthText[health]}>
+          {percent(option.marginPercent)}
+        </span>
+        <span className="text-ink-600"> margin · {option.lines.length} lines</span>
       </p>
     </button>
   );
@@ -1197,374 +1649,192 @@ function TierCard({
 
 function AddTier({
   onAdd,
-  busy,
+  disabled,
 }: {
   onAdd: (name: string) => void;
-  busy: boolean;
+  disabled: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
-  if (!open) {
+  if (!adding) {
     return (
       <button
-        onClick={() => setOpen(true)}
-        className="min-w-[150px] rounded-[10px] border border-dashed border-ink-700 px-4 py-3 text-left text-[13px] text-ink-500 transition-colors duration-150 hover:border-ink-600 hover:text-ink-300"
+        onClick={() => setAdding(true)}
+        disabled={disabled}
+        className={cn(
+          'min-w-[150px] rounded-[10px] border border-dashed border-ink-700 px-4 py-3',
+          'text-[13px] text-ink-500 transition-colors duration-150',
+          'hover:border-ink-600 hover:text-ink-300 disabled:opacity-50',
+        )}
       >
-        <Plus className="mb-1 size-4" strokeWidth={1.75} />
-        <span className="block">Add a tier</span>
+        <Plus className="mr-1.5 inline size-4" strokeWidth={1.75} />
+        Add tier
       </button>
     );
   }
 
   return (
-    <div className="flex min-w-[210px] flex-col gap-2 rounded-[10px] border border-ink-700 bg-ink-900 p-3">
+    <div className="flex min-w-[220px] items-center gap-2 rounded-[10px] border border-ink-700 bg-ink-900 px-3 py-2">
       <Input
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
+        placeholder="Deluxe"
+        className="h-8"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && name.trim()) {
             onAdd(name.trim());
             setName('');
-            setOpen(false);
+            setAdding(false);
           }
-          if (e.key === 'Escape') setOpen(false);
+          if (e.key === 'Escape') setAdding(false);
         }}
-        placeholder="Budget / Deluxe"
       />
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          disabled={busy || !name.trim()}
-          onClick={() => {
-            onAdd(name.trim());
-            setName('');
-            setOpen(false);
-          }}
-        >
-          Add
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
+      <Button
+        size="sm"
+        disabled={!name.trim()}
+        onClick={() => {
+          onAdd(name.trim());
+          setName('');
+          setAdding(false);
+        }}
+      >
+        Add
+      </Button>
     </div>
   );
 }
 
-/* ----------------------------------------------------------------- editor */
-
-function TierEditor({
-  quoteId,
-  option,
-  busy,
-  minMargin,
-  act,
+/** Numbers commit on blur — typing "6200" should not fire four saves. */
+function NumCell({
+  value,
+  disabled,
+  onCommit,
+  className,
 }: {
-  quoteId: string;
-  option: QuoteOptionRow;
-  busy: boolean;
-  minMargin: number;
-  act: <T>(fn: () => Promise<T>) => Promise<void>;
+  value: number;
+  disabled: boolean;
+  onCommit: (v: number) => void;
+  className?: string;
 }) {
-  const advisory = option.advisory;
-  const showWarnings =
-    advisory && advisory.warnings.filter((w) => !w.startsWith('Break-even not')).length > 0;
+  const [local, setLocal] = useState(String(value));
+  useEffect(() => setLocal(String(value)), [value]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-      <div className="space-y-4">
-        <Panel>
-          <PanelHeader>
-            <PanelTitle>{option.name} — services</PanelTitle>
-            <span className="tabular text-[11px] text-ink-500">
-              {option.lines.length} line{option.lines.length === 1 ? '' : 's'}
-            </span>
-          </PanelHeader>
-
-          {option.lines.length === 0 ? (
-            <PanelBody className="py-8 text-center">
-              <p className="text-[13px] text-ink-300">No services yet</p>
-              <p className="mt-1 text-[12px] text-ink-500">
-                Pull in a contracted rate below, or add a line by hand.
-              </p>
-            </PanelBody>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
-                    <th className="px-4 py-2.5 font-medium">Service</th>
-                    <th className="px-2 py-2.5 text-center font-medium">Qty</th>
-                    <th className="px-2 py-2.5 text-center font-medium">Units</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Net each</th>
-                    <th className="px-2 py-2.5 font-medium">Markup</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Cost</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Sell</th>
-                    <th className="px-2 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {option.lines.map((line) => (
-                    <LineRow key={line.id} line={line} busy={busy} act={act} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
-
-        <Panel>
-          <PanelHeader>
-            <PanelTitle>Add from your supplier rates</PanelTitle>
-          </PanelHeader>
-          <PanelBody>
-            <RatePicker
-              busy={busy}
-              onPick={(rate: VendorRateRow, quantity, units) =>
-                act(() =>
-                  api.post(`/quotes/options/${option.id}/lines/from-rate`, {
-                    rateId: rate.id,
-                    quantity,
-                    units,
-                  }),
-                )
-              }
-            />
-          </PanelBody>
-        </Panel>
-
-        <ManualLine optionId={option.id} busy={busy} act={act} />
-      </div>
-
-      {/* Right rail: the verdict */}
-      <div className="space-y-4">
-        <Panel className="sticky top-6">
-          <PanelHeader>
-            <PanelTitle>What this tier makes</PanelTitle>
-          </PanelHeader>
-          <PanelBody className="space-y-4">
-            <MarginRibbon
-              sell={option.totalSell}
-              cost={option.totalNet}
-              minMargin={minMargin}
-            />
-
-            <dl className="space-y-2 border-t border-ink-800 pt-3 text-[13px]">
-              <Line label="Cost" value={money(option.totalNet)} />
-              <Line label="Sell" value={money(option.totalSell)} strong />
-              <Line
-                label="Margin"
-                value={`${percent(option.marginPercent)}`}
-                hint="profit ÷ sell"
-              />
-              <Line
-                label="Markup"
-                value={`${percent(option.markupPercentEffective)}`}
-                hint="profit ÷ cost"
-              />
-              {option.perPersonSell > 0 && (
-                <Line label="Per person" value={money(option.perPersonSell)} />
-              )}
-            </dl>
-
-            {showWarnings && advisory && (
-              <div className="rounded-md border border-warn-500/40 bg-warn-500/10 p-3">
-                <div className="flex items-center gap-2">
-                  <TriangleAlert className="size-3.5 text-warn-400" strokeWidth={2} />
-                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-warn-400">
-                    Priced too low
-                  </span>
-                </div>
-                <ul className="mt-2 space-y-1">
-                  {advisory.warnings
-                    .filter((w) => !w.startsWith('Break-even not'))
-                    .map((w) => (
-                      <li key={w} className="text-[12px] leading-relaxed text-ink-300">
-                        {w}
-                      </li>
-                    ))}
-                </ul>
-                {advisory.shortfall > 0 && (
-                  <p className="tabular mt-2 border-t border-warn-500/20 pt-2 text-[12px] text-warn-400">
-                    Sell at {money(advisory.suggestedMinSell)} — add{' '}
-                    {money(advisory.shortfall)}
-                  </p>
-                )}
-              </div>
-            )}
-          </PanelBody>
-        </Panel>
-
-        <Panel>
-          <PanelHeader>
-            <PanelTitle>Tier setup</PanelTitle>
-          </PanelHeader>
-          <PanelBody className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <NumField
-                label="Adults"
-                value={option.adults}
-                busy={busy}
-                onSave={(v) =>
-                  act(() => api.patch(`/quotes/options/${option.id}`, { adults: v }))
-                }
-              />
-              <NumField
-                label="Children"
-                value={option.children}
-                busy={busy}
-                onSave={(v) =>
-                  act(() => api.patch(`/quotes/options/${option.id}`, { children: v }))
-                }
-              />
-              <NumField
-                label="Nights"
-                value={option.nights}
-                busy={busy}
-                onSave={(v) =>
-                  act(() => api.patch(`/quotes/options/${option.id}`, { nights: v }))
-                }
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Tier markup override</Label>
-              <Input
-                type="number"
-                defaultValue={option.markupPercent ?? ''}
-                placeholder="Uses your default"
-                disabled={busy}
-                onBlur={(e) => {
-                  const raw = e.target.value.trim();
-                  const next = raw === '' ? null : Number(raw);
-                  if (next !== option.markupPercent) {
-                    act(() =>
-                      api.patch(`/quotes/options/${option.id}`, {
-                        markupPercent: next,
-                      }),
-                    );
-                  }
-                }}
-              />
-              <p className="text-[11px] text-ink-600">
-                Applies to every line set to “Default markup”.
-              </p>
-            </div>
-
-            <div className="flex gap-2 border-t border-ink-800 pt-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  act(() =>
-                    api.post(`/quotes/options/${option.id}/duplicate`, {
-                      name: `${option.name} copy`,
-                    }),
-                  )
-                }
-              >
-                <Copy className="size-4" strokeWidth={1.75} />
-                Duplicate
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => {
-                  if (confirm(`Delete the “${option.name}” tier and its lines?`)) {
-                    act(() => api.del(`/quotes/options/${option.id}`));
-                  }
-                }}
-              >
-                <Trash2 className="size-4" strokeWidth={1.75} />
-                Delete
-              </Button>
-            </div>
-          </PanelBody>
-        </Panel>
-      </div>
-    </div>
+    <input
+      type="number"
+      min={0}
+      value={local}
+      disabled={disabled}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        const n = Number(local);
+        if (!Number.isNaN(n) && n !== value) onCommit(n);
+        else setLocal(String(value));
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      className={cn(
+        'tabular h-7 w-full rounded border border-transparent bg-transparent px-1.5 text-[13px] text-ink-100',
+        'transition-[border-color,background-color] duration-150',
+        'hover:border-ink-700 hover:bg-ink-950/40',
+        'focus:border-signal-500 focus:bg-ink-950 focus:outline-none',
+        className,
+      )}
+    />
   );
 }
 
 function LineRow({
   line,
   busy,
-  act,
+  onPatch,
+  onDelete,
 }: {
-  line: QuoteLineRow;
+  line: QuoteLine;
   busy: boolean;
-  act: <T>(fn: () => Promise<T>) => Promise<void>;
+  onPatch: (body: Record<string, unknown>) => void;
+  onDelete: () => void;
 }) {
-  function save(body: Record<string, unknown>) {
-    act(() => api.patch(`/quotes/lines/${line.id}`, body));
-  }
+  const [desc, setDesc] = useState(line.description);
+  useEffect(() => setDesc(line.description), [line.description]);
 
   return (
-    <tr className="group border-b border-ink-800/60 transition-colors last:border-0 hover:bg-ink-850/60">
-      <td className="px-4 py-2.5">
-        <p className="text-ink-100">{line.description}</p>
-        <Chip className="mt-1">{humanise(line.serviceType)}</Chip>
+    <tr className="group border-b border-ink-800/60 last:border-0 hover:bg-ink-850/60">
+      <td className="px-4 py-2">
+        <input
+          value={desc}
+          disabled={busy}
+          onChange={(e) => setDesc(e.target.value)}
+          onBlur={() =>
+            desc !== line.description && onPatch({ description: desc })
+          }
+          className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-[13px] text-ink-100 transition-colors hover:border-ink-700 focus:border-signal-500 focus:bg-ink-950 focus:outline-none"
+        />
+        <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-600">
+          {humanise(line.serviceType)}
+        </span>
       </td>
-      <td className="px-2 py-2.5 text-center">
-        <Cell
+      <td className="px-2 py-2">
+        <NumCell
           value={line.quantity}
           disabled={busy}
-          onSave={(v) => save({ quantity: v })}
+          className="text-center"
+          onCommit={(v) => onPatch({ quantity: v })}
         />
       </td>
-      <td className="px-2 py-2.5 text-center">
-        <Cell value={line.units} disabled={busy} onSave={(v) => save({ units: v })} />
-      </td>
-      <td className="px-2 py-2.5 text-right">
-        <Cell
-          value={line.unitNet}
-          width="w-20"
+      <td className="px-2 py-2">
+        <NumCell
+          value={line.units}
           disabled={busy}
-          onSave={(v) => save({ unitNet: v })}
+          className="text-center"
+          onCommit={(v) => onPatch({ units: v })}
         />
       </td>
-      <td className="px-2 py-2.5">
-        <div className="flex items-center gap-1">
+      <td className="px-2 py-2">
+        <NumCell
+          value={line.unitNet}
+          disabled={busy}
+          className="text-right"
+          onCommit={(v) => onPatch({ unitNet: v })}
+        />
+      </td>
+      <td className="tabular px-2 py-2 text-right text-ink-400">
+        {money(line.lineNet)}
+      </td>
+      <td className="px-2 py-2">
+        <div className="flex gap-1">
           <select
             value={line.markupMode}
             disabled={busy}
-            onChange={(e) => save({ markupMode: e.target.value })}
-            className="h-8 rounded border border-ink-700 bg-ink-950/60 px-1.5 text-[11px] text-ink-200 focus:border-signal-500 focus:outline-none"
-            aria-label="Markup mode"
+            onChange={(e) => onPatch({ markupMode: e.target.value })}
+            className="h-7 rounded border border-transparent bg-transparent px-1 text-[11px] text-ink-300 transition-colors hover:border-ink-700 focus:border-signal-500 focus:bg-ink-950 focus:outline-none"
           >
             {MARKUP_MODES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
+              <option key={m} value={m}>
+                {m === 'INHERIT' ? 'Auto' : humanise(m)}
               </option>
             ))}
           </select>
           {line.markupMode !== 'INHERIT' && (
-            <Cell
+            <NumCell
               value={line.markupValue ?? 0}
-              width="w-16"
               disabled={busy}
-              title={MARKUP_HINT[line.markupMode]}
-              onSave={(v) => save({ markupValue: v })}
+              className="w-16 text-right"
+              onCommit={(v) => onPatch({ markupValue: v })}
             />
           )}
         </div>
       </td>
-      <td className="tabular px-2 py-2.5 text-right text-ink-400">
-        {money(line.lineNet)}
-      </td>
-      <td className="tabular px-2 py-2.5 text-right font-medium text-ink-100">
+      <td className="tabular px-2 py-2 text-right text-ink-100">
         {money(line.lineSell)}
       </td>
-      <td className="px-2 py-2.5">
+      <td className="px-2 py-2">
         <button
+          onClick={onDelete}
           disabled={busy}
-          onClick={() => act(() => api.del(`/quotes/lines/${line.id}`))}
-          className="rounded p-1 text-ink-600 opacity-0 transition-[opacity,color] duration-150 hover:text-loss-400 focus-visible:opacity-100 group-hover:opacity-100"
           aria-label={`Remove ${line.description}`}
+          className="rounded p-1 text-ink-600 opacity-0 transition-[opacity,color,background-color] duration-150 group-hover:opacity-100 hover:bg-ink-800 hover:text-loss-400 focus:opacity-100"
         >
           <Trash2 className="size-3.5" strokeWidth={1.75} />
         </button>
@@ -1573,220 +1843,229 @@ function LineRow({
   );
 }
 
-function ManualLine({
-  optionId,
-  busy,
-  act,
+function AddLine({
+  onAdd,
+  disabled,
 }: {
-  optionId: string;
-  busy: boolean;
-  act: <T>(fn: () => Promise<T>) => Promise<void>;
+  onAdd: (body: Record<string, unknown>) => void;
+  disabled: boolean;
 }) {
   const [serviceType, setServiceType] = useState('HOTEL');
   const [description, setDescription] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [units, setUnits] = useState(1);
-  const [unitNet, setUnitNet] = useState(0);
+  const [quantity, setQuantity] = useState('1');
+  const [units, setUnits] = useState('1');
+  const [unitNet, setUnitNet] = useState('');
 
-  const valid = description.trim().length > 0 && unitNet >= 0;
-
-  function add() {
-    act(() =>
-      api.post(`/quotes/options/${optionId}/lines`, {
-        serviceType,
-        description: description.trim(),
-        quantity,
-        units,
-        unitNet,
-      }),
-    ).then(() => {
-      setDescription('');
-      setUnitNet(0);
+  function submit() {
+    if (!description.trim() || !unitNet) return;
+    onAdd({
+      serviceType,
+      description: description.trim(),
+      quantity: Number(quantity) || 1,
+      units: Number(units) || 1,
+      unitNet: Number(unitNet) || 0,
     });
+    setDescription('');
+    setUnitNet('');
+    setQuantity('1');
+    setUnits('1');
   }
 
   return (
-    <Panel>
-      <PanelHeader>
-        <PanelTitle>Add a line by hand</PanelTitle>
-      </PanelHeader>
-      <PanelBody>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-[130px] space-y-1.5">
-            <Label>Type</Label>
-            <Select
-              value={serviceType}
-              onChange={(e) => setServiceType(e.target.value)}
-            >
-              {SERVICE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {humanise(t)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="min-w-[200px] flex-1 space-y-1.5">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && valid && add()}
-              placeholder="Shikara ride, 1 hour"
-            />
-          </div>
-          <div className="w-[70px] space-y-1.5">
-            <Label>Qty</Label>
-            <Input
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              className="tabular text-center"
-            />
-          </div>
-          <div className="w-[70px] space-y-1.5">
-            <Label>Units</Label>
-            <Input
-              type="number"
-              min={1}
-              value={units}
-              onChange={(e) => setUnits(Math.max(1, Number(e.target.value)))}
-              className="tabular text-center"
-            />
-          </div>
-          <div className="w-[110px] space-y-1.5">
-            <Label>Net each</Label>
-            <Input
-              type="number"
-              min={0}
-              value={unitNet}
-              onChange={(e) => setUnitNet(Math.max(0, Number(e.target.value)))}
-              className="tabular text-right"
-            />
-          </div>
-          <Button onClick={add} disabled={busy || !valid}>
-            <Plus className="size-4" strokeWidth={1.75} />
-            Add
-          </Button>
-        </div>
-      </PanelBody>
-    </Panel>
-  );
-}
-
-/* ------------------------------------------------------------------ atoms */
-
-/**
- * Inline numeric cell. Commits on blur or Enter, reverts on Escape —
- * the server recalculates and the returned totals win.
- */
-function Cell({
-  value,
-  onSave,
-  disabled,
-  width = 'w-14',
-  title,
-}: {
-  value: number;
-  onSave: (v: number) => void;
-  disabled?: boolean;
-  width?: string;
-  title?: string;
-}) {
-  const [draft, setDraft] = useState(String(value));
-
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
-
-  return (
-    <input
-      type="number"
-      title={title}
-      value={draft}
-      disabled={disabled}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        const n = Number(draft);
-        if (!Number.isNaN(n) && n !== value) onSave(n);
-        else setDraft(String(value));
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        if (e.key === 'Escape') {
-          setDraft(String(value));
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
-      className={cn(
-        'tabular h-8 rounded border border-transparent bg-transparent px-1.5 text-center text-[12px] text-ink-200',
-        'transition-[border-color,background-color] duration-150',
-        'hover:border-ink-700 hover:bg-ink-950/60',
-        'focus:border-signal-500 focus:bg-ink-950 focus:outline-none',
-        width,
-      )}
-    />
-  );
-}
-
-function NumField({
-  label,
-  value,
-  onSave,
-  busy,
-}: {
-  label: string;
-  value: number;
-  onSave: (v: number) => void;
-  busy: boolean;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input
-        type="number"
-        min={0}
-        defaultValue={value}
-        disabled={busy}
-        className="tabular text-center"
-        onBlur={(e) => {
-          const n = Number(e.target.value);
-          if (!Number.isNaN(n) && n !== value) onSave(n);
-        }}
-      />
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="w-[128px] space-y-1">
+        <Label htmlFor="svc">Type</Label>
+        <Select
+          id="svc"
+          value={serviceType}
+          onChange={(e) => setServiceType(e.target.value)}
+        >
+          {SERVICE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {humanise(t)}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="min-w-[180px] flex-1 space-y-1">
+        <Label htmlFor="desc">Description</Label>
+        <Input
+          id="desc"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Srinagar deluxe room, MAP"
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
+      </div>
+      <div className="w-[64px] space-y-1">
+        <Label htmlFor="qty">Qty</Label>
+        <Input
+          id="qty"
+          type="number"
+          min={1}
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          className="text-center"
+        />
+      </div>
+      <div className="w-[64px] space-y-1">
+        <Label htmlFor="unt">Units</Label>
+        <Input
+          id="unt"
+          type="number"
+          min={1}
+          value={units}
+          onChange={(e) => setUnits(e.target.value)}
+          className="text-center"
+        />
+      </div>
+      <div className="w-[104px] space-y-1">
+        <Label htmlFor="net">Net each</Label>
+        <Input
+          id="net"
+          type="number"
+          min={0}
+          value={unitNet}
+          onChange={(e) => setUnitNet(e.target.value)}
+          placeholder="6200"
+          className="text-right"
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
+      </div>
+      <Button
+        onClick={submit}
+        disabled={disabled || !description.trim() || !unitNet}
+      >
+        <Plus className="size-4" strokeWidth={1.75} />
+        Add
+      </Button>
     </div>
   );
 }
 
-function Line({
+function TierSettings({
+  tier,
+  busy,
+  defaultMarkup,
+  onSave,
+}: {
+  tier: QuoteOption;
+  busy: boolean;
+  defaultMarkup: number;
+  onSave: (body: Record<string, unknown>) => void;
+}) {
+  const [adults, setAdults] = useState(String(tier.adults));
+  const [children, setChildren] = useState(String(tier.children));
+  const [nights, setNights] = useState(String(tier.nights));
+  const [markup, setMarkup] = useState(
+    tier.markupPercent === null ? '' : String(tier.markupPercent),
+  );
+
+  useEffect(() => {
+    setAdults(String(tier.adults));
+    setChildren(String(tier.children));
+    setNights(String(tier.nights));
+    setMarkup(tier.markupPercent === null ? '' : String(tier.markupPercent));
+  }, [tier]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="ad">Adults</Label>
+          <Input
+            id="ad"
+            type="number"
+            min={1}
+            value={adults}
+            disabled={busy}
+            onChange={(e) => setAdults(e.target.value)}
+            onBlur={() =>
+              Number(adults) !== tier.adults &&
+              onSave({ adults: Number(adults) || 1 })
+            }
+            className="text-center"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="ch">Children</Label>
+          <Input
+            id="ch"
+            type="number"
+            min={0}
+            value={children}
+            disabled={busy}
+            onChange={(e) => setChildren(e.target.value)}
+            onBlur={() =>
+              Number(children) !== tier.children &&
+              onSave({ children: Number(children) || 0 })
+            }
+            className="text-center"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="ni">Nights</Label>
+          <Input
+            id="ni"
+            type="number"
+            min={0}
+            value={nights}
+            disabled={busy}
+            onChange={(e) => setNights(e.target.value)}
+            onBlur={() =>
+              Number(nights) !== tier.nights &&
+              onSave({ nights: Number(nights) || 0 })
+            }
+            className="text-center"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="mk">Markup override</Label>
+        <Input
+          id="mk"
+          type="number"
+          min={0}
+          value={markup}
+          disabled={busy}
+          placeholder={`Auto (${defaultMarkup}%)`}
+          onChange={(e) => setMarkup(e.target.value)}
+          onBlur={() => {
+            const v = markup === '' ? null : Number(markup);
+            if (v !== tier.markupPercent) onSave({ markupPercent: v });
+          }}
+        />
+        <p className="text-[11px] leading-relaxed text-ink-600">
+          Leave blank to use your per-service defaults. Set a number to apply it
+          to every line in this tier that is on Auto.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Fact({
   label,
   value,
-  strong,
   hint,
 }: {
   label: string;
   value: string;
-  strong?: boolean;
   hint?: string;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-[11px] uppercase tracking-[0.08em] text-ink-500" title={hint}>
+      <dt className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
         {label}
+        {hint && <span className="ml-1 normal-case text-ink-600">({hint})</span>}
       </dt>
-      <dd
-        className={cn(
-          'tabular',
-          strong ? 'text-[15px] font-semibold text-ink-50' : 'text-ink-200',
-        )}
-      >
-        {value}
-      </dd>
+      <dd className="tabular text-ink-100">{value}</dd>
     </div>
   );
 }
 GLITZEOF
-ok "wrote 6 files"
+ok "wrote 7 files"
 
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
   say "Production build (type-checks everything)"
@@ -1798,7 +2077,7 @@ say "Committing"
 cd ..
 if git rev-parse --git-dir >/dev/null 2>&1; then
   git add -A
-  git commit -qm "Phase 9: quotation builder with tiers, rate picker and live margin" || warn "commit skipped"
+  git commit -qm "Phase 9: quotation builder — tiers, line editing, live margin, price check" || warn "commit skipped"
   ok "committed"
 else
   warn "no git repo at project root — skipping commit"
@@ -1807,40 +2086,37 @@ fi
 say "PHASE 9 COMPLETE"
 cat << 'GLITZEOF'
 
-Before this is useful, set your commercial policy once — the advisory is only
-as good as these numbers:
+Run both servers, then walk the whole flow end to end:
 
-  Open http://localhost:3001 and sign in, then from Git Bash:
+  cd backend  && npm run start:dev     # :3000
+  cd frontend && npm run dev           # :3001
 
-    LOGIN=$(curl -s -X POST http://localhost:3000/api/auth/login \
-      -H "Content-Type: application/json" \
-      -d '{"email":"admin@glitz.local","password":"YOUR-PASSWORD"}')
-    TOKEN=$(echo "$LOGIN" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+  1. Set your commercial policy first — the price check is only as good as
+     these numbers:  http://localhost:3001  ->  or via curl:
 
-    curl -X PATCH http://localhost:3000/api/settings/pricing \
-      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-      -d '{"defaultMarkupPercent":20,"hotelMarkupPercent":18,
-           "transportMarkupPercent":30,"minMarginPercent":15,
-           "monthlyOverhead":120000,"filesPerMonth":25,"roundTo":50}'
+     curl -X PATCH http://localhost:3000/api/settings/pricing \
+       -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+       -d '{"defaultMarkupPercent":20,"hotelMarkupPercent":18,
+            "transportMarkupPercent":30,"minMarginPercent":15,
+            "monthlyOverhead":120000,"filesPerMonth":25,"roundTo":50}'
 
-  monthlyOverhead and filesPerMonth are yours to be honest about — office,
-  salaries, ad spend, divided by files you actually close. That is what makes
-  "this quote does not cover your break-even" a real warning instead of noise.
+  2. Open a lead -> "Build quotation" -> create.
 
-Then try the flow:
+  3. In the builder:
+     - Add a line: Hotel, "Srinagar deluxe MAP", qty 2, units 3, net 6200
+     - Watch the right rail: margin and markup are DIFFERENT numbers
+     - Add transport: qty 1, units 6, net 3500 (picks up your 30% default)
+     - Change one line's markup to Fixed 900 — only that line changes
+     - Duplicate the tier, rename it Deluxe, swap the hotel for a costlier one
+     - Compare both tiers in the strip at the top
 
-  1. /leads -> open a lead -> "Build quotation"
-  2. Add a tier called "Standard"
-  3. Search your supplier rates (city "Srinagar") and add 2 rooms x 3 nights.
-     No rates yet? Add a hotel and its rates under Suppliers first, or use
-     "Add a line by hand".
-  4. Watch the ribbon and margin update as you change quantities
-  5. Set one line's markup to "Set sell price" and type a low number — the
-     advisory should turn amber and tell you what to charge instead
-  6. Duplicate the tier, rename it "Deluxe", swap in a better hotel
+  4. Now underprice something on purpose: set a line's markup mode to Manual
+     and type a sell price barely above cost. The price check turns amber and
+     tells you the least you should charge and how far short you are.
 
-A note on what is NOT here yet: the client-facing PDF. That is next, using
-@react-pdf/renderer — it renders without a headless browser, so it deploys to
-Vercel cleanly where Puppeteer does not.
+If "From supplier rates" finds nothing, you have no vendors yet — add a hotel
+and a rate via the API (see phase-4.sh notes) and it will populate.
+
+Still to come: the supplier screens, the booking desk, and the quotation PDF.
 
 GLITZEOF

@@ -7,19 +7,17 @@ import {
   ArrowLeft,
   Copy,
   Plus,
-  Send,
   Trash2,
   TriangleAlert,
-  Star,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   api,
   ApiError,
-  type PricingSettings,
   type QuoteDetail,
-  type QuoteLineRow,
-  type QuoteOptionRow,
-  type VendorRateRow,
+  type QuoteLine,
+  type QuoteOption,
+  type PricingSettings,
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
@@ -28,15 +26,29 @@ import { Select } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
 import { MarginRibbon } from '@/components/margin-ribbon';
 import { RatePicker } from '@/components/rate-picker';
-import {
-  MARKUP_HINT,
-  MARKUP_MODES,
-  QUOTE_STATUSES,
-  SERVICE_TYPES,
-  humanise,
-} from '@/lib/constants';
-import { marginHealth, money, percent } from '@/lib/format';
+import { money, percent, marginHealth, healthText } from '@/lib/format';
+import { humanise } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+
+const SERVICE_TYPES = [
+  'HOTEL',
+  'TRANSPORT',
+  'ACTIVITY',
+  'FLIGHT',
+  'GUIDE',
+  'MEAL',
+  'PERMIT',
+  'MISC',
+];
+const MARKUP_MODES = ['INHERIT', 'PERCENT', 'FIXED', 'MANUAL'];
+const QUOTE_STATUSES = [
+  'DRAFT',
+  'SENT',
+  'ACCEPTED',
+  'REJECTED',
+  'EXPIRED',
+  'REVISED',
+];
 
 export default function QuoteBuilderPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,44 +56,45 @@ export default function QuoteBuilderPage() {
 
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [settings, setSettings] = useState<PricingSettings | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeTier, setActiveTier] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(
-    async (keepActive = true) => {
-      try {
-        const data = await api.get<QuoteDetail>(`/quotes/${id}`);
-        setQuote(data);
-        setActiveId((prev) => {
-          if (keepActive && prev && data.options.some((o) => o.id === prev)) {
-            return prev;
-          }
-          return data.options[0]?.id ?? null;
-        });
-      } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Could not load this quotation.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [id],
-  );
+  /**
+   * The server owns the pricing chain (line -> option -> totals), so every
+   * mutation refetches rather than patching local state. Slightly chattier,
+   * but the margin you see is always the margin the server computed.
+   */
+  const load = useCallback(async () => {
+    try {
+      const data = await api.get<QuoteDetail>(`/quotes/${id}`);
+      setQuote(data);
+      setActiveTier((cur) =>
+        cur && data.options.some((o) => o.id === cur)
+          ? cur
+          : (data.options[0]?.id ?? null),
+      );
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load this quotation.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     load();
     api.get<PricingSettings>('/settings/pricing').then(setSettings).catch(() => {});
   }, [load]);
 
-  async function act<T>(fn: () => Promise<T>) {
+  async function mutate(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
     try {
       await fn();
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'That did not save.');
+      setError(e instanceof ApiError ? e.message : 'That change did not save.');
     } finally {
       setBusy(false);
     }
@@ -98,7 +111,11 @@ export default function QuoteBuilderPage() {
   if (!quote) {
     return (
       <div className="mx-auto max-w-[1180px] px-8 py-8">
-        <Panel className="border-loss-500/40 bg-loss-500/5">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/quotes')}>
+          <ArrowLeft className="size-4" strokeWidth={1.75} />
+          Quotations
+        </Button>
+        <Panel className="mt-4 border-loss-500/40 bg-loss-500/5">
           <PanelBody>
             <p className="text-[13px] text-ink-100">{error ?? 'Not found.'}</p>
           </PanelBody>
@@ -107,7 +124,7 @@ export default function QuoteBuilderPage() {
     );
   }
 
-  const active = quote.options.find((o) => o.id === activeId) ?? null;
+  const tier = quote.options.find((o) => o.id === activeTier) ?? null;
   const minMargin = settings?.minMarginPercent ?? 15;
 
   return (
@@ -126,20 +143,22 @@ export default function QuoteBuilderPage() {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-semibold tracking-tight text-ink-50">
-              {quote.title || 'Untitled quotation'}
+              {quote.title ?? 'Untitled package'}
             </h1>
-            <Chip>{quote.quoteNumber}</Chip>
+            <Chip className="tabular">{quote.quoteNumber}</Chip>
           </div>
-          <p className="mt-1 text-[13px] text-ink-400">
-            for{' '}
-            <Link
-              href={`/leads/${quote.leadId}`}
-              className="text-signal-400 transition-colors hover:text-signal-300"
-            >
-              {quote.lead.name}
-            </Link>
-            <span className="tabular text-ink-500"> · {quote.lead.phone}</span>
-          </p>
+          {quote.lead && (
+            <p className="mt-1 text-[13px] text-ink-400">
+              for{' '}
+              <Link
+                href={`/leads/${quote.lead.id}`}
+                className="text-signal-400 transition-colors hover:text-signal-300"
+              >
+                {quote.lead.name}
+              </Link>
+              <span className="tabular"> · {quote.lead.phone}</span>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -149,7 +168,7 @@ export default function QuoteBuilderPage() {
               disabled={busy}
               aria-label="Quotation status"
               onChange={(e) =>
-                act(() => api.patch(`/quotes/${id}`, { status: e.target.value }))
+                mutate(() => api.patch(`/quotes/${id}`, { status: e.target.value }))
               }
             >
               {QUOTE_STATUSES.map((s) => (
@@ -159,17 +178,6 @@ export default function QuoteBuilderPage() {
               ))}
             </Select>
           </div>
-          {quote.status === 'DRAFT' && (
-            <Button
-              disabled={busy || quote.options.length === 0}
-              onClick={() =>
-                act(() => api.patch(`/quotes/${id}`, { status: 'SENT' }))
-              }
-            >
-              <Send className="size-4" strokeWidth={1.75} />
-              Mark as sent
-            </Button>
-          )}
         </div>
       </header>
 
@@ -182,50 +190,275 @@ export default function QuoteBuilderPage() {
         </p>
       )}
 
-      {/* Comparison strip — every tier's price and margin at a glance */}
+      {/* Comparison strip — every tier at a glance before you go editing one */}
       <div className="mb-4 flex flex-wrap gap-3">
         {quote.options.map((o) => (
           <TierCard
             key={o.id}
             option={o}
-            active={o.id === activeId}
+            active={o.id === activeTier}
             minMargin={minMargin}
-            onSelect={() => setActiveId(o.id)}
+            onSelect={() => setActiveTier(o.id)}
           />
         ))}
         <AddTier
-          busy={busy}
+          disabled={busy}
           onAdd={(name) =>
-            act(() => api.post(`/quotes/${id}/options`, { name, sortOrder: quote.options.length }))
+            mutate(async () => {
+              const created = await api.post<QuoteOption>(
+                `/quotes/${id}/options`,
+                { name, sortOrder: quote.options.length },
+              );
+              setActiveTier(created.id);
+            })
           }
         />
       </div>
 
-      {!active ? (
+      {!tier ? (
         <Panel>
-          <PanelBody className="py-12 text-center">
+          <PanelBody className="py-14 text-center">
             <p className="text-[13px] text-ink-300">No package tiers yet</p>
             <p className="mt-1 text-[12px] text-ink-500">
-              Add one above — “Standard” is a good first tier. You can copy it
-              later to build Deluxe.
+              Add one above — call it Budget, Standard, Deluxe, whatever you
+              quote.
             </p>
           </PanelBody>
         </Panel>
       ) : (
-        <TierEditor
-          key={active.id}
-          quoteId={quote.id}
-          option={active}
-          busy={busy}
-          minMargin={minMargin}
-          act={act}
-        />
+        <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+          <div className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>{tier.name} — services</PanelTitle>
+                <div className="flex gap-2">
+                  <RatePicker
+                    onPick={(rateId, quantity, units) =>
+                      mutate(() =>
+                        api.post(`/quotes/options/${tier.id}/lines/from-rate`, {
+                          rateId,
+                          quantity,
+                          units,
+                        }),
+                      )
+                    }
+                  />
+                </div>
+              </PanelHeader>
+
+              {tier.lines.length === 0 ? (
+                <PanelBody className="py-10 text-center">
+                  <p className="text-[13px] text-ink-300">No services yet</p>
+                  <p className="mt-1 text-[12px] text-ink-500">
+                    Pull rates from your supplier book, or add a line below.
+                  </p>
+                </PanelBody>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[13px]">
+                    <thead>
+                      <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
+                        <th className="px-4 py-2.5 font-medium">Service</th>
+                        <th className="w-14 px-2 py-2.5 text-center font-medium">
+                          Qty
+                        </th>
+                        <th className="w-14 px-2 py-2.5 text-center font-medium">
+                          Units
+                        </th>
+                        <th className="w-24 px-2 py-2.5 text-right font-medium">
+                          Net each
+                        </th>
+                        <th className="w-24 px-2 py-2.5 text-right font-medium">
+                          Cost
+                        </th>
+                        <th className="w-32 px-2 py-2.5 font-medium">Markup</th>
+                        <th className="w-24 px-2 py-2.5 text-right font-medium">
+                          Sell
+                        </th>
+                        <th className="w-8 px-2 py-2.5" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tier.lines.map((line) => (
+                        <LineRow
+                          key={line.id}
+                          line={line}
+                          busy={busy}
+                          onPatch={(body) =>
+                            mutate(() =>
+                              api.patch(`/quotes/lines/${line.id}`, body),
+                            )
+                          }
+                          onDelete={() =>
+                            mutate(() => api.del(`/quotes/lines/${line.id}`))
+                          }
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="border-t border-ink-800 p-4">
+                <AddLine
+                  disabled={busy}
+                  onAdd={(body) =>
+                    mutate(() =>
+                      api.post(`/quotes/options/${tier.id}/lines`, body),
+                    )
+                  }
+                />
+              </div>
+            </Panel>
+          </div>
+
+          {/* Right rail: the verdict */}
+          <div className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>What you make</PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-4">
+                <MarginRibbon
+                  sell={tier.totalSell}
+                  cost={tier.totalNet}
+                  minMargin={minMargin}
+                />
+
+                <dl className="space-y-2 border-t border-ink-800 pt-3 text-[13px]">
+                  <Fact label="Cost" value={money(tier.totalNet)} />
+                  <Fact label="Sell" value={money(tier.totalSell)} />
+                  <Fact
+                    label="Per person"
+                    value={money(tier.perPersonSell)}
+                  />
+                  <Fact
+                    label="Margin"
+                    value={percent(tier.marginPercent)}
+                    hint="profit ÷ sell"
+                  />
+                  <Fact
+                    label="Markup"
+                    value={percent(tier.markupPercentEffective)}
+                    hint="profit ÷ cost"
+                  />
+                </dl>
+              </PanelBody>
+            </Panel>
+
+            {tier.advisory && (
+              <Panel
+                className={cn(
+                  !tier.advisory.ok && 'border-warn-500/40 bg-warn-500/[0.04]',
+                )}
+              >
+                <PanelHeader>
+                  <PanelTitle>Price check</PanelTitle>
+                  {tier.advisory.ok ? (
+                    <CheckCircle2
+                      className="size-4 text-healthy-400"
+                      strokeWidth={1.75}
+                    />
+                  ) : (
+                    <TriangleAlert
+                      className="size-4 text-warn-400"
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </PanelHeader>
+                <PanelBody className="space-y-2.5">
+                  {tier.advisory.warnings.length === 0 ? (
+                    <p className="text-[12px] text-ink-400">
+                      This price clears your policy.
+                    </p>
+                  ) : (
+                    tier.advisory.warnings.map((w) => (
+                      <p key={w} className="text-[12px] leading-relaxed text-warn-400">
+                        {w}
+                      </p>
+                    ))
+                  )}
+
+                  {tier.advisory.shortfall > 0 && (
+                    <div className="border-t border-ink-800 pt-2.5">
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
+                        Least you should charge
+                      </p>
+                      <p className="tabular mt-0.5 text-[15px] text-ink-100">
+                        {money(tier.advisory.suggestedMinSell)}
+                      </p>
+                      <p className="tabular mt-0.5 text-[11px] text-warn-400">
+                        {money(tier.advisory.shortfall)} short
+                      </p>
+                    </div>
+                  )}
+
+                  {tier.advisory.breakEvenPerFile !== null && (
+                    <p className="tabular border-t border-ink-800 pt-2.5 text-[11px] text-ink-500">
+                      Break-even {money(tier.advisory.breakEvenPerFile)} per file
+                    </p>
+                  )}
+                </PanelBody>
+              </Panel>
+            )}
+
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Tier settings</PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-3">
+                <TierSettings
+                  tier={tier}
+                  busy={busy}
+                  defaultMarkup={settings?.defaultMarkupPercent ?? 20}
+                  onSave={(body) =>
+                    mutate(() => api.patch(`/quotes/options/${tier.id}`, body))
+                  }
+                />
+                <div className="flex gap-2 border-t border-ink-800 pt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    className="flex-1"
+                    onClick={() =>
+                      mutate(async () => {
+                        const copy = await api.post<QuoteOption>(
+                          `/quotes/options/${tier.id}/duplicate`,
+                          { name: `${tier.name} copy` },
+                        );
+                        setActiveTier(copy.id);
+                      })
+                    }
+                  >
+                    <Copy className="size-4" strokeWidth={1.75} />
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!confirm(`Delete the "${tier.name}" tier?`)) return;
+                      mutate(async () => {
+                        await api.del(`/quotes/options/${tier.id}`);
+                        setActiveTier(null);
+                      });
+                    }}
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.75} />
+                  </Button>
+                </div>
+              </PanelBody>
+            </Panel>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ tiers */
+/* ------------------------------------------------------------------ */
 
 function TierCard({
   option,
@@ -233,44 +466,32 @@ function TierCard({
   minMargin,
   onSelect,
 }: {
-  option: QuoteOptionRow;
+  option: QuoteOption;
   active: boolean;
   minMargin: number;
   onSelect: () => void;
 }) {
   const health = marginHealth(option.marginPercent, minMargin);
-  const dot =
-    health === 'healthy'
-      ? 'bg-healthy-500'
-      : health === 'warn'
-        ? 'bg-warn-500'
-        : 'bg-loss-500';
-
   return (
     <button
       onClick={onSelect}
       className={cn(
-        'group min-w-[190px] rounded-[10px] border px-4 py-3 text-left',
+        'min-w-[180px] flex-1 rounded-[10px] border px-4 py-3 text-left',
         'transition-[transform,border-color,background-color] duration-200 ease-out',
-        'hover:-translate-y-px',
         active
           ? 'border-signal-500/60 bg-ink-850'
-          : 'border-ink-700 bg-ink-900 hover:border-ink-600',
+          : 'border-ink-700/80 bg-ink-900 hover:-translate-y-px hover:border-ink-600',
       )}
     >
-      <div className="flex items-center gap-1.5">
-        {option.isRecommended && (
-          <Star className="size-3 text-ink-300" strokeWidth={2} fill="currentColor" />
-        )}
-        <span className="text-[13px] font-medium text-ink-100">{option.name}</span>
-        <span className={cn('ml-auto size-1.5 rounded-full', dot)} aria-hidden />
-      </div>
-      <p className="tabular mt-2 text-lg font-semibold leading-none text-ink-50">
+      <span className="text-[13px] font-medium text-ink-100">{option.name}</span>
+      <p className="tabular mt-1 text-[17px] font-semibold text-ink-50">
         {money(option.totalSell)}
       </p>
-      <p className="tabular mt-1.5 text-[11px] text-ink-500">
-        {percent(option.marginPercent)} margin
-        {option.perPersonSell > 0 && ` · ${money(option.perPersonSell)} pp`}
+      <p className="tabular mt-0.5 text-[11px]">
+        <span className={healthText[health]}>
+          {percent(option.marginPercent)}
+        </span>
+        <span className="text-ink-600"> margin · {option.lines.length} lines</span>
       </p>
     </button>
   );
@@ -278,374 +499,192 @@ function TierCard({
 
 function AddTier({
   onAdd,
-  busy,
+  disabled,
 }: {
   onAdd: (name: string) => void;
-  busy: boolean;
+  disabled: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
 
-  if (!open) {
+  if (!adding) {
     return (
       <button
-        onClick={() => setOpen(true)}
-        className="min-w-[150px] rounded-[10px] border border-dashed border-ink-700 px-4 py-3 text-left text-[13px] text-ink-500 transition-colors duration-150 hover:border-ink-600 hover:text-ink-300"
+        onClick={() => setAdding(true)}
+        disabled={disabled}
+        className={cn(
+          'min-w-[150px] rounded-[10px] border border-dashed border-ink-700 px-4 py-3',
+          'text-[13px] text-ink-500 transition-colors duration-150',
+          'hover:border-ink-600 hover:text-ink-300 disabled:opacity-50',
+        )}
       >
-        <Plus className="mb-1 size-4" strokeWidth={1.75} />
-        <span className="block">Add a tier</span>
+        <Plus className="mr-1.5 inline size-4" strokeWidth={1.75} />
+        Add tier
       </button>
     );
   }
 
   return (
-    <div className="flex min-w-[210px] flex-col gap-2 rounded-[10px] border border-ink-700 bg-ink-900 p-3">
+    <div className="flex min-w-[220px] items-center gap-2 rounded-[10px] border border-ink-700 bg-ink-900 px-3 py-2">
       <Input
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
+        placeholder="Deluxe"
+        className="h-8"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && name.trim()) {
             onAdd(name.trim());
             setName('');
-            setOpen(false);
+            setAdding(false);
           }
-          if (e.key === 'Escape') setOpen(false);
+          if (e.key === 'Escape') setAdding(false);
         }}
-        placeholder="Budget / Deluxe"
       />
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          disabled={busy || !name.trim()}
-          onClick={() => {
-            onAdd(name.trim());
-            setName('');
-            setOpen(false);
-          }}
-        >
-          Add
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
+      <Button
+        size="sm"
+        disabled={!name.trim()}
+        onClick={() => {
+          onAdd(name.trim());
+          setName('');
+          setAdding(false);
+        }}
+      >
+        Add
+      </Button>
     </div>
   );
 }
 
-/* ----------------------------------------------------------------- editor */
-
-function TierEditor({
-  quoteId,
-  option,
-  busy,
-  minMargin,
-  act,
+/** Numbers commit on blur — typing "6200" should not fire four saves. */
+function NumCell({
+  value,
+  disabled,
+  onCommit,
+  className,
 }: {
-  quoteId: string;
-  option: QuoteOptionRow;
-  busy: boolean;
-  minMargin: number;
-  act: <T>(fn: () => Promise<T>) => Promise<void>;
+  value: number;
+  disabled: boolean;
+  onCommit: (v: number) => void;
+  className?: string;
 }) {
-  const advisory = option.advisory;
-  const showWarnings =
-    advisory && advisory.warnings.filter((w) => !w.startsWith('Break-even not')).length > 0;
+  const [local, setLocal] = useState(String(value));
+  useEffect(() => setLocal(String(value)), [value]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-      <div className="space-y-4">
-        <Panel>
-          <PanelHeader>
-            <PanelTitle>{option.name} — services</PanelTitle>
-            <span className="tabular text-[11px] text-ink-500">
-              {option.lines.length} line{option.lines.length === 1 ? '' : 's'}
-            </span>
-          </PanelHeader>
-
-          {option.lines.length === 0 ? (
-            <PanelBody className="py-8 text-center">
-              <p className="text-[13px] text-ink-300">No services yet</p>
-              <p className="mt-1 text-[12px] text-ink-500">
-                Pull in a contracted rate below, or add a line by hand.
-              </p>
-            </PanelBody>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
-                    <th className="px-4 py-2.5 font-medium">Service</th>
-                    <th className="px-2 py-2.5 text-center font-medium">Qty</th>
-                    <th className="px-2 py-2.5 text-center font-medium">Units</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Net each</th>
-                    <th className="px-2 py-2.5 font-medium">Markup</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Cost</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Sell</th>
-                    <th className="px-2 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {option.lines.map((line) => (
-                    <LineRow key={line.id} line={line} busy={busy} act={act} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
-
-        <Panel>
-          <PanelHeader>
-            <PanelTitle>Add from your supplier rates</PanelTitle>
-          </PanelHeader>
-          <PanelBody>
-            <RatePicker
-              busy={busy}
-              onPick={(rate: VendorRateRow, quantity, units) =>
-                act(() =>
-                  api.post(`/quotes/options/${option.id}/lines/from-rate`, {
-                    rateId: rate.id,
-                    quantity,
-                    units,
-                  }),
-                )
-              }
-            />
-          </PanelBody>
-        </Panel>
-
-        <ManualLine optionId={option.id} busy={busy} act={act} />
-      </div>
-
-      {/* Right rail: the verdict */}
-      <div className="space-y-4">
-        <Panel className="sticky top-6">
-          <PanelHeader>
-            <PanelTitle>What this tier makes</PanelTitle>
-          </PanelHeader>
-          <PanelBody className="space-y-4">
-            <MarginRibbon
-              sell={option.totalSell}
-              cost={option.totalNet}
-              minMargin={minMargin}
-            />
-
-            <dl className="space-y-2 border-t border-ink-800 pt-3 text-[13px]">
-              <Line label="Cost" value={money(option.totalNet)} />
-              <Line label="Sell" value={money(option.totalSell)} strong />
-              <Line
-                label="Margin"
-                value={`${percent(option.marginPercent)}`}
-                hint="profit ÷ sell"
-              />
-              <Line
-                label="Markup"
-                value={`${percent(option.markupPercentEffective)}`}
-                hint="profit ÷ cost"
-              />
-              {option.perPersonSell > 0 && (
-                <Line label="Per person" value={money(option.perPersonSell)} />
-              )}
-            </dl>
-
-            {showWarnings && advisory && (
-              <div className="rounded-md border border-warn-500/40 bg-warn-500/10 p-3">
-                <div className="flex items-center gap-2">
-                  <TriangleAlert className="size-3.5 text-warn-400" strokeWidth={2} />
-                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-warn-400">
-                    Priced too low
-                  </span>
-                </div>
-                <ul className="mt-2 space-y-1">
-                  {advisory.warnings
-                    .filter((w) => !w.startsWith('Break-even not'))
-                    .map((w) => (
-                      <li key={w} className="text-[12px] leading-relaxed text-ink-300">
-                        {w}
-                      </li>
-                    ))}
-                </ul>
-                {advisory.shortfall > 0 && (
-                  <p className="tabular mt-2 border-t border-warn-500/20 pt-2 text-[12px] text-warn-400">
-                    Sell at {money(advisory.suggestedMinSell)} — add{' '}
-                    {money(advisory.shortfall)}
-                  </p>
-                )}
-              </div>
-            )}
-          </PanelBody>
-        </Panel>
-
-        <Panel>
-          <PanelHeader>
-            <PanelTitle>Tier setup</PanelTitle>
-          </PanelHeader>
-          <PanelBody className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <NumField
-                label="Adults"
-                value={option.adults}
-                busy={busy}
-                onSave={(v) =>
-                  act(() => api.patch(`/quotes/options/${option.id}`, { adults: v }))
-                }
-              />
-              <NumField
-                label="Children"
-                value={option.children}
-                busy={busy}
-                onSave={(v) =>
-                  act(() => api.patch(`/quotes/options/${option.id}`, { children: v }))
-                }
-              />
-              <NumField
-                label="Nights"
-                value={option.nights}
-                busy={busy}
-                onSave={(v) =>
-                  act(() => api.patch(`/quotes/options/${option.id}`, { nights: v }))
-                }
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Tier markup override</Label>
-              <Input
-                type="number"
-                defaultValue={option.markupPercent ?? ''}
-                placeholder="Uses your default"
-                disabled={busy}
-                onBlur={(e) => {
-                  const raw = e.target.value.trim();
-                  const next = raw === '' ? null : Number(raw);
-                  if (next !== option.markupPercent) {
-                    act(() =>
-                      api.patch(`/quotes/options/${option.id}`, {
-                        markupPercent: next,
-                      }),
-                    );
-                  }
-                }}
-              />
-              <p className="text-[11px] text-ink-600">
-                Applies to every line set to “Default markup”.
-              </p>
-            </div>
-
-            <div className="flex gap-2 border-t border-ink-800 pt-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  act(() =>
-                    api.post(`/quotes/options/${option.id}/duplicate`, {
-                      name: `${option.name} copy`,
-                    }),
-                  )
-                }
-              >
-                <Copy className="size-4" strokeWidth={1.75} />
-                Duplicate
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => {
-                  if (confirm(`Delete the “${option.name}” tier and its lines?`)) {
-                    act(() => api.del(`/quotes/options/${option.id}`));
-                  }
-                }}
-              >
-                <Trash2 className="size-4" strokeWidth={1.75} />
-                Delete
-              </Button>
-            </div>
-          </PanelBody>
-        </Panel>
-      </div>
-    </div>
+    <input
+      type="number"
+      min={0}
+      value={local}
+      disabled={disabled}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        const n = Number(local);
+        if (!Number.isNaN(n) && n !== value) onCommit(n);
+        else setLocal(String(value));
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      className={cn(
+        'tabular h-7 w-full rounded border border-transparent bg-transparent px-1.5 text-[13px] text-ink-100',
+        'transition-[border-color,background-color] duration-150',
+        'hover:border-ink-700 hover:bg-ink-950/40',
+        'focus:border-signal-500 focus:bg-ink-950 focus:outline-none',
+        className,
+      )}
+    />
   );
 }
 
 function LineRow({
   line,
   busy,
-  act,
+  onPatch,
+  onDelete,
 }: {
-  line: QuoteLineRow;
+  line: QuoteLine;
   busy: boolean;
-  act: <T>(fn: () => Promise<T>) => Promise<void>;
+  onPatch: (body: Record<string, unknown>) => void;
+  onDelete: () => void;
 }) {
-  function save(body: Record<string, unknown>) {
-    act(() => api.patch(`/quotes/lines/${line.id}`, body));
-  }
+  const [desc, setDesc] = useState(line.description);
+  useEffect(() => setDesc(line.description), [line.description]);
 
   return (
-    <tr className="group border-b border-ink-800/60 transition-colors last:border-0 hover:bg-ink-850/60">
-      <td className="px-4 py-2.5">
-        <p className="text-ink-100">{line.description}</p>
-        <Chip className="mt-1">{humanise(line.serviceType)}</Chip>
+    <tr className="group border-b border-ink-800/60 last:border-0 hover:bg-ink-850/60">
+      <td className="px-4 py-2">
+        <input
+          value={desc}
+          disabled={busy}
+          onChange={(e) => setDesc(e.target.value)}
+          onBlur={() =>
+            desc !== line.description && onPatch({ description: desc })
+          }
+          className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-[13px] text-ink-100 transition-colors hover:border-ink-700 focus:border-signal-500 focus:bg-ink-950 focus:outline-none"
+        />
+        <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-600">
+          {humanise(line.serviceType)}
+        </span>
       </td>
-      <td className="px-2 py-2.5 text-center">
-        <Cell
+      <td className="px-2 py-2">
+        <NumCell
           value={line.quantity}
           disabled={busy}
-          onSave={(v) => save({ quantity: v })}
+          className="text-center"
+          onCommit={(v) => onPatch({ quantity: v })}
         />
       </td>
-      <td className="px-2 py-2.5 text-center">
-        <Cell value={line.units} disabled={busy} onSave={(v) => save({ units: v })} />
-      </td>
-      <td className="px-2 py-2.5 text-right">
-        <Cell
-          value={line.unitNet}
-          width="w-20"
+      <td className="px-2 py-2">
+        <NumCell
+          value={line.units}
           disabled={busy}
-          onSave={(v) => save({ unitNet: v })}
+          className="text-center"
+          onCommit={(v) => onPatch({ units: v })}
         />
       </td>
-      <td className="px-2 py-2.5">
-        <div className="flex items-center gap-1">
+      <td className="px-2 py-2">
+        <NumCell
+          value={line.unitNet}
+          disabled={busy}
+          className="text-right"
+          onCommit={(v) => onPatch({ unitNet: v })}
+        />
+      </td>
+      <td className="tabular px-2 py-2 text-right text-ink-400">
+        {money(line.lineNet)}
+      </td>
+      <td className="px-2 py-2">
+        <div className="flex gap-1">
           <select
             value={line.markupMode}
             disabled={busy}
-            onChange={(e) => save({ markupMode: e.target.value })}
-            className="h-8 rounded border border-ink-700 bg-ink-950/60 px-1.5 text-[11px] text-ink-200 focus:border-signal-500 focus:outline-none"
-            aria-label="Markup mode"
+            onChange={(e) => onPatch({ markupMode: e.target.value })}
+            className="h-7 rounded border border-transparent bg-transparent px-1 text-[11px] text-ink-300 transition-colors hover:border-ink-700 focus:border-signal-500 focus:bg-ink-950 focus:outline-none"
           >
             {MARKUP_MODES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
+              <option key={m} value={m}>
+                {m === 'INHERIT' ? 'Auto' : humanise(m)}
               </option>
             ))}
           </select>
           {line.markupMode !== 'INHERIT' && (
-            <Cell
+            <NumCell
               value={line.markupValue ?? 0}
-              width="w-16"
               disabled={busy}
-              title={MARKUP_HINT[line.markupMode]}
-              onSave={(v) => save({ markupValue: v })}
+              className="w-16 text-right"
+              onCommit={(v) => onPatch({ markupValue: v })}
             />
           )}
         </div>
       </td>
-      <td className="tabular px-2 py-2.5 text-right text-ink-400">
-        {money(line.lineNet)}
-      </td>
-      <td className="tabular px-2 py-2.5 text-right font-medium text-ink-100">
+      <td className="tabular px-2 py-2 text-right text-ink-100">
         {money(line.lineSell)}
       </td>
-      <td className="px-2 py-2.5">
+      <td className="px-2 py-2">
         <button
+          onClick={onDelete}
           disabled={busy}
-          onClick={() => act(() => api.del(`/quotes/lines/${line.id}`))}
-          className="rounded p-1 text-ink-600 opacity-0 transition-[opacity,color] duration-150 hover:text-loss-400 focus-visible:opacity-100 group-hover:opacity-100"
           aria-label={`Remove ${line.description}`}
+          className="rounded p-1 text-ink-600 opacity-0 transition-[opacity,color,background-color] duration-150 group-hover:opacity-100 hover:bg-ink-800 hover:text-loss-400 focus:opacity-100"
         >
           <Trash2 className="size-3.5" strokeWidth={1.75} />
         </button>
@@ -654,215 +693,224 @@ function LineRow({
   );
 }
 
-function ManualLine({
-  optionId,
-  busy,
-  act,
+function AddLine({
+  onAdd,
+  disabled,
 }: {
-  optionId: string;
-  busy: boolean;
-  act: <T>(fn: () => Promise<T>) => Promise<void>;
+  onAdd: (body: Record<string, unknown>) => void;
+  disabled: boolean;
 }) {
   const [serviceType, setServiceType] = useState('HOTEL');
   const [description, setDescription] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [units, setUnits] = useState(1);
-  const [unitNet, setUnitNet] = useState(0);
+  const [quantity, setQuantity] = useState('1');
+  const [units, setUnits] = useState('1');
+  const [unitNet, setUnitNet] = useState('');
 
-  const valid = description.trim().length > 0 && unitNet >= 0;
-
-  function add() {
-    act(() =>
-      api.post(`/quotes/options/${optionId}/lines`, {
-        serviceType,
-        description: description.trim(),
-        quantity,
-        units,
-        unitNet,
-      }),
-    ).then(() => {
-      setDescription('');
-      setUnitNet(0);
+  function submit() {
+    if (!description.trim() || !unitNet) return;
+    onAdd({
+      serviceType,
+      description: description.trim(),
+      quantity: Number(quantity) || 1,
+      units: Number(units) || 1,
+      unitNet: Number(unitNet) || 0,
     });
+    setDescription('');
+    setUnitNet('');
+    setQuantity('1');
+    setUnits('1');
   }
 
   return (
-    <Panel>
-      <PanelHeader>
-        <PanelTitle>Add a line by hand</PanelTitle>
-      </PanelHeader>
-      <PanelBody>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-[130px] space-y-1.5">
-            <Label>Type</Label>
-            <Select
-              value={serviceType}
-              onChange={(e) => setServiceType(e.target.value)}
-            >
-              {SERVICE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {humanise(t)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="min-w-[200px] flex-1 space-y-1.5">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && valid && add()}
-              placeholder="Shikara ride, 1 hour"
-            />
-          </div>
-          <div className="w-[70px] space-y-1.5">
-            <Label>Qty</Label>
-            <Input
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              className="tabular text-center"
-            />
-          </div>
-          <div className="w-[70px] space-y-1.5">
-            <Label>Units</Label>
-            <Input
-              type="number"
-              min={1}
-              value={units}
-              onChange={(e) => setUnits(Math.max(1, Number(e.target.value)))}
-              className="tabular text-center"
-            />
-          </div>
-          <div className="w-[110px] space-y-1.5">
-            <Label>Net each</Label>
-            <Input
-              type="number"
-              min={0}
-              value={unitNet}
-              onChange={(e) => setUnitNet(Math.max(0, Number(e.target.value)))}
-              className="tabular text-right"
-            />
-          </div>
-          <Button onClick={add} disabled={busy || !valid}>
-            <Plus className="size-4" strokeWidth={1.75} />
-            Add
-          </Button>
-        </div>
-      </PanelBody>
-    </Panel>
-  );
-}
-
-/* ------------------------------------------------------------------ atoms */
-
-/**
- * Inline numeric cell. Commits on blur or Enter, reverts on Escape —
- * the server recalculates and the returned totals win.
- */
-function Cell({
-  value,
-  onSave,
-  disabled,
-  width = 'w-14',
-  title,
-}: {
-  value: number;
-  onSave: (v: number) => void;
-  disabled?: boolean;
-  width?: string;
-  title?: string;
-}) {
-  const [draft, setDraft] = useState(String(value));
-
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
-
-  return (
-    <input
-      type="number"
-      title={title}
-      value={draft}
-      disabled={disabled}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        const n = Number(draft);
-        if (!Number.isNaN(n) && n !== value) onSave(n);
-        else setDraft(String(value));
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        if (e.key === 'Escape') {
-          setDraft(String(value));
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
-      className={cn(
-        'tabular h-8 rounded border border-transparent bg-transparent px-1.5 text-center text-[12px] text-ink-200',
-        'transition-[border-color,background-color] duration-150',
-        'hover:border-ink-700 hover:bg-ink-950/60',
-        'focus:border-signal-500 focus:bg-ink-950 focus:outline-none',
-        width,
-      )}
-    />
-  );
-}
-
-function NumField({
-  label,
-  value,
-  onSave,
-  busy,
-}: {
-  label: string;
-  value: number;
-  onSave: (v: number) => void;
-  busy: boolean;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input
-        type="number"
-        min={0}
-        defaultValue={value}
-        disabled={busy}
-        className="tabular text-center"
-        onBlur={(e) => {
-          const n = Number(e.target.value);
-          if (!Number.isNaN(n) && n !== value) onSave(n);
-        }}
-      />
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="w-[128px] space-y-1">
+        <Label htmlFor="svc">Type</Label>
+        <Select
+          id="svc"
+          value={serviceType}
+          onChange={(e) => setServiceType(e.target.value)}
+        >
+          {SERVICE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {humanise(t)}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="min-w-[180px] flex-1 space-y-1">
+        <Label htmlFor="desc">Description</Label>
+        <Input
+          id="desc"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Srinagar deluxe room, MAP"
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
+      </div>
+      <div className="w-[64px] space-y-1">
+        <Label htmlFor="qty">Qty</Label>
+        <Input
+          id="qty"
+          type="number"
+          min={1}
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          className="text-center"
+        />
+      </div>
+      <div className="w-[64px] space-y-1">
+        <Label htmlFor="unt">Units</Label>
+        <Input
+          id="unt"
+          type="number"
+          min={1}
+          value={units}
+          onChange={(e) => setUnits(e.target.value)}
+          className="text-center"
+        />
+      </div>
+      <div className="w-[104px] space-y-1">
+        <Label htmlFor="net">Net each</Label>
+        <Input
+          id="net"
+          type="number"
+          min={0}
+          value={unitNet}
+          onChange={(e) => setUnitNet(e.target.value)}
+          placeholder="6200"
+          className="text-right"
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
+      </div>
+      <Button
+        onClick={submit}
+        disabled={disabled || !description.trim() || !unitNet}
+      >
+        <Plus className="size-4" strokeWidth={1.75} />
+        Add
+      </Button>
     </div>
   );
 }
 
-function Line({
+function TierSettings({
+  tier,
+  busy,
+  defaultMarkup,
+  onSave,
+}: {
+  tier: QuoteOption;
+  busy: boolean;
+  defaultMarkup: number;
+  onSave: (body: Record<string, unknown>) => void;
+}) {
+  const [adults, setAdults] = useState(String(tier.adults));
+  const [children, setChildren] = useState(String(tier.children));
+  const [nights, setNights] = useState(String(tier.nights));
+  const [markup, setMarkup] = useState(
+    tier.markupPercent === null ? '' : String(tier.markupPercent),
+  );
+
+  useEffect(() => {
+    setAdults(String(tier.adults));
+    setChildren(String(tier.children));
+    setNights(String(tier.nights));
+    setMarkup(tier.markupPercent === null ? '' : String(tier.markupPercent));
+  }, [tier]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="ad">Adults</Label>
+          <Input
+            id="ad"
+            type="number"
+            min={1}
+            value={adults}
+            disabled={busy}
+            onChange={(e) => setAdults(e.target.value)}
+            onBlur={() =>
+              Number(adults) !== tier.adults &&
+              onSave({ adults: Number(adults) || 1 })
+            }
+            className="text-center"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="ch">Children</Label>
+          <Input
+            id="ch"
+            type="number"
+            min={0}
+            value={children}
+            disabled={busy}
+            onChange={(e) => setChildren(e.target.value)}
+            onBlur={() =>
+              Number(children) !== tier.children &&
+              onSave({ children: Number(children) || 0 })
+            }
+            className="text-center"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="ni">Nights</Label>
+          <Input
+            id="ni"
+            type="number"
+            min={0}
+            value={nights}
+            disabled={busy}
+            onChange={(e) => setNights(e.target.value)}
+            onBlur={() =>
+              Number(nights) !== tier.nights &&
+              onSave({ nights: Number(nights) || 0 })
+            }
+            className="text-center"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="mk">Markup override</Label>
+        <Input
+          id="mk"
+          type="number"
+          min={0}
+          value={markup}
+          disabled={busy}
+          placeholder={`Auto (${defaultMarkup}%)`}
+          onChange={(e) => setMarkup(e.target.value)}
+          onBlur={() => {
+            const v = markup === '' ? null : Number(markup);
+            if (v !== tier.markupPercent) onSave({ markupPercent: v });
+          }}
+        />
+        <p className="text-[11px] leading-relaxed text-ink-600">
+          Leave blank to use your per-service defaults. Set a number to apply it
+          to every line in this tier that is on Auto.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Fact({
   label,
   value,
-  strong,
   hint,
 }: {
   label: string;
   value: string;
-  strong?: boolean;
   hint?: string;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-[11px] uppercase tracking-[0.08em] text-ink-500" title={hint}>
+      <dt className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
         {label}
+        {hint && <span className="ml-1 normal-case text-ink-600">({hint})</span>}
       </dt>
-      <dd
-        className={cn(
-          'tabular',
-          strong ? 'text-[15px] font-semibold text-ink-50' : 'text-ink-200',
-        )}
-      >
-        {value}
-      </dd>
+      <dd className="tabular text-ink-100">{value}</dd>
     </div>
   );
 }

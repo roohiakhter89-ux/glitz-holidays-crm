@@ -184,6 +184,101 @@ export interface LeadDetail extends LeadRow {
   activities: ActivityRow[];
 }
 
+export interface QuoteLine {
+  id: string;
+  serviceType: string;
+  description: string;
+  vendorId: string | null;
+  vendorRateId: string | null;
+  quantity: number;
+  units: number;
+  unitNet: number;
+  markupMode: string;
+  markupValue: number | null;
+  lineNet: number;
+  lineSell: number;
+  sortOrder: number;
+  notes: string | null;
+}
+
+export interface Advisory {
+  breakEvenPerFile: number | null;
+  minSellForPolicy: number;
+  minSellForBreakEven: number | null;
+  suggestedMinSell: number;
+  shortfall: number;
+  ok: boolean;
+  warnings: string[];
+}
+
+export interface QuoteOption {
+  id: string;
+  quoteId: string;
+  name: string;
+  sortOrder: number;
+  isRecommended: boolean;
+  adults: number;
+  children: number;
+  nights: number;
+  markupPercent: number | null;
+  totalNet: number;
+  totalSell: number;
+  totalMargin: number;
+  marginPercent: number;
+  markupPercentEffective: number;
+  perPersonSell: number;
+  lines: QuoteLine[];
+  advisory?: Advisory;
+}
+
+export interface QuoteRow {
+  id: string;
+  quoteNumber: string;
+  title: string | null;
+  status: string;
+  validUntil: string | null;
+  createdAt: string;
+  lead?: {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string | null;
+  } | null;
+  options: QuoteOption[];
+}
+
+export interface QuoteDetail extends QuoteRow {
+  notes: string | null;
+  terms: string | null;
+}
+
+export interface PricingSettings {
+  defaultMarkupPercent: number;
+  minMarginPercent: number;
+  monthlyOverhead: number | null;
+  filesPerMonth: number | null;
+  gstPercent: number;
+  roundTo: number;
+  currency: string;
+}
+
+export interface VendorRateRow {
+  id: string;
+  variant: string;
+  season: string;
+  mealPlan: string | null;
+  rateBasis: string;
+  netRate: number;
+  rackRate: number | null;
+  vendor: {
+    id: string;
+    name: string;
+    type: string;
+    city: string | null;
+    contactRedacted?: boolean;
+  };
+}
+
 export interface UserRow {
   id: string;
   name: string;
