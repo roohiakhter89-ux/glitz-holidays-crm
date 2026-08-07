@@ -11,6 +11,7 @@ import { GenerateSlipDto } from './dto/generate-slip.dto';
 import { CreateInterviewDto } from './dto/create-interview.dto';
 import { UpdateInterviewDto } from './dto/update-interview.dto';
 import { toDateOrNull } from '../common/dates';
+import { withNumberRetry } from '../common/sequence';
 import {
   computeSlip,
   daysInMonth,
@@ -40,6 +41,10 @@ export class HrService {
   }
 
   async createEmployee(dto: CreateEmployeeDto) {
+    return withNumberRetry(() => this.createEmployeeOnce(dto));
+  }
+
+  private async createEmployeeOnce(dto: CreateEmployeeDto) {
     const data: Prisma.EmployeeCreateInput = {
       code: await this.nextEmployeeCode(),
       fullName: dto.fullName,

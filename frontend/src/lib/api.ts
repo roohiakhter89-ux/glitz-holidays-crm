@@ -249,6 +249,13 @@ export interface Advisory {
   warnings: string[];
 }
 
+export interface GstBreakdown {
+  total: number;
+  gstAmount: number;
+  baseAmount: number;
+  gstPercent: number;
+}
+
 export interface QuoteOption {
   id: string;
   quoteId: string;
@@ -267,6 +274,7 @@ export interface QuoteOption {
   perPersonSell: number;
   lines: QuoteLine[];
   advisory?: Advisory;
+  gst?: GstBreakdown;
 }
 
 export interface QuoteRow {
@@ -414,6 +422,7 @@ export interface QuoteOptionRow {
   perPersonSell: number;
   lines: QuoteLineRow[];
   advisory?: Advisory;
+  gst?: GstBreakdown;
 }
 
 export interface QuoteDetail {

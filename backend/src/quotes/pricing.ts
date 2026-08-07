@@ -8,6 +8,14 @@ import { MarkupMode, ServiceType } from '@prisma/client';
  *   markup% = profit / COST   -> ₹10,000 cost + 20% markup = ₹12,000 sell
  *   margin% = profit / SELL   -> that same deal is a 16.7% margin
  * Treating them as interchangeable is how tour operators quietly underprice.
+ *
+ * GST CONVENTION:
+ *   Quoted / booked totals are TAX-INCLUSIVE. What the client sees on the
+ *   quotation is what they pay. On the invoice we split it into the base
+ *   amount and the GST portion so they can claim ITC if applicable.
+ *   Indian tour packages carry 5% GST without ITC by default; if that policy
+ *   ever changes for a specific product, do the split at quote time — never
+ *   layer GST on top at invoice time.
  */
 
 export interface SettingsLike {
@@ -24,6 +32,8 @@ export interface SettingsLike {
   monthlyOverhead?: number | null;
   filesPerMonth?: number | null;
   roundTo: number;
+  /** Inclusive GST rate applied to the client-facing invoice split. */
+  gstPercent?: number;
 }
 
 export interface LineLike {
@@ -125,6 +135,35 @@ export function computeOptionTotals(
     marginPercent: totalSell > 0 ? (totalMargin / totalSell) * 100 : 0,
     markupPercentEffective: totalNet > 0 ? (totalMargin / totalNet) * 100 : 0,
     perPersonSell: pax > 0 ? Math.round(totalSell / pax) : totalSell,
+  };
+}
+
+/**
+ * Split a GST-inclusive total into base + tax portions.
+ * Rounded to whole rupees; any half-rupee difference lands on the base so
+ * the two components always add back to the input.
+ */
+export interface GstBreakdown {
+  /** GST-inclusive total the client pays (identity return). */
+  total: number;
+  /** Portion attributable to GST at the given rate. */
+  gstAmount: number;
+  /** Pre-tax base amount. base + gstAmount === total. */
+  baseAmount: number;
+  gstPercent: number;
+}
+
+export function gstBreakdown(total: number, gstPercent: number): GstBreakdown {
+  if (gstPercent <= 0 || total <= 0) {
+    return { total, gstAmount: 0, baseAmount: total, gstPercent };
+  }
+  // base * (1 + gst/100) = total  =>  base = total / (1 + gst/100)
+  const base = Math.round(total / (1 + gstPercent / 100));
+  return {
+    total,
+    baseAmount: base,
+    gstAmount: total - base,
+    gstPercent,
   };
 }
 

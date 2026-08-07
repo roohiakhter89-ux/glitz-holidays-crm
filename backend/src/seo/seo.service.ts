@@ -210,9 +210,14 @@ async function fetchHtml(url: string): Promise<string> {
 }
 
 /**
- * Google's public PageSpeed Insights v5 API. No key required for low volume,
- * though quota kicks in around ~25 000 queries/day. Category=performance,
- * accessibility, best-practices, seo — one call, four scores.
+ * Google's PageSpeed Insights v5 API. Works keyless at low volume, but a
+ * single site with 4-5 landing pages burns the free per-IP quota fast and
+ * starts returning 429. Setting PAGESPEED_API_KEY in the env lifts that.
+ * Grab a key from https://developers.google.com/speed/docs/insights/v5/get-started
+ * — it's free.
+ *
+ * Category=performance, accessibility, best-practices, seo — one call, four
+ * scores. Mobile strategy because Kashmir traffic skews mobile.
  */
 async function fetchPagespeed(url: string): Promise<PagespeedScores> {
   const endpoint = new URL('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');
@@ -221,6 +226,9 @@ async function fetchPagespeed(url: string): Promise<PagespeedScores> {
     endpoint.searchParams.append('category', c);
   }
   endpoint.searchParams.set('strategy', 'mobile');
+  if (process.env.PAGESPEED_API_KEY) {
+    endpoint.searchParams.set('key', process.env.PAGESPEED_API_KEY);
+  }
 
   const res = await fetch(endpoint.toString(), {
     signal: AbortSignal.timeout(45_000),

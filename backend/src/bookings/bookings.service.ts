@@ -21,6 +21,7 @@ import { QueryBookingsDto } from './dto/query-bookings.dto';
 import { computeBookingFinancials, deriveStatus } from './booking-math';
 import { Actor, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
+import { withNumberRetry } from '../common/sequence';
 
 @Injectable()
 export class BookingsService {
@@ -153,24 +154,28 @@ export class BookingsService {
     if (!lead) throw new NotFoundException('Lead not found');
     await this.assertLeadAccess(leadId, actor);
 
-    const booking = await this.prisma.booking.create({
-      data: {
-        bookingNumber: await this.nextBookingNumber(),
-        leadId,
-        quoteId,
-        quoteOptionId: dto.quoteOptionId ?? null,
-        createdById: userId ?? null,
-        status: BookingStatus.CONFIRMED,
-        packageName,
-        travelStartDate: toDateOrNull(dto.travelStartDate),
-        travelEndDate: toDateOrNull(dto.travelEndDate),
-        adults,
-        children,
-        nights,
-        totalSell,
-        totalNet,
-        notes: dto.notes ?? null,
-      },
+    // Race-safe number + insert. See src/common/sequence.ts.
+    const booking = await withNumberRetry(async () => {
+      const bookingNumber = await this.nextBookingNumber();
+      return this.prisma.booking.create({
+        data: {
+          bookingNumber,
+          leadId,
+          quoteId,
+          quoteOptionId: dto.quoteOptionId ?? null,
+          createdById: userId ?? null,
+          status: BookingStatus.CONFIRMED,
+          packageName,
+          travelStartDate: toDateOrNull(dto.travelStartDate),
+          travelEndDate: toDateOrNull(dto.travelEndDate),
+          adults,
+          children,
+          nights,
+          totalSell,
+          totalNet,
+          notes: dto.notes ?? null,
+        },
+      });
     });
 
     // pipeline side-effects

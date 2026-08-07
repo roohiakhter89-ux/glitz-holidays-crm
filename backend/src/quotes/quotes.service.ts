@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { Actor, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
+import { withNumberRetry } from '../common/sequence';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { CreateOptionDto } from './dto/create-option.dto';
@@ -14,6 +15,7 @@ import {
   advise,
   computeLine,
   computeOptionTotals,
+  gstBreakdown,
   SettingsLike,
 } from './pricing';
 
@@ -142,16 +144,22 @@ export class QuotesService {
     if (!lead) throw new NotFoundException('Lead not found');
     await this.assertLeadAccess(dto.leadId, actor);
 
-    const quote = await this.prisma.quote.create({
-      data: {
-        quoteNumber: await this.nextQuoteNumber(),
-        leadId: dto.leadId,
-        title: dto.title ?? null,
-        validUntil: toDateOrNull(dto.validUntil),
-        notes: dto.notes ?? null,
-        terms: dto.terms ?? null,
-        createdById: actor.id,
-      },
+    // Number+insert inside the retry loop: two concurrent creates that read
+    // the same "highest" value will both write N+1, one hits the unique
+    // constraint on quoteNumber, the retry re-reads and writes N+2.
+    const quote = await withNumberRetry(async () => {
+      const quoteNumber = await this.nextQuoteNumber();
+      return this.prisma.quote.create({
+        data: {
+          quoteNumber,
+          leadId: dto.leadId,
+          title: dto.title ?? null,
+          validUntil: toDateOrNull(dto.validUntil),
+          notes: dto.notes ?? null,
+          terms: dto.terms ?? null,
+          createdById: actor.id,
+        },
+      });
     });
 
     await this.prisma.activity.create({
@@ -202,6 +210,10 @@ export class QuotesService {
       options: quote.options.map((o: any) => ({
         ...o,
         advisory: advise(o.totalNet, o.totalSell, s),
+        // Client-facing tax split. Quoted totals are GST-inclusive by policy
+        // — see pricing.ts. Attaching it here keeps the invoice PDF and the
+        // quote UI in sync.
+        gst: gstBreakdown(o.totalSell, s.gstPercent ?? 0),
       })),
     };
   }

@@ -362,6 +362,24 @@ export default function QuoteBuilderPage() {
                     hint="profit ÷ cost"
                   />
                 </dl>
+
+                {/* GST breakdown — the sell price is tax-inclusive. Shows the
+                    client what they actually paid in tax so they can claim ITC. */}
+                {tier.gst && tier.gst.gstPercent > 0 && (
+                  <dl className="space-y-1.5 border-t border-ink-800 pt-3 text-[12px]">
+                    <p className="text-[10.5px] font-medium uppercase tracking-[0.11em] text-ink-500">
+                      Client sees (GST-inclusive)
+                    </p>
+                    <Fact
+                      label="Base"
+                      value={money(tier.gst.baseAmount)}
+                    />
+                    <Fact
+                      label={`GST @ ${tier.gst.gstPercent}%`}
+                      value={money(tier.gst.gstAmount)}
+                    />
+                  </dl>
+                )}
               </PanelBody>
             </Panel>
 

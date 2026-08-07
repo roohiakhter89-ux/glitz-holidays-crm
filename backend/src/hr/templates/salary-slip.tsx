@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Document, Page, View, Text } from '@react-pdf/renderer';
-import { pdfStyles, brand } from '../../pdf/templates/theme';
+import { pdfStyles, pdfFonts, brand } from '../../pdf/templates/theme';
 import { BrandHeader, BrandFooter, GoldRule, inr, shortDate } from '../../pdf/templates/primitives';
 
 export interface SalarySlipInput {
@@ -141,7 +141,7 @@ export function SalarySlipDocument({ employee: e, slip: s }: SalarySlipInput) {
             </Text>
             <Text
               style={{
-                fontFamily: 'Times-Roman',
+                fontFamily: pdfFonts.display,
                 fontWeight: 700,
                 fontSize: 28,
                 color: '#FFFFFF',
@@ -219,7 +219,7 @@ function SlipColumn({
         <Text
           style={{
             ...pdfStyles.td,
-            fontFamily: 'Times-Roman',
+            fontFamily: pdfFonts.display,
             fontWeight: 700,
             fontSize: 12,
             color: brand.teal,

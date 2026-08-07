@@ -14,6 +14,7 @@ import type { Response } from 'express';
 import { Role } from '@prisma/client';
 import { BookingsService } from './bookings.service';
 import { PdfService } from '../pdf/pdf.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -42,6 +43,7 @@ export class BookingsController {
   constructor(
     private readonly bookings: BookingsService,
     private readonly pdf: PdfService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Post()
@@ -79,7 +81,10 @@ export class BookingsController {
     @CurrentUser() actor: Actor,
     @Res() res: Response,
   ) {
-    const b = await this.bookings.findOne(id, actor);
+    const [b, pricing] = await Promise.all([
+      this.bookings.findOne(id, actor),
+      this.settings.getPricing(),
+    ]);
     const buf = await this.pdf.renderInvoice({
       bookingNumber: b.bookingNumber,
       packageName: b.packageName,
@@ -90,6 +95,7 @@ export class BookingsController {
       nights: b.nights,
       totalSell: b.totalSell,
       totalReceived: b.totalReceived,
+      gstPercent: pricing.gstPercent,
       createdAt: b.createdAt,
       notes: b.notes,
       lead: {

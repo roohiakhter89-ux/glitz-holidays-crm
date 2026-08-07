@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Document, Page, View, Text } from '@react-pdf/renderer';
-import { pdfStyles, brand } from './theme';
+import { pdfStyles, pdfFonts, brand } from './theme';
 import { BrandHeader, BrandFooter, GoldRule, inr, shortDate } from './primitives';
 
 export interface InvoiceInput {
@@ -13,6 +13,8 @@ export interface InvoiceInput {
   nights: number;
   totalSell: number;
   totalReceived: number;
+  /** Effective GST rate (%). Zero or omitted → hide the tax split. */
+  gstPercent?: number;
   createdAt: Date | string;
   notes: string | null;
   lead: {
@@ -42,6 +44,12 @@ export function InvoiceDocument({ b }: { b: InvoiceInput }) {
       : b.totalReceived > 0
         ? 'Balance due'
         : 'Amount due';
+
+  // Package total is GST-inclusive. Split it so the client can claim ITC
+  // if their GSTIN allows. See quotes/pricing.ts for the policy comment.
+  const gstPct = b.gstPercent ?? 0;
+  const gstBase = gstPct > 0 ? Math.round(b.totalSell / (1 + gstPct / 100)) : b.totalSell;
+  const gstAmount = b.totalSell - gstBase;
 
   return (
     <Document
@@ -90,6 +98,63 @@ export function InvoiceDocument({ b }: { b: InvoiceInput }) {
           </View>
         </View>
 
+        {/* Tax breakdown row — invoice-style summary. Skipped when GST is
+            zero (rare but happens for tax-exempt segments). */}
+        {gstPct > 0 && (
+          <View
+            style={{
+              marginBottom: 10,
+              padding: 12,
+              backgroundColor: brand.parchment,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: brand.border,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={pdfStyles.small}>Package base</Text>
+              <Text style={{ ...pdfStyles.td, color: brand.text }}>
+                {inr(gstBase)}
+              </Text>
+            </View>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={pdfStyles.small}>GST @ {gstPct}% (inclusive)</Text>
+              <Text style={{ ...pdfStyles.td, color: brand.text }}>
+                {inr(gstAmount)}
+              </Text>
+            </View>
+            <View
+              style={{
+                marginTop: 4,
+                paddingTop: 6,
+                borderTopWidth: 1,
+                borderTopColor: brand.border,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={{ ...pdfStyles.para, fontWeight: 700, color: brand.ink }}>
+                Package total
+              </Text>
+              <Text style={{ ...pdfStyles.para, fontWeight: 700, color: brand.ink }}>
+                {inr(b.totalSell)}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Amount block — the number that matters, big and centred. */}
         <View
           style={{
@@ -115,7 +180,7 @@ export function InvoiceDocument({ b }: { b: InvoiceInput }) {
             </Text>
             <Text
               style={{
-                fontFamily: 'Times-Roman',
+                fontFamily: pdfFonts.display,
                 fontWeight: 700,
                 fontSize: 28,
                 color: '#FFFFFF',

@@ -3,19 +3,64 @@
  * salary slips, offer letters, interview sheets. Change once, change
  * everywhere.
  *
- * Values are literals (not CSS variables) because @react-pdf/renderer
- * doesn't parse CSS variables — it takes plain style objects.
+ * Font strategy:
+ *   Prefer Fraunces + Inter to match the app UI. Fall back to the built-in
+ *   PDF-14 fonts (Times-Roman + Helvetica) when the .ttf files aren't
+ *   present. See src/pdf/fonts/README.md for the two-minute upgrade.
  */
 
-import { StyleSheet } from '@react-pdf/renderer';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Font, StyleSheet } from '@react-pdf/renderer';
 
-/**
- * We use @react-pdf/renderer's built-in PDF14 fonts (Helvetica, Times-Roman,
- * Courier). They ship with every PDF viewer — no network fetch, no font
- * subsetting, no missing-glyph rectangles. When the design brief demands
- * Fraunces later, drop a bundled .ttf under src/pdf/fonts/ and Font.register
- * it here.
- */
+const FONTS_DIR = path.resolve(__dirname, '..', 'fonts');
+
+interface FontResolution {
+  display: string; // used for headings + hero numbers
+  body: string;    // used for everything else
+}
+
+/** Register bundled fonts if the files are present. */
+function resolveFonts(): FontResolution {
+  const has = (name: string) => fs.existsSync(path.join(FONTS_DIR, name));
+
+  const hasFraunces =
+    has('Fraunces-Regular.ttf') && has('Fraunces-Bold.ttf');
+  const hasInter =
+    has('Inter-Regular.ttf') && has('Inter-Bold.ttf');
+
+  if (hasFraunces) {
+    Font.register({
+      family: 'Fraunces',
+      fonts: [
+        { src: path.join(FONTS_DIR, 'Fraunces-Regular.ttf'), fontWeight: 400 },
+        { src: path.join(FONTS_DIR, 'Fraunces-Bold.ttf'),    fontWeight: 700 },
+      ],
+    });
+  }
+  if (hasInter) {
+    Font.register({
+      family: 'Inter',
+      fonts: [
+        { src: path.join(FONTS_DIR, 'Inter-Regular.ttf'), fontWeight: 400 },
+        { src: path.join(FONTS_DIR, 'Inter-Bold.ttf'),    fontWeight: 700 },
+      ],
+    });
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[pdf] fonts: display=${hasFraunces ? 'Fraunces' : 'Times-Roman'}, ` +
+    `body=${hasInter ? 'Inter' : 'Helvetica'}`,
+  );
+
+  return {
+    display: hasFraunces ? 'Fraunces' : 'Times-Roman',
+    body:    hasInter    ? 'Inter'    : 'Helvetica',
+  };
+}
+
+const F = resolveFonts();
 
 /**
  * Palette pulled straight from the logo. Kept here (not imported from the
@@ -39,9 +84,12 @@ export const brand = {
   loss:      '#B84A37',
 } as const;
 
+/** Exported so templates that write inline styles can reach for them too. */
+export const pdfFonts = F;
+
 export const pdfStyles = StyleSheet.create({
   page: {
-    fontFamily: 'Helvetica',
+    fontFamily: F.body,
     fontSize: 10,
     color: brand.text,
     backgroundColor: '#FFFFFF',
@@ -62,14 +110,14 @@ export const pdfStyles = StyleSheet.create({
   },
   brandRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   brandGold: {
-    fontFamily: 'Times-Roman',
+    fontFamily: F.display,
     fontWeight: 700,
     fontSize: 20,
     color: brand.gold,
     letterSpacing: -0.3,
   },
   brandTeal: {
-    fontFamily: 'Helvetica',
+    fontFamily: F.body,
     fontWeight: 700,
     fontSize: 10,
     color: brand.teal,
@@ -91,7 +139,7 @@ export const pdfStyles = StyleSheet.create({
     marginBottom: 2,
   },
   docNumber: {
-    fontFamily: 'Times-Roman',
+    fontFamily: F.display,
     fontWeight: 700,
     fontSize: 15,
     color: brand.ink,
@@ -101,7 +149,7 @@ export const pdfStyles = StyleSheet.create({
 
   // ---- generic display --------------------------------------------------
   h1: {
-    fontFamily: 'Times-Roman',
+    fontFamily: F.display,
     fontWeight: 700,
     fontSize: 22,
     color: brand.ink,
@@ -109,7 +157,7 @@ export const pdfStyles = StyleSheet.create({
     marginBottom: 4,
   },
   h2: {
-    fontFamily: 'Times-Roman',
+    fontFamily: F.display,
     fontWeight: 700,
     fontSize: 13,
     color: brand.ink,
@@ -189,9 +237,9 @@ export const pdfStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  totalGrandLabel: { fontFamily: 'Times-Roman', fontWeight: 700, fontSize: 12, color: brand.ink },
+  totalGrandLabel: { fontFamily: F.display, fontWeight: 700, fontSize: 12, color: brand.ink },
   totalGrandValue: {
-    fontFamily: 'Times-Roman',
+    fontFamily: F.display,
     fontWeight: 700,
     fontSize: 15,
     color: brand.teal,

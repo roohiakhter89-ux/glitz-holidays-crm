@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Document, Page, View, Text } from '@react-pdf/renderer';
-import { pdfStyles, brand } from '../../pdf/templates/theme';
+import { pdfStyles, pdfFonts, brand } from '../../pdf/templates/theme';
 import { BrandHeader, BrandFooter, GoldRule, shortDate } from '../../pdf/templates/primitives';
 
 export interface InterviewSheetInput {
@@ -164,7 +164,7 @@ export function InterviewSheetDocument({ interview: i }: InterviewSheetInput) {
             </Text>
             <Text
               style={{
-                fontFamily: 'Times-Roman',
+                fontFamily: pdfFonts.display,
                 fontWeight: 700,
                 fontSize: 20,
                 color: '#FFFFFF',
