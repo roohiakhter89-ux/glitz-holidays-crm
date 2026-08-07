@@ -1,0 +1,481 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  ActivityType,
+  BookingStatus,
+  LeadStatus,
+  PaymentMode,
+  Prisma,
+  QuoteStatus,
+} from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateBookingDto } from './dto/create-booking.dto';
+import { UpdateBookingDto } from './dto/update-booking.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreateCostDto } from './dto/create-cost.dto';
+import { UpdateCostDto } from './dto/update-cost.dto';
+import { QueryBookingsDto } from './dto/query-bookings.dto';
+import { computeBookingFinancials, deriveStatus } from './booking-math';
+
+@Injectable()
+export class BookingsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private async nextBookingNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `GLZ-B-${year}-`;
+    const last = await this.prisma.booking.findFirst({
+      where: { bookingNumber: { startsWith: prefix } },
+      orderBy: { bookingNumber: 'desc' },
+      select: { bookingNumber: true },
+    });
+    const n = last
+      ? parseInt(last.bookingNumber.slice(prefix.length), 10) + 1
+      : 1;
+    return `${prefix}${String(n).padStart(4, '0')}`;
+  }
+
+  /** Recompute stored totals from the child rows, then re-derive status. */
+  private async refresh(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { payments: true, costs: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const fin = computeBookingFinancials({
+      totalSell: booking.totalSell,
+      totalNet: booking.totalNet,
+      payments: booking.payments,
+      costs: booking.costs,
+    });
+
+    const status = deriveStatus(
+      booking.status,
+      booking.totalSell,
+      fin.totalReceived,
+    ) as BookingStatus;
+
+    return this.prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        totalReceived: fin.totalReceived,
+        totalCostPaid: fin.totalCostPaid,
+        status,
+      },
+    });
+  }
+
+  async create(dto: CreateBookingDto, userId?: string) {
+    let leadId = dto.leadId;
+    let totalSell = dto.totalSell ?? 0;
+    let totalNet = dto.totalNet ?? 0;
+    let quoteId: string | null = null;
+    let packageName = dto.packageName ?? null;
+    let adults = dto.adults ?? 2;
+    let children = dto.children ?? 0;
+    let nights = dto.nights ?? 0;
+
+    // --- build from a quote tier: snapshot its numbers ---
+    if (dto.quoteOptionId) {
+      const option = await this.prisma.quoteOption.findUnique({
+        where: { id: dto.quoteOptionId },
+        include: { quote: true },
+      });
+      if (!option) throw new NotFoundException('Quote option not found');
+
+      leadId = option.quote.leadId;
+      quoteId = option.quoteId;
+      totalSell = option.totalSell;
+      totalNet = option.totalNet;
+      packageName =
+        packageName ?? `${option.quote.title ?? 'Package'} — ${option.name}`;
+      adults = dto.adults ?? option.adults;
+      children = dto.children ?? option.children;
+      nights = dto.nights ?? option.nights;
+
+      if (totalSell <= 0) {
+        throw new BadRequestException(
+          'That quote tier has no priced lines yet — add lines before booking.',
+        );
+      }
+    }
+
+    if (!leadId) {
+      throw new BadRequestException(
+        'Provide either quoteOptionId or leadId.',
+      );
+    }
+
+    const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const booking = await this.prisma.booking.create({
+      data: {
+        bookingNumber: await this.nextBookingNumber(),
+        leadId,
+        quoteId,
+        quoteOptionId: dto.quoteOptionId ?? null,
+        createdById: userId ?? null,
+        status: BookingStatus.CONFIRMED,
+        packageName,
+        travelStartDate: dto.travelStartDate
+          ? new Date(dto.travelStartDate)
+          : null,
+        travelEndDate: dto.travelEndDate ? new Date(dto.travelEndDate) : null,
+        adults,
+        children,
+        nights,
+        totalSell,
+        totalNet,
+        notes: dto.notes ?? null,
+      },
+    });
+
+    // pipeline side-effects
+    await this.prisma.lead.update({
+      where: { id: leadId },
+      data: { status: LeadStatus.CONFIRMED },
+    });
+    if (quoteId) {
+      await this.prisma.quote.update({
+        where: { id: quoteId },
+        data: { status: QuoteStatus.ACCEPTED },
+      });
+    }
+    await this.prisma.activity.create({
+      data: {
+        leadId,
+        userId: userId ?? null,
+        type: ActivityType.SYSTEM,
+        content: `Booking ${booking.bookingNumber} confirmed — sell ${totalSell}, est. cost ${totalNet}`,
+      },
+    });
+
+    return booking;
+  }
+
+  async findAll(q: QueryBookingsDto) {
+    const page = q.page ?? 1;
+    const limit = q.limit ?? 25;
+
+    const where: Prisma.BookingWhereInput = {};
+    if (q.status) where.status = q.status;
+    if (q.leadId) where.leadId = q.leadId;
+    if (q.from || q.to) {
+      where.travelStartDate = {};
+      if (q.from) where.travelStartDate.gte = new Date(q.from);
+      if (q.to) where.travelStartDate.lte = new Date(q.to);
+    }
+    if (q.search) {
+      where.OR = [
+        { bookingNumber: { contains: q.search, mode: 'insensitive' } },
+        { packageName: { contains: q.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, rows] = await Promise.all([
+      this.prisma.booking.count({ where }),
+      this.prisma.booking.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          lead: { select: { id: true, name: true, phone: true } },
+          payments: { select: { amount: true } },
+          costs: { select: { amountDue: true, amountPaid: true } },
+        },
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+      data: rows.map((b: any) => ({
+        ...b,
+        payments: undefined,
+        costs: undefined,
+        financials: computeBookingFinancials({
+          totalSell: b.totalSell,
+          totalNet: b.totalNet,
+          payments: b.payments,
+          costs: b.costs,
+        }),
+      })),
+    };
+  }
+
+  async findOne(id: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        lead: { select: { id: true, name: true, phone: true, email: true } },
+        payments: { orderBy: { receivedAt: 'desc' } },
+        costs: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    return {
+      ...booking,
+      financials: computeBookingFinancials({
+        totalSell: booking.totalSell,
+        totalNet: booking.totalNet,
+        payments: booking.payments,
+        costs: booking.costs,
+      }),
+    };
+  }
+
+  async update(id: string, dto: UpdateBookingDto, userId?: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const data: Prisma.BookingUpdateInput = {};
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.packageName !== undefined) data.packageName = dto.packageName;
+    if (dto.adults !== undefined) data.adults = dto.adults;
+    if (dto.children !== undefined) data.children = dto.children;
+    if (dto.nights !== undefined) data.nights = dto.nights;
+    if (dto.totalSell !== undefined) data.totalSell = dto.totalSell;
+    if (dto.notes !== undefined) data.notes = dto.notes;
+    if (dto.cancelledReason !== undefined)
+      data.cancelledReason = dto.cancelledReason;
+    if (dto.travelStartDate !== undefined)
+      data.travelStartDate = new Date(dto.travelStartDate);
+    if (dto.travelEndDate !== undefined)
+      data.travelEndDate = new Date(dto.travelEndDate);
+
+    await this.prisma.booking.update({ where: { id }, data });
+
+    if (dto.status && dto.status !== booking.status) {
+      await this.prisma.activity.create({
+        data: {
+          leadId: booking.leadId,
+          userId: userId ?? null,
+          type: ActivityType.SYSTEM,
+          content: `Booking ${booking.bookingNumber}: ${booking.status} -> ${dto.status}`,
+        },
+      });
+      if (dto.status === BookingStatus.CANCELLED) {
+        await this.prisma.lead.update({
+          where: { id: booking.leadId },
+          data: { status: LeadStatus.CANCELLED },
+        });
+      }
+    }
+
+    return this.findOne(id);
+  }
+
+  // --- payments (money in) -------------------------------------------------
+
+  async addPayment(
+    bookingId: string,
+    dto: CreatePaymentDto,
+    userId?: string,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    // a refund is stored as a negative amount so totals stay a simple sum
+    const signed = dto.isRefund ? -Math.abs(dto.amount) : Math.abs(dto.amount);
+
+    await this.prisma.bookingPayment.create({
+      data: {
+        bookingId,
+        amount: signed,
+        mode: dto.mode ?? PaymentMode.BANK_TRANSFER,
+        reference: dto.reference ?? null,
+        receivedAt: dto.receivedAt ? new Date(dto.receivedAt) : new Date(),
+        notes: dto.notes ?? null,
+        isRefund: dto.isRefund ?? false,
+        recordedById: userId ?? null,
+      },
+    });
+
+    await this.prisma.activity.create({
+      data: {
+        leadId: booking.leadId,
+        userId: userId ?? null,
+        type: ActivityType.SYSTEM,
+        content: `${dto.isRefund ? 'Refund' : 'Payment'} ${Math.abs(
+          dto.amount,
+        )} recorded on ${booking.bookingNumber}`,
+      },
+    });
+
+    await this.refresh(bookingId);
+    return this.findOne(bookingId);
+  }
+
+  async removePayment(paymentId: string) {
+    const payment = await this.prisma.bookingPayment.findUnique({
+      where: { id: paymentId },
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+    await this.prisma.bookingPayment.delete({ where: { id: paymentId } });
+    await this.refresh(payment.bookingId);
+    return this.findOne(payment.bookingId);
+  }
+
+  // --- costs (money out) ---------------------------------------------------
+
+  async addCost(bookingId: string, dto: CreateCostDto) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    await this.prisma.bookingCost.create({
+      data: {
+        bookingId,
+        vendorId: dto.vendorId ?? null,
+        description: dto.description,
+        amountDue: dto.amountDue,
+        amountPaid: dto.amountPaid ?? 0,
+        paidAt: dto.paidAt ? new Date(dto.paidAt) : null,
+        reference: dto.reference ?? null,
+        notes: dto.notes ?? null,
+      },
+    });
+
+    await this.refresh(bookingId);
+    return this.findOne(bookingId);
+  }
+
+  async updateCost(costId: string, dto: UpdateCostDto) {
+    const cost = await this.prisma.bookingCost.findUnique({
+      where: { id: costId },
+    });
+    if (!cost) throw new NotFoundException('Cost not found');
+
+    const data: Record<string, any> = { ...dto };
+    if (dto.paidAt !== undefined)
+      data.paidAt = dto.paidAt ? new Date(dto.paidAt) : null;
+
+    await this.prisma.bookingCost.update({ where: { id: costId }, data });
+    await this.refresh(cost.bookingId);
+    return this.findOne(cost.bookingId);
+  }
+
+  async removeCost(costId: string) {
+    const cost = await this.prisma.bookingCost.findUnique({
+      where: { id: costId },
+    });
+    if (!cost) throw new NotFoundException('Cost not found');
+    await this.prisma.bookingCost.delete({ where: { id: costId } });
+    await this.refresh(cost.bookingId);
+    return this.findOne(cost.bookingId);
+  }
+
+  /** Copy the quote's lines in as expected vendor costs — no retyping. */
+  async seedCostsFromQuote(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { costs: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (!booking.quoteOptionId) {
+      throw new BadRequestException('This booking was not created from a quote.');
+    }
+    if (booking.costs.length > 0) {
+      throw new BadRequestException(
+        'Costs already exist on this booking — add them individually instead.',
+      );
+    }
+
+    const lines = await this.prisma.quoteLine.findMany({
+      where: { optionId: booking.quoteOptionId },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    for (const l of lines) {
+      await this.prisma.bookingCost.create({
+        data: {
+          bookingId,
+          vendorId: l.vendorId,
+          description: l.description,
+          amountDue: l.lineNet,
+          amountPaid: 0,
+        },
+      });
+    }
+
+    await this.refresh(bookingId);
+    return this.findOne(bookingId);
+  }
+
+  // --- reporting -----------------------------------------------------------
+
+  async stats(from?: string, to?: string) {
+    const where: Prisma.BookingWhereInput = {};
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to) where.createdAt.lte = new Date(to);
+    }
+
+    const bookings = await this.prisma.booking.findMany({
+      where,
+      include: {
+        payments: { select: { amount: true } },
+        costs: { select: { amountDue: true, amountPaid: true } },
+      },
+    });
+
+    let totalSell = 0;
+    let totalQuotedProfit = 0;
+    let totalActualProfit = 0;
+    let totalReceived = 0;
+    let totalOutstanding = 0;
+    let vendorOutstanding = 0;
+
+    for (const b of bookings as any[]) {
+      const f = computeBookingFinancials({
+        totalSell: b.totalSell,
+        totalNet: b.totalNet,
+        payments: b.payments,
+        costs: b.costs,
+      });
+      if (b.status === BookingStatus.CANCELLED) continue;
+      totalSell += f.totalSell;
+      totalQuotedProfit += f.quotedProfit;
+      totalActualProfit += f.actualProfit;
+      totalReceived += f.totalReceived;
+      totalOutstanding += f.balanceDue;
+      vendorOutstanding += f.vendorOutstanding;
+    }
+
+    const byStatus = await this.prisma.booking.groupBy({
+      by: ['status'],
+      where,
+      _count: { _all: true },
+    });
+
+    return {
+      bookings: bookings.length,
+      totalSell,
+      totalReceived,
+      totalOutstanding,
+      vendorOutstanding,
+      totalQuotedProfit,
+      totalActualProfit,
+      profitVariance: totalActualProfit - totalQuotedProfit,
+      averageMarginPercent:
+        totalSell > 0 ? (totalActualProfit / totalSell) * 100 : 0,
+      byStatus: byStatus.map((r: any) => ({
+        status: r.status,
+        count: r._count._all,
+      })),
+    };
+  }
+}

@@ -78,8 +78,6 @@ model User {
 
   assignedLeads Lead[]     @relation("LeadAssignee")
   createdQuotes Quote[]    @relation("QuoteCreator")
-  createdBookings Booking[]        @relation("BookingCreator")
-  recordedPayments BookingPayment[] @relation("PaymentRecorder")
   activities    Activity[]
 
   @@index([role])
@@ -140,7 +138,6 @@ model Lead {
 
   activities Activity[]
   quotes     Quote[]
-  bookings   Booking[]
 
   @@index([status])
   @@index([source])
@@ -449,118 +446,3 @@ model QuoteLine {
 // PHASE 5 — Pricing + Quotations
 // ============================================================================
 
-
-// ============================================================================
-// PHASE 6 — Bookings + Payments
-// ============================================================================
-
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  PARTIALLY_PAID
-  PAID
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum PaymentMode {
-  CASH
-  BANK_TRANSFER
-  UPI
-  CARD
-  CHEQUE
-  RAZORPAY
-  OTHER
-}
-
-model Booking {
-  id            String        @id @default(cuid())
-  bookingNumber String        @unique
-  status        BookingStatus @default(PENDING)
-
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  /// Where it came from. Kept for traceability only — the numbers below are
-  /// a frozen snapshot and do NOT follow later edits to the quote.
-  quoteId       String?
-  quoteOptionId String?
-
-  createdById String?
-  createdBy   User?   @relation("BookingCreator", fields: [createdById], references: [id], onDelete: SetNull)
-
-  // --- trip ---
-  packageName     String?
-  travelStartDate DateTime?
-  travelEndDate   DateTime?
-  adults          Int       @default(2)
-  children        Int       @default(0)
-  nights          Int       @default(0)
-
-  // --- FROZEN pricing snapshot (taken at confirmation) ---
-  totalSell Int @default(0)
-  /// Estimated cost from the quote at the time of booking.
-  totalNet  Int @default(0)
-
-  // --- running actuals ---
-  totalReceived Int @default(0)
-  totalCostPaid Int @default(0)
-
-  notes      String?
-  cancelledReason String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  payments BookingPayment[]
-  costs    BookingCost[]
-
-  @@index([leadId])
-  @@index([status])
-  @@index([travelStartDate])
-}
-
-/// Money IN from the client. Negative amounts represent refunds.
-model BookingPayment {
-  id        String  @id @default(cuid())
-  bookingId String
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  amount     Int
-  mode       PaymentMode @default(BANK_TRANSFER)
-  reference  String?
-  receivedAt DateTime    @default(now())
-  notes      String?
-  isRefund   Boolean     @default(false)
-
-  recordedById String?
-  recordedBy   User?   @relation("PaymentRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-
-  @@index([bookingId])
-  @@index([receivedAt])
-}
-
-/// Money OUT to vendors — what is owed vs what has actually been paid.
-model BookingCost {
-  id        String  @id @default(cuid())
-  bookingId String
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  vendorId    String?
-  description String
-
-  amountDue  Int
-  amountPaid Int       @default(0)
-  paidAt     DateTime?
-  reference  String?
-  notes      String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([bookingId])
-  @@index([vendorId])
-}

@@ -10,6 +10,7 @@ import { LeadsModule } from './leads/leads.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { SettingsModule } from './settings/settings.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -27,6 +28,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     VendorsModule,
     SettingsModule,
     QuotesModule,
+    BookingsModule,
   ],
   providers: [
     // Order: rate limit -> authenticate -> authorize.
