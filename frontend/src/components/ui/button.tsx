@@ -13,13 +13,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // Primary CTA — the deep Kashmir teal from the logo, with a warm
+        // gold underglow that lifts slightly on hover.
         primary:
-          'bg-signal-600 text-ink-50 hover:bg-signal-500 shadow-[0_1px_0_0_rgba(255,255,255,0.08)_inset,0_1px_2px_0_rgba(0,0,0,0.6)]',
+          'bg-signal-600 text-ink-950 hover:bg-signal-500 ' +
+          'shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_2px_6px_-2px_rgba(11,74,90,0.45)] ' +
+          'hover:shadow-[0_1px_0_rgba(255,255,255,0.28)_inset,0_6px_18px_-6px_rgba(11,74,90,0.55),0_2px_10px_-4px_rgba(234,177,48,0.35)]',
         secondary:
-          'bg-ink-800 text-ink-100 border border-ink-700 hover:bg-ink-700 hover:border-ink-600',
-        ghost: 'text-ink-300 hover:text-ink-50 hover:bg-ink-800',
-        danger: 'bg-loss-500 text-ink-50 hover:bg-loss-400',
-        link: 'text-signal-400 underline-offset-4 hover:underline',
+          'bg-ink-900 text-ink-200 border border-ink-700 hover:bg-ink-850 hover:border-ink-600',
+        ghost: 'text-ink-400 hover:text-ink-100 hover:bg-ink-850',
+        danger: 'bg-loss-500 text-ink-950 hover:bg-loss-400',
+        link: 'text-signal-500 underline-offset-4 hover:underline hover:text-signal-400',
       },
       size: {
         sm: 'h-8 px-3 text-xs',

@@ -155,7 +155,7 @@ export default function LeadDetailPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold tracking-tight text-ink-50">
+            <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
               {lead.name}
             </h1>
             {lead.enquiryCount > 1 && (

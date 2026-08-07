@@ -1,0 +1,273 @@
+'use client';
+
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { api, ApiError } from '@/lib/api';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input, Label } from '@/components/ui/input';
+import { Select, Textarea } from '@/components/ui/select';
+import { LEAD_SOURCES, humanise } from '@/lib/constants';
+
+/**
+ * Manual lead capture — the "customer just called" flow.
+ *
+ * Only NAME and PHONE are required. Everything else is optional; the sales
+ * exec can enrich the record on the detail page while the customer talks.
+ * The dedupe rule (same phone within 30 days = re-enquiry, not new lead)
+ * lives on the server and applies here too.
+ */
+export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Split fields per common data-entry order (contact -> trip -> notes) rather
+  // than schema order — an operator on a call reads their form top-to-bottom.
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [source, setSource] = useState<string>('PHONE');
+  const [destination, setDestination] = useState('');
+  const [travelDate, setTravelDate] = useState('');
+  const [nights, setNights] = useState('');
+  const [adults, setAdults] = useState('');
+  const [children, setChildren] = useState('');
+  const [budget, setBudget] = useState('');
+  const [message, setMessage] = useState('');
+
+  function reset() {
+    setName('');
+    setPhone('');
+    setEmail('');
+    setSource('PHONE');
+    setDestination('');
+    setTravelDate('');
+    setNights('');
+    setAdults('');
+    setChildren('');
+    setBudget('');
+    setMessage('');
+    setError(null);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !phone.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        name: name.trim(),
+        phone: phone.trim(),
+        source,
+      };
+      // Send only what the operator actually filled. Empty strings would fail
+      // validation (@IsEmail on ""), and null would overwrite defaults.
+      if (email.trim()) body.email = email.trim();
+      if (destination.trim()) body.destination = destination.trim();
+      if (travelDate) body.travelDate = travelDate;
+      if (nights) body.nights = Number(nights);
+      if (adults) body.adults = Number(adults);
+      if (children) body.children = Number(children);
+      if (budget) body.budget = Number(budget);
+      if (message.trim()) body.message = message.trim();
+
+      const res = await api.post<{ leadId: string; duplicate: boolean }>(
+        '/leads',
+        body,
+      );
+      setOpen(false);
+      reset();
+      onCreated(res.leadId);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not save the lead.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="size-4" strokeWidth={1.75} />
+          Add lead
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent
+        title="Add lead"
+        description="For phone-ins, walk-ins, or a WhatsApp that came directly to you. Auto-assigns to you."
+      >
+        <form onSubmit={submit} className="max-h-[70vh] overflow-y-auto p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="al-name">Name *</Label>
+              <Input
+                id="al-name"
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Aditya Sharma"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-phone">Phone *</Label>
+              <Input
+                id="al-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98184 34726"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-email">Email</Label>
+              <Input
+                id="al-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-source">Source</Label>
+              <Select
+                id="al-source"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+              >
+                {LEAD_SOURCES.map((s) => (
+                  <option key={s} value={s}>
+                    {humanise(s)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-dest">Destination</Label>
+              <Input
+                id="al-dest"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Kashmir, Ladakh, Sonmarg…"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-date">Travel date</Label>
+              <Input
+                id="al-date"
+                type="date"
+                value={travelDate}
+                onChange={(e) => setTravelDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-nights">Nights</Label>
+              <Input
+                id="al-nights"
+                type="number"
+                min={0}
+                value={nights}
+                onChange={(e) => setNights(e.target.value)}
+                placeholder="5"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="al-adults">Adults</Label>
+                <Input
+                  id="al-adults"
+                  type="number"
+                  min={0}
+                  value={adults}
+                  onChange={(e) => setAdults(e.target.value)}
+                  placeholder="2"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="al-kids">Children</Label>
+                <Input
+                  id="al-kids"
+                  type="number"
+                  min={0}
+                  value={children}
+                  onChange={(e) => setChildren(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-budget">Budget (₹)</Label>
+              <Input
+                id="al-budget"
+                type="number"
+                min={0}
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                placeholder="80000"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="al-msg">Notes</Label>
+              <Textarea
+                id="al-msg"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="What did they ask about? Any special requests?"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 rounded-md border border-loss-500/40 bg-loss-500/10 px-3 py-2 text-[13px] text-loss-400"
+            >
+              {error}
+            </p>
+          )}
+
+          <div className="mt-5 flex items-center justify-end gap-2 border-t border-ink-800 pt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" size="sm">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              type="submit"
+              disabled={busy || !name.trim() || !phone.trim()}
+            >
+              {busy ? 'Saving…' : 'Save lead'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

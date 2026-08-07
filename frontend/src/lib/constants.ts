@@ -70,6 +70,29 @@ export const MARKUP_MODES = [
 
 export const SEASONS = ['PEAK', 'SHOULDER', 'OFF', 'FESTIVE'] as const;
 
+export const VENDOR_TYPES = [
+  'HOTEL',
+  'HOUSEBOAT',
+  'TRANSPORT',
+  'GUIDE',
+  'ACTIVITY',
+  'RESTAURANT',
+  'PHOTOGRAPHER',
+  'EVENT',
+  'OTHER',
+] as const;
+
+export const MEAL_PLANS = ['EP', 'CP', 'MAP', 'AP'] as const;
+
+export const RATE_BASES = [
+  'PER_ROOM_NIGHT',
+  'PER_PERSON',
+  'PER_PERSON_NIGHT',
+  'PER_VEHICLE_DAY',
+  'PER_TRANSFER',
+  'PER_UNIT',
+] as const;
+
 export const QUOTE_STATUSES = [
   'DRAFT',
   'SENT',
@@ -77,6 +100,26 @@ export const QUOTE_STATUSES = [
   'REJECTED',
   'EXPIRED',
   'REVISED',
+] as const;
+
+export const BOOKING_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'PARTIALLY_PAID',
+  'PAID',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
+
+export const PAYMENT_MODES = [
+  'CASH',
+  'BANK_TRANSFER',
+  'UPI',
+  'CARD',
+  'CHEQUE',
+  'RAZORPAY',
+  'OTHER',
 ] as const;
 
 /** What the markupValue field means for each mode. */

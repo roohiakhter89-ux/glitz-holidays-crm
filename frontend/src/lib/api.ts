@@ -105,6 +105,44 @@ export const api = {
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
+/**
+ * Fetch a binary asset (PDF, image) and open it in a new tab. We can't just
+ * `<a href="…">` because the endpoint needs the Authorization header — a
+ * bare link would 401. We fetch, convert to a blob URL, and let the browser
+ * render it (PDFs open inline in every modern browser).
+ */
+export async function openBinary(
+  path: string,
+  suggestedName?: string,
+): Promise<void> {
+  const token = tokenStore.get();
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401) {
+    tokenStore.clear();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    return;
+  }
+  if (!res.ok) {
+    throw new ApiError(`Could not download the file (${res.status}).`, res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  // Prefer opening inline so the user can review before downloading. A named
+  // download attribute is honoured when the user hits Ctrl-S in the tab.
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  if (suggestedName) a.download = suggestedName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Give the tab a moment to grab the blob before we revoke it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 // ---- shapes returned by the backend (kept minimal on purpose) ------------
 
 export interface LeadStats {
@@ -279,6 +317,48 @@ export interface VendorRateRow {
   };
 }
 
+export interface VendorRow {
+  id: string;
+  name: string;
+  type: string;
+  city: string | null;
+  area: string | null;
+  starRating: number | null;
+  falconGrade: string | null;
+  contactPerson: string | null;
+  phone: string | null;
+  altPhone: string | null;
+  email: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  ifsc: string | null;
+  gstin: string | null;
+  panNumber: string | null;
+  paymentTerms: string | null;
+  unionZone: string | null;
+  notes: string | null;
+  isActive: boolean;
+  contactRedacted?: boolean;
+  rates: VendorRateFullRow[];
+}
+
+export interface VendorRateFullRow {
+  id: string;
+  variant: string;
+  season: string;
+  mealPlan: string | null;
+  rateBasis: string;
+  netRate: number;
+  rackRate: number | null;
+  extraBedRate: number | null;
+  childRate: number | null;
+  maxOccupancy: number | null;
+  validFrom: string | null;
+  validTo: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
 export interface UserRow {
   id: string;
   name: string;
@@ -384,4 +464,299 @@ export interface PricingSettings {
   filesPerMonth: number | null;
   roundTo: number;
   gstPercent: number;
+}
+
+// ---- bookings -------------------------------------------------------------
+
+export interface BookingFinancials {
+  totalSell: number;
+  totalNet: number;
+  totalReceived: number;
+  totalCostPaid: number;
+  totalCostDue: number;
+  balanceDue: number;
+  vendorOutstanding: number;
+  quotedProfit: number;
+  quotedMarginPercent: number;
+  actualProfit: number;
+  actualMarginPercent: number;
+  marginVariance: number;
+  netCashPosition: number;
+  fullyPaid: boolean;
+  overpaid: boolean;
+}
+
+export interface BookingRow {
+  id: string;
+  bookingNumber: string;
+  status: string;
+  packageName: string | null;
+  travelStartDate: string | null;
+  travelEndDate: string | null;
+  adults: number;
+  children: number;
+  nights: number;
+  totalSell: number;
+  totalNet: number;
+  createdAt: string;
+  lead: { id: string; name: string; phone: string } | null;
+  financials: BookingFinancials;
+}
+
+export interface BookingPayment {
+  id: string;
+  amount: number;
+  mode: string;
+  reference: string | null;
+  receivedAt: string;
+  notes: string | null;
+  isRefund: boolean;
+  recordedBy?: { id: string; name: string } | null;
+}
+
+export interface BookingCost {
+  id: string;
+  vendorId: string | null;
+  description: string;
+  amountDue: number;
+  amountPaid: number;
+  paidAt: string | null;
+  reference: string | null;
+  notes: string | null;
+}
+
+// ---- attribution ----------------------------------------------------------
+
+export interface LandingPageRow {
+  id: string;
+  slug: string;
+  name: string;
+  url: string | null;
+  campaign: string | null;
+  isActive: boolean;
+}
+
+export interface AdSpendRow {
+  id: string;
+  spendDate: string;
+  channel: string;
+  campaign: string | null;
+  adGroup: string | null;
+  landingPageId: string | null;
+  landingPage: { id: string; name: string; slug: string } | null;
+  amount: number;
+  currency: string;
+  impressions: number | null;
+  clicks: number | null;
+  notes: string | null;
+}
+
+export interface PageReportRow {
+  id: string;
+  slug: string;
+  name: string;
+  campaign: string | null;
+  isActive: boolean;
+  visits: number;
+  leads: number;
+  bookings: number;
+  revenue: number;
+  spend: number;
+  conversionPercent: number;
+  bookingRatePercent: number;
+  costPerLead: number | null;
+  costPerBooking: number | null;
+  roas: number | null;
+}
+
+export interface DailyReportRow {
+  day: string;
+  spend: number;
+  leads: number;
+  costPerLead: number | null;
+}
+
+// ---- HR --------------------------------------------------------------------
+
+export interface EmployeeRow {
+  id: string;
+  code: string;
+  fullName: string;
+  designation: string;
+  department: string | null;
+  phone: string;
+  email: string | null;
+  status: string;
+  employmentType: string;
+  joinedOn: string;
+  photoUrl: string | null;
+  reportsTo?: { id: string; fullName: string; code: string } | null;
+}
+
+export interface EmployeeDetail extends EmployeeRow {
+  fatherName: string | null;
+  bloodGroup: string | null;
+  dob: string | null;
+  gender: string | null;
+  nationality: string | null;
+  altPhone: string | null;
+  addressLine: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  emergencyContactRelation: string | null;
+  aadhaar: string | null;
+  pan: string | null;
+  confirmedOn: string | null;
+  exitedOn: string | null;
+  ctcMonthly: number | null;
+  basicMonthly: number | null;
+  hraMonthly: number | null;
+  allowMonthly: number | null;
+  pfMonthly: number | null;
+  esiMonthly: number | null;
+  taxMonthly: number | null;
+  otherDedMonthly: number | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  ifsc: string | null;
+  notes: string | null;
+  user?: { id: string; email: string; role: string } | null;
+  salarySlips: SalarySlipRow[];
+  reports: {
+    id: string;
+    fullName: string;
+    code: string;
+    designation: string;
+    status: string;
+  }[];
+}
+
+export interface SalarySlipRow {
+  id: string;
+  periodMonth: string;
+  daysWorked: number | null;
+  daysInMonth: number | null;
+  lop: number | null;
+  basic: number;
+  hra: number;
+  allowances: number;
+  bonus: number;
+  arrears: number;
+  pf: number;
+  esi: number;
+  tax: number;
+  otherDed: number;
+  grossPay: number;
+  totalDed: number;
+  netPay: number;
+  paidOn: string | null;
+  reference: string | null;
+}
+
+export interface EmployeePerformance {
+  linked: boolean;
+  message?: string;
+  leadsAssigned?: number;
+  leadsConverted?: number;
+  conversionPercent?: number;
+  quotesCreated?: number;
+  bookingsCreated?: number;
+  revenue?: number;
+  grossProfit?: number;
+  averageDealSize?: number;
+}
+
+export interface InterviewRow {
+  id: string;
+  candidateName: string;
+  candidatePhone: string;
+  candidateEmail: string | null;
+  role: string;
+  scheduledAt: string;
+  durationMinutes: number | null;
+  interviewerName: string | null;
+  interviewer: { id: string; fullName: string } | null;
+  overallRating: number | null;
+  outcome: string;
+}
+
+export interface InterviewDetail extends InterviewRow {
+  questionnaire: { question: string; answer?: string; rating?: number }[];
+  strengths: string | null;
+  concerns: string | null;
+  outcomeNote: string | null;
+}
+
+// ---- SEO -------------------------------------------------------------------
+
+export interface SeoSiteRow {
+  id: string;
+  name: string;
+  url: string;
+  crawlPaths: string[];
+  isActive: boolean;
+  lastRunAt: string | null;
+  avgScore: number | null;
+  pageCount: number;
+}
+
+export interface SeoCheck {
+  id: string;
+  label: string;
+  severity: 'pass' | 'warn' | 'fail';
+  weight: number;
+  detail?: string;
+  task?: string;
+}
+
+export interface SeoAuditRow {
+  id: string;
+  siteId: string;
+  runId: string;
+  url: string;
+  score: number;
+  perfScore: number | null;
+  a11yScore: number | null;
+  bpScore: number | null;
+  seoScore: number | null;
+  lcpMs: number | null;
+  clsX1k: number | null;
+  inpMs: number | null;
+  checks: { results: SeoCheck[] } | null;
+  tasks: { id: string; severity: 'pass' | 'warn' | 'fail'; label: string; task: string }[] | null;
+  errors: string | null;
+  createdAt: string;
+}
+
+export interface SeoAuditResponse {
+  site: SeoSiteRow;
+  pages: SeoAuditRow[];
+}
+
+export interface BookingDetail {
+  id: string;
+  bookingNumber: string;
+  status: string;
+  packageName: string | null;
+  travelStartDate: string | null;
+  travelEndDate: string | null;
+  adults: number;
+  children: number;
+  nights: number;
+  totalSell: number;
+  totalNet: number;
+  totalReceived: number;
+  totalCostPaid: number;
+  notes: string | null;
+  cancelledReason: string | null;
+  quoteId: string | null;
+  quoteOptionId: string | null;
+  createdAt: string;
+  lead: { id: string; name: string; phone: string; email: string | null };
+  payments: BookingPayment[];
+  costs: BookingCost[];
+  financials: BookingFinancials;
 }

@@ -10,10 +10,13 @@ import {
   Trash2,
   TriangleAlert,
   CheckCircle2,
+  CalendarCheck,
+  FileDown,
 } from 'lucide-react';
 import {
   api,
   ApiError,
+  openBinary,
   type QuoteDetail,
   type QuoteLine,
   type QuoteOption,
@@ -142,7 +145,7 @@ export default function QuoteBuilderPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight text-ink-50">
+            <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
               {quote.title ?? 'Untitled package'}
             </h1>
             <Chip className="tabular">{quote.quoteNumber}</Chip>
@@ -162,6 +165,22 @@ export default function QuoteBuilderPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={busy || quote.options.length === 0}
+            onClick={() =>
+              openBinary(
+                `/quotes/${id}/pdf`,
+                `Quotation-${quote.quoteNumber}.pdf`,
+              ).catch((e) =>
+                setError(e instanceof ApiError ? e.message : 'Download failed.'),
+              )
+            }
+          >
+            <FileDown className="size-4" strokeWidth={1.75} />
+            Download PDF
+          </Button>
           <div className="w-[150px]">
             <Select
               value={quote.status}
@@ -415,6 +434,36 @@ export default function QuoteBuilderPage() {
                     mutate(() => api.patch(`/quotes/options/${tier.id}`, body))
                   }
                 />
+
+                {/*
+                 * "Book this tier" freezes the numbers on the server and
+                 * creates a Booking. The lead auto-moves to CONFIRMED and the
+                 * quote to ACCEPTED — reversing that means going into the
+                 * booking and cancelling it, not editing status here.
+                 */}
+                <Button
+                  disabled={busy || tier.totalSell <= 0}
+                  className="w-full border-t border-ink-800 pt-3 mt-3"
+                  onClick={() => {
+                    if (
+                      !confirm(
+                        `Confirm booking for "${tier.name}" at ${money(tier.totalSell)}?\n\nThis freezes the price and moves the lead to Confirmed.`,
+                      )
+                    )
+                      return;
+                    mutate(async () => {
+                      const booking = await api.post<{ id: string }>(
+                        '/bookings',
+                        { quoteOptionId: tier.id },
+                      );
+                      router.push(`/bookings/${booking.id}`);
+                    });
+                  }}
+                >
+                  <CalendarCheck className="size-4" strokeWidth={1.75} />
+                  Book this tier
+                </Button>
+
                 <div className="flex gap-2 border-t border-ink-800 pt-3">
                   <Button
                     variant="secondary"

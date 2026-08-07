@@ -40,25 +40,31 @@ export function EChart({
   return <div ref={ref} style={{ height }} className={className} />;
 }
 
-/** Shared axis/tooltip styling so every chart in the product matches. */
+/**
+ * Shared axis/tooltip styling. Values are literals rather than CSS variables
+ * because ECharts renders into a canvas and can't read `var(--…)` at runtime.
+ * Keep them synchronised with globals.css.
+ */
 export const chartBase: Pick<
   echarts.EChartsOption,
   'grid' | 'textStyle' | 'tooltip'
 > = {
   grid: { left: 8, right: 12, top: 16, bottom: 4, containLabel: true },
-  textStyle: { fontFamily: 'var(--font-geist-mono), monospace', fontSize: 11 },
+  textStyle: { fontFamily: 'var(--font-geist-sans), sans-serif', fontSize: 11 },
   tooltip: {
-    backgroundColor: '#171b22',
-    borderColor: '#333b4a',
+    backgroundColor: '#ffffff',
+    borderColor: '#ecdfc4',
     borderWidth: 1,
-    textStyle: { color: '#dfe3ea', fontSize: 12 },
+    textStyle: { color: '#2b2f3a', fontSize: 12 },
     padding: [8, 10],
+    extraCssText:
+      'box-shadow: 0 8px 24px -8px rgba(28,30,40,0.18); border-radius: 8px;',
   },
 };
 
 export const axisStyle = {
-  axisLine: { lineStyle: { color: '#262c38' } },
+  axisLine: { lineStyle: { color: '#ecdfc4' } },
   axisTick: { show: false },
-  axisLabel: { color: '#6b7688', fontSize: 10 },
-  splitLine: { lineStyle: { color: '#1c212a' } },
+  axisLabel: { color: '#6d6a5c', fontSize: 10 },
+  splitLine: { lineStyle: { color: '#f6efdf' } },
 };

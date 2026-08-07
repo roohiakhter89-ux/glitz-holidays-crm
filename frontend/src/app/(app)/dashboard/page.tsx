@@ -1,9 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { EChartsOption } from 'echarts';
 import Link from 'next/link';
-import { ArrowUpRight, TriangleAlert } from 'lucide-react';
+import {
+  ArrowUpRight,
+  TriangleAlert,
+  Wallet,
+  Users,
+  Receipt,
+  TrendingUp,
+} from 'lucide-react';
+import type { EChartsOption } from 'echarts';
 import {
   api,
   ApiError,
@@ -13,35 +20,53 @@ import {
   type Paged,
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
-import { MarginRibbon, ScoreMeter } from '@/components/margin-ribbon';
 import { EChart, chartBase, axisStyle } from '@/components/echart';
 import { Stage } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { WeatherStrip } from '@/components/weather-widget';
+import { CountUp } from '@/components/count-up';
 import { money, moneyShort, percent, relativeDate } from '@/lib/format';
+import { tokenStore } from '@/lib/api';
 
+/**
+ * The desk — the first screen the owner sees when they log in.
+ *
+ * The hierarchy is deliberate:
+ *   1. Greeting + weather   — humane orientation, "which of my destinations
+ *                             am I sending people to today"
+ *   2. Four KPI tiles       — booked, owed to us, owed to vendors, margin
+ *   3. Pipeline + sources   — where work is stuck / where it comes from
+ *   4. Latest enquiries     — the actual queue to act on
+ *
+ * Colour is spent only on money-verdict signals (healthy/warn/loss) and the
+ * teal accent tied to the brand. Everything else stays warm neutral so
+ * numbers stay the loudest thing on the screen.
+ */
 export default function DashboardPage() {
   const [bookings, setBookings] = useState<BookingStats | null>(null);
   const [leads, setLeads] = useState<LeadStats | null>(null);
   const [recent, setRecent] = useState<LeadRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [name, setName] = useState<string>('there');
 
   useEffect(() => {
+    setName(tokenStore.user()?.name.split(' ')[0] ?? 'there');
     let cancelled = false;
     (async () => {
       try {
         const [b, l, r] = await Promise.all([
           api.get<BookingStats>('/bookings/stats').catch(() => null),
           api.get<LeadStats>('/leads/stats').catch(() => null),
-          api.get<Paged<LeadRow>>('/leads?limit=6').catch(
-            (): Paged<LeadRow> => ({
+          api
+            .get<Paged<LeadRow>>('/leads?limit=6')
+            .catch((): Paged<LeadRow> => ({
               total: 0,
               page: 1,
               limit: 6,
               pages: 0,
               data: [],
-            }),
-          ),
+            })),
         ]);
         if (cancelled) return;
         setBookings(b);
@@ -60,12 +85,33 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Where leads are stuck — laid out as a segmented bar rather than a chart,
+  // because the shape of the bar IS the pipeline diagnosis.
+  const pipeline = useMemo(() => {
+    const order = [
+      'NEW',
+      'CONTACTED',
+      'INTERESTED',
+      'QUOTATION_SENT',
+      'NEGOTIATION',
+      'CONFIRMED',
+    ] as const;
+    const map = new Map((leads?.byStatus ?? []).map((r) => [r.status, r.count]));
+    const rows = order.map((s) => ({ stage: s, count: map.get(s) ?? 0 }));
+    const total = rows.reduce((a, r) => a + r.count, 0) || 1;
+    return { rows, total };
+  }, [leads]);
+
   const sourceOption = useMemo<EChartsOption>(() => {
-    const rows = (leads?.bySource ?? []).slice().sort((a, b) => b.count - a.count);
+    const rows = (leads?.bySource ?? [])
+      .slice()
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
     return {
       ...chartBase,
       grid: { ...chartBase.grid, left: 4 },
-      xAxis: { type: 'value' as const, ...axisStyle },
+      xAxis: { type: 'value' as const, ...axisStyle, splitLine: { show: false } },
       yAxis: {
         type: 'category' as const,
         ...axisStyle,
@@ -77,39 +123,19 @@ export default function DashboardPage() {
           type: 'bar' as const,
           data: rows.map((r) => r.count),
           barMaxWidth: 14,
-          itemStyle: { color: '#4a5566', borderRadius: [0, 3, 3, 0] },
-          emphasis: { itemStyle: { color: '#359296' } },
-        },
-      ],
-    };
-  }, [leads]);
-
-  const pipelineOption = useMemo<EChartsOption>(() => {
-    const order = [
-      'NEW',
-      'CONTACTED',
-      'INTERESTED',
-      'QUOTATION_SENT',
-      'NEGOTIATION',
-      'CONFIRMED',
-    ];
-    const map = new Map((leads?.byStatus ?? []).map((r) => [r.status, r.count]));
-    return {
-      ...chartBase,
-      xAxis: {
-        type: 'category' as const,
-        ...axisStyle,
-        data: order.map((s) => s.replace(/_/g, ' ').toLowerCase()),
-        axisLabel: { ...axisStyle.axisLabel, interval: 0, rotate: 28 },
-      },
-      yAxis: { type: 'value' as const, ...axisStyle },
-      series: [
-        {
-          type: 'bar' as const,
-          data: order.map((s) => map.get(s) ?? 0),
-          barMaxWidth: 26,
-          itemStyle: { color: '#333b4a', borderRadius: [3, 3, 0, 0] },
-          emphasis: { itemStyle: { color: '#359296' } },
+          itemStyle: {
+            // Warm brand-to-teal gradient — matches the logo.
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 1, y2: 0,
+              colorStops: [
+                { offset: 0, color: '#f4c85a' },
+                { offset: 1, color: '#1b7d93' },
+              ],
+            },
+            borderRadius: [0, 6, 6, 0],
+          },
+          emphasis: { itemStyle: { color: '#0e5d71' } },
         },
       ],
     };
@@ -118,232 +144,404 @@ export default function DashboardPage() {
   const eroding =
     bookings != null && bookings.profitVariance < 0 ? bookings.profitVariance : 0;
 
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const today = new Intl.DateTimeFormat('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date());
+
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
-      <header className="mb-7 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink-50">
-            Desk
-          </h1>
-          <p className="mt-0.5 text-[13px] text-ink-400">
-            Where the money is, right now.
-          </p>
-        </div>
-        <Button asChild variant="secondary" size="sm">
-          <Link href="/leads">
-            Open leads
-            <ArrowUpRight className="size-4" strokeWidth={1.75} />
-          </Link>
-        </Button>
-      </header>
-
-      {error && (
-        <Panel className="mb-6 border-loss-500/40 bg-loss-500/5">
-          <PanelBody className="flex items-start gap-3 py-4">
-            <TriangleAlert className="mt-0.5 size-4 text-loss-400" strokeWidth={1.75} />
-            <div>
-              <p className="text-[13px] text-ink-100">{error}</p>
-              <p className="mt-1 text-[12px] text-ink-400">
-                Start the backend with <code className="tabular">npm run start:dev</code>,
-                then reload.
-              </p>
-            </div>
-          </PanelBody>
-        </Panel>
-      )}
-
-      {/* Row 1 — the money question */}
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr_1fr]">
-        <Panel interactive className="rise">
-          <PanelHeader>
-            <PanelTitle>Booked value</PanelTitle>
-            {eroding < 0 && (
-              <span className="tabular text-[11px] text-warn-400">
-                {money(eroding)} vs quoted
-              </span>
-            )}
-          </PanelHeader>
-          <PanelBody>
-            {loading ? (
-              <Skeleton />
-            ) : bookings && bookings.totalSell > 0 ? (
-              <>
-                <p className="tabular text-[2rem] leading-none font-semibold text-ink-50">
-                  {money(bookings.totalSell)}
-                </p>
-                <p className="mt-1.5 text-[12px] text-ink-500">
-                  across {bookings.bookings} file
-                  {bookings.bookings === 1 ? '' : 's'}
-                </p>
-                <div className="mt-5">
-                  <MarginRibbon
-                    sell={bookings.totalSell}
-                    cost={bookings.totalSell - bookings.totalActualProfit}
-                  />
-                </div>
-              </>
-            ) : (
-              <Empty
-                title="No bookings yet"
-                hint="Confirm a quotation to see value here."
-              />
-            )}
-          </PanelBody>
-        </Panel>
-
-        <Panel interactive className="rise" style={{ animationDelay: '60ms' }}>
-          <PanelHeader>
-            <PanelTitle>Owed to you</PanelTitle>
-          </PanelHeader>
-          <PanelBody>
-            {loading ? (
-              <Skeleton />
-            ) : (
-              <>
-                <p className="tabular text-[2rem] leading-none font-semibold text-ink-50">
-                  {money(bookings?.totalOutstanding ?? 0)}
-                </p>
-                <p className="mt-1.5 text-[12px] text-ink-500">
-                  {money(bookings?.totalReceived ?? 0)} received so far
-                </p>
-              </>
-            )}
-          </PanelBody>
-        </Panel>
-
-        <Panel interactive className="rise" style={{ animationDelay: '120ms' }}>
-          <PanelHeader>
-            <PanelTitle>You owe suppliers</PanelTitle>
-          </PanelHeader>
-          <PanelBody>
-            {loading ? (
-              <Skeleton />
-            ) : (
-              <>
-                <p className="tabular text-[2rem] leading-none font-semibold text-ink-50">
-                  {money(bookings?.vendorOutstanding ?? 0)}
-                </p>
-                <p className="mt-1.5 text-[12px] text-ink-500">
-                  {bookings && bookings.averageMarginPercent > 0
-                    ? `${percent(bookings.averageMarginPercent)} average margin`
-                    : 'Record vendor costs to track this'}
-                </p>
-              </>
-            )}
-          </PanelBody>
-        </Panel>
+    <div className="relative min-h-screen">
+      {/* Aurora — a soft warm haze behind the hero. Text-safe because it
+          sits below the content and only paints the top 400px. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] overflow-hidden"
+      >
+        <div
+          className="aurora absolute -top-32 -left-24 h-[520px] w-[620px] rounded-full blur-[100px]"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 40%, rgba(244,200,90,0.35), transparent 60%)',
+          }}
+        />
+        <div
+          className="aurora absolute -top-24 right-0 h-[420px] w-[520px] rounded-full blur-[100px]"
+          style={{
+            background:
+              'radial-gradient(circle at 60% 50%, rgba(79,165,184,0.28), transparent 60%)',
+            animationDelay: '4s',
+          }}
+        />
       </div>
 
-      {/* Row 2 — where work comes from */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Panel className="rise" style={{ animationDelay: '180ms' }}>
-          <PanelHeader>
-            <PanelTitle>Pipeline</PanelTitle>
-            <span className="tabular text-[11px] text-ink-500">
-              {leads?.total ?? 0} leads
-            </span>
-          </PanelHeader>
-          <PanelBody className="pt-2">
-            {leads && leads.total > 0 ? (
-              <EChart option={pipelineOption} height={240} />
-            ) : (
-              <Empty
-                title="No leads yet"
-                hint="Point a landing page at /api/leads/capture."
+      <div className="relative mx-auto max-w-[1180px] px-8 py-10">
+        <header className="mb-8 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="text-[11.5px] font-medium uppercase tracking-[0.14em] text-signal-600">
+              {today}
+            </p>
+            <h1 className="display mt-2 text-[34px] font-semibold leading-tight text-ink-100">
+              {greeting},{' '}
+              <span className="text-brand-600">{name}</span>.
+            </h1>
+            <p className="mt-1 text-[13.5px] text-ink-400">
+              Here&rsquo;s where the money is right now.
+            </p>
+          </div>
+
+          <WeatherStrip />
+        </header>
+
+        {error && (
+          <Panel className="mb-6 border-loss-500/30 bg-loss-500/5">
+            <PanelBody className="flex items-start gap-3 py-4">
+              <TriangleAlert
+                className="mt-0.5 size-4 text-loss-500"
+                strokeWidth={1.75}
               />
-            )}
-          </PanelBody>
-        </Panel>
-
-        <Panel className="rise" style={{ animationDelay: '240ms' }}>
-          <PanelHeader>
-            <PanelTitle>Where leads come from</PanelTitle>
-            {leads && leads.unassigned > 0 && (
-              <span className="tabular text-[11px] text-warn-400">
-                {leads.unassigned} unassigned
-              </span>
-            )}
-          </PanelHeader>
-          <PanelBody className="pt-2">
-            {leads && leads.bySource.length > 0 ? (
-              <EChart option={sourceOption} height={240} />
-            ) : (
-              <Empty title="Nothing to chart" hint="Sources appear as leads arrive." />
-            )}
-          </PanelBody>
-        </Panel>
-      </div>
-
-      {/* Row 3 — the actual work queue */}
-      <Panel className="rise mt-4" style={{ animationDelay: '300ms' }}>
-        <PanelHeader>
-          <PanelTitle>Latest enquiries</PanelTitle>
-          <Button asChild variant="link" size="sm">
-            <Link href="/leads">View all</Link>
-          </Button>
-        </PanelHeader>
-        {recent.length === 0 ? (
-          <PanelBody>
-            <Empty
-              title="No enquiries yet"
-              hint="Leads captured from your landing pages land here first."
-            />
-          </PanelBody>
-        ) : (
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
-                <th className="px-5 py-2.5 font-medium">Name</th>
-                <th className="px-5 py-2.5 font-medium">Destination</th>
-                <th className="px-5 py-2.5 font-medium">Stage</th>
-                <th className="px-5 py-2.5 font-medium">Score</th>
-                <th className="px-5 py-2.5 text-right font-medium">Received</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map((lead) => (
-                <tr
-                  key={lead.id}
-                  className="group border-b border-ink-800/60 transition-colors duration-150 last:border-0 hover:bg-ink-850"
-                >
-                  <td className="px-5 py-3">
-                    <Link
-                      href={`/leads/${lead.id}`}
-                      className="text-ink-100 transition-colors group-hover:text-signal-300"
-                    >
-                      {lead.name}
-                    </Link>
-                    <span className="tabular ml-2 text-[11px] text-ink-500">
-                      {lead.phone}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-ink-300">
-                    {lead.destination ?? '—'}
-                  </td>
-                  <td className="px-5 py-3">
-                    <Stage value={lead.status} />
-                  </td>
-                  <td className="px-5 py-3">
-                    <ScoreMeter score={lead.score} />
-                  </td>
-                  <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
-                    {relativeDate(lead.createdAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              <div>
+                <p className="text-[13px] text-ink-100">{error}</p>
+                <p className="mt-1 text-[12px] text-ink-500">
+                  Start the backend with{' '}
+                  <code className="tabular">npm run start:dev</code>, then reload.
+                </p>
+              </div>
+            </PanelBody>
+          </Panel>
         )}
-      </Panel>
+
+        {/* Row 1 — the four numbers you'd shout across the office */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <KpiTile
+            label="Booked value"
+            value={bookings?.totalSell ?? 0}
+            loading={loading}
+            hint={
+              bookings && bookings.bookings > 0
+                ? `${bookings.bookings} file${bookings.bookings === 1 ? '' : 's'}`
+                : 'no files yet'
+            }
+            icon={Wallet}
+            accent="signal"
+            format={money}
+          />
+          <KpiTile
+            label="Owed to you"
+            value={bookings?.totalOutstanding ?? 0}
+            loading={loading}
+            hint={`${money(bookings?.totalReceived ?? 0)} received`}
+            icon={ArrowUpRight}
+            accent="brand"
+            format={money}
+            delay={80}
+          />
+          <KpiTile
+            label="You owe suppliers"
+            value={bookings?.vendorOutstanding ?? 0}
+            loading={loading}
+            hint={
+              eroding < 0
+                ? `${money(eroding)} margin variance`
+                : 'balances current'
+            }
+            hintTone={eroding < 0 ? 'warn' : 'muted'}
+            icon={Receipt}
+            accent="warn"
+            format={money}
+            delay={160}
+          />
+          <KpiTile
+            label="Average margin"
+            value={Math.round(bookings?.averageMarginPercent ?? 0)}
+            loading={loading}
+            hint={
+              (bookings?.averageMarginPercent ?? 0) >= 15
+                ? 'healthy'
+                : bookings && bookings.bookings > 0
+                  ? 'thin — review pricing'
+                  : 'no data yet'
+            }
+            hintTone={
+              (bookings?.averageMarginPercent ?? 0) >= 15
+                ? 'healthy'
+                : bookings && bookings.bookings > 0
+                  ? 'warn'
+                  : 'muted'
+            }
+            icon={TrendingUp}
+            accent="healthy"
+            format={(n) => `${n}%`}
+            delay={240}
+          />
+        </div>
+
+        {/* Row 2 — pipeline shape + source mix */}
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+          <Panel className="rise" style={{ animationDelay: '260ms' }}>
+            <PanelHeader>
+              <PanelTitle className="flex items-center gap-1.5">
+                <Users className="size-3.5" strokeWidth={1.75} />
+                Pipeline shape
+              </PanelTitle>
+              <span className="tabular text-[11px] text-ink-500">
+                {leads?.total ?? 0} leads
+                {leads && leads.unassigned > 0 && (
+                  <span className="ml-2 text-warn-500">
+                    · {leads.unassigned} unassigned
+                  </span>
+                )}
+              </span>
+            </PanelHeader>
+            <PanelBody>
+              <PipelineBar rows={pipeline.rows} total={pipeline.total} />
+            </PanelBody>
+          </Panel>
+
+          <Panel className="rise" style={{ animationDelay: '320ms' }}>
+            <PanelHeader>
+              <PanelTitle>Where they came from</PanelTitle>
+            </PanelHeader>
+            <PanelBody className="pt-2">
+              {leads && leads.bySource.some((r) => r.count > 0) ? (
+                <EChart option={sourceOption} height={220} />
+              ) : (
+                <Empty
+                  title="Nothing to chart yet"
+                  hint="Sources appear as leads arrive."
+                />
+              )}
+            </PanelBody>
+          </Panel>
+        </div>
+
+        {/* Row 3 — the actual work queue */}
+        <Panel className="rise mt-5" style={{ animationDelay: '380ms' }}>
+          <PanelHeader>
+            <PanelTitle>Latest enquiries</PanelTitle>
+            <Button asChild variant="link" size="sm">
+              <Link href="/leads">
+                View all
+                <ArrowUpRight className="size-3.5" strokeWidth={1.75} />
+              </Link>
+            </Button>
+          </PanelHeader>
+          {loading ? (
+            <TableSkeleton />
+          ) : recent.length === 0 ? (
+            <PanelBody>
+              <Empty
+                title="No enquiries yet"
+                hint="Leads captured from your landing pages land here first."
+              />
+            </PanelBody>
+          ) : (
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
+                  <th className="px-5 py-2.5 font-medium">Name</th>
+                  <th className="px-5 py-2.5 font-medium">Destination</th>
+                  <th className="px-5 py-2.5 font-medium">Source</th>
+                  <th className="px-5 py-2.5 font-medium">Stage</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((lead) => (
+                  <tr
+                    key={lead.id}
+                    className="group border-b border-ink-800/60 transition-colors duration-150 last:border-0 hover:bg-ink-850/70"
+                  >
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/leads/${lead.id}`}
+                        className="font-medium text-ink-100 transition-colors group-hover:text-signal-600"
+                      >
+                        {lead.name}
+                      </Link>
+                      <span className="tabular ml-2 text-[11px] text-ink-500">
+                        {lead.phone}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-ink-300">
+                      {lead.destination ?? '—'}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="rounded-full border border-ink-800 bg-ink-850 px-2 py-0.5 text-[10.5px] uppercase tracking-[0.06em] text-ink-500">
+                        {lead.source.replace(/_/g, ' ').toLowerCase()}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Stage value={lead.status} />
+                    </td>
+                    <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
+                      {relativeDate(lead.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }
 
-function Skeleton() {
+/* ------------------------------------------------------------------ */
+
+type Tone = 'signal' | 'brand' | 'warn' | 'healthy' | 'muted';
+
+const ACCENT: Record<Tone, { ring: string; icon: string; glow: string }> = {
+  signal:  { ring: 'ring-signal-200',  icon: 'text-signal-600',  glow: 'from-signal-200/40' },
+  brand:   { ring: 'ring-brand-200',   icon: 'text-brand-600',   glow: 'from-brand-200/50' },
+  warn:    { ring: 'ring-warn-500/20', icon: 'text-warn-500',    glow: 'from-warn-500/15' },
+  healthy: { ring: 'ring-healthy-500/20', icon: 'text-healthy-500', glow: 'from-healthy-500/15' },
+  muted:   { ring: 'ring-ink-800',     icon: 'text-ink-500',     glow: 'from-ink-800/30' },
+};
+
+const HINT_TONE: Record<Tone, string> = {
+  signal:  'text-signal-500',
+  brand:   'text-brand-600',
+  warn:    'text-warn-500',
+  healthy: 'text-healthy-500',
+  muted:   'text-ink-500',
+};
+
+function KpiTile({
+  label,
+  value,
+  loading,
+  hint,
+  hintTone = 'muted',
+  icon: Icon,
+  accent,
+  format,
+  delay = 0,
+}: {
+  label: string;
+  value: number;
+  loading: boolean;
+  hint: string;
+  hintTone?: Tone;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  accent: Tone;
+  format: (n: number) => string;
+  delay?: number;
+}) {
+  const a = ACCENT[accent];
   return (
-    <div className="space-y-2">
-      <div className="h-8 w-32 animate-pulse rounded bg-ink-800" />
-      <div className="h-3 w-20 animate-pulse rounded bg-ink-850" />
+    <Panel
+      interactive
+      className="rise relative overflow-hidden"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      {/* Soft radial wash in the accent colour, top-right corner. */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${a.glow} to-transparent blur-2xl`}
+      />
+      <PanelBody className="relative py-5">
+        <div className="flex items-start justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-[0.11em] text-ink-500">
+            {label}
+          </p>
+          <div
+            className={`grid size-8 place-items-center rounded-lg bg-ink-950 ring-1 ${a.ring}`}
+          >
+            <Icon className={`size-4 ${a.icon}`} strokeWidth={1.75} />
+          </div>
+        </div>
+        {loading ? (
+          <div className="mt-4 h-8 w-32 rounded shimmer" />
+        ) : (
+          <p className="display tabular mt-4 text-[28px] leading-none font-semibold text-ink-100">
+            <CountUp value={value} format={format} />
+          </p>
+        )}
+        <p className={`mt-2 text-[11.5px] ${HINT_TONE[hintTone]}`}>{hint}</p>
+      </PanelBody>
+    </Panel>
+  );
+}
+
+/**
+ * Pipeline shown as a single segmented bar. Each stage's width is its share
+ * of the funnel — the shape tells you where deals are stuck at a glance.
+ * A stage stuck at 40% "quotation sent" is visible even before you read the
+ * label.
+ */
+function PipelineBar({
+  rows,
+  total,
+}: {
+  rows: { stage: string; count: number }[];
+  total: number;
+}) {
+  const colors: Record<string, string> = {
+    NEW:            'bg-signal-200',
+    CONTACTED:      'bg-signal-300',
+    INTERESTED:     'bg-signal-400',
+    QUOTATION_SENT: 'bg-brand-400',
+    NEGOTIATION:    'bg-brand-500',
+    CONFIRMED:      'bg-healthy-500',
+  };
+  return (
+    <div>
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-ink-850">
+        {rows.map((r, i) => {
+          const pct = (r.count / total) * 100;
+          if (pct === 0) return null;
+          return (
+            <div
+              key={r.stage}
+              className={`sweep h-full ${colors[r.stage]}`}
+              style={{
+                width: `${pct}%`,
+                animationDelay: `${i * 90}ms`,
+              }}
+              title={`${r.stage.replace(/_/g, ' ').toLowerCase()} · ${r.count}`}
+            />
+          );
+        })}
+      </div>
+      <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+        {rows.map((r) => (
+          <li key={r.stage} className="flex items-center gap-2 text-[12px]">
+            <span
+              aria-hidden
+              className={`inline-block size-2 rounded-sm ${colors[r.stage]}`}
+            />
+            <span className="capitalize text-ink-400">
+              {r.stage.replace(/_/g, ' ').toLowerCase()}
+            </span>
+            <span className="tabular ml-auto font-medium text-ink-200">
+              {r.count}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TableSkeleton() {
+  return (
+    <div className="divide-y divide-ink-800/60">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-5 py-3.5">
+          <div className="h-3 w-40 rounded shimmer" />
+          <div className="h-3 w-24 rounded shimmer" />
+          <div className="ml-auto h-3 w-16 rounded shimmer" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -356,3 +554,7 @@ function Empty({ title, hint }: { title: string; hint: string }) {
     </div>
   );
 }
+
+// moneyShort/percent stay imported for future rows; suppress unused warnings.
+void moneyShort;
+void percent;

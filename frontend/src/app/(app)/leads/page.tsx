@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Search, X, Inbox } from 'lucide-react';
 import { api, ApiError, type LeadRow, type Paged } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
@@ -10,10 +11,12 @@ import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Stage, Chip } from '@/components/ui/badge';
 import { ScoreMeter } from '@/components/margin-ribbon';
+import { AddLeadDialog } from '@/components/add-lead-dialog';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
 import { relativeDate } from '@/lib/format';
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [rows, setRows] = useState<LeadRow[]>([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 0 });
   const [search, setSearch] = useState('');
@@ -62,7 +65,7 @@ export default function LeadsPage() {
     <div className="mx-auto max-w-[1180px] px-8 py-8">
       <header className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink-50">
+          <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
             Leads
           </h1>
           <p className="mt-0.5 text-[13px] text-ink-400">
@@ -70,6 +73,7 @@ export default function LeadsPage() {
             {filtered ? ' matching your filters' : ' in the pipeline'}
           </p>
         </div>
+        <AddLeadDialog onCreated={(id) => router.push(`/leads/${id}`)} />
       </header>
 
       {/* Filters — a toolbar, not a panel. It is chrome, not content. */}
