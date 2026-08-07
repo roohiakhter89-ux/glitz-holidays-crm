@@ -66,4 +66,12 @@ export class CaptureLeadDto {
   @IsOptional() @IsString() @MaxLength(500) landingPage?: string;
   @IsOptional() @IsString() @MaxLength(500) referrer?: string;
   @IsOptional() @IsString() @MaxLength(200) keyword?: string;
+
+  /**
+   * Landing-page beacon returned this on page load; the form submit sends it
+   * back. When present, the visit's stored attribution wins over anything the
+   * form fields carry — the URL had the ground truth, form values can be
+   * spoofed by copy-paste.
+   */
+  @IsOptional() @IsString() @MaxLength(64) visitId?: string;
 }

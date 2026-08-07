@@ -16,6 +16,8 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { QueryLeadsDto } from './dto/query-leads.dto';
 import { scoreLead } from './lead-scoring';
 import { Actor, canSeeAllLeads } from '../common/access';
+import { toDateOrNull } from '../common/dates';
+import { AttributionService } from '../attribution/attribution.service';
 
 /** Extra request context the controller extracts (not client-supplied). */
 export interface CaptureContext {
@@ -28,7 +30,10 @@ const DEDUPE_WINDOW_DAYS = 30;
 
 @Injectable()
 export class LeadsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attribution: AttributionService,
+  ) {}
 
   /**
    * Sales execs may only touch leads assigned to them.
@@ -48,6 +53,18 @@ export class LeadsService {
   }
 
   async capture(dto: CaptureLeadDto, ctx: CaptureContext) {
+    // Load the visit early so its stored attribution wins over anything the
+    // form fields might carry — the URL had ground truth, form values can be
+    // spoofed with copy-paste. `pick` is DTO-first, visit-fallback.
+    const visit = dto.visitId
+      ? await this.attribution.findVisit(dto.visitId)
+      : null;
+    // DTO-first, visit-fallback. Typed loose on purpose — both sides share the
+    // same attribution field names, but they live on different types.
+    const v = visit as any;
+    const pick = (key: string): string | null | undefined =>
+      (dto as any)[key] ?? (v ? v[key] : undefined);
+
     const phoneKey = this.normalisePhone(dto.phone);
     const since = new Date();
     since.setDate(since.getDate() - DEDUPE_WINDOW_DAYS);
@@ -132,19 +149,20 @@ export class LeadsService {
         status: LeadStatus.NEW,
         score,
         scoreNotes: notes,
-        utmSource: dto.utmSource ?? null,
-        utmMedium: dto.utmMedium ?? null,
-        utmCampaign: dto.utmCampaign ?? null,
-        utmTerm: dto.utmTerm ?? null,
-        utmContent: dto.utmContent ?? null,
-        gclid: dto.gclid ?? null,
-        fbclid: dto.fbclid ?? null,
-        landingPage: dto.landingPage ?? null,
-        referrer: dto.referrer ?? null,
-        keyword: dto.keyword ?? null,
-        device: ctx.device ?? null,
-        userAgent: ctx.userAgent ?? null,
-        ipAddress: ctx.ipAddress ?? null,
+        utmSource: pick('utmSource') ?? null,
+        utmMedium: pick('utmMedium') ?? null,
+        utmCampaign: pick('utmCampaign') ?? null,
+        utmTerm: pick('utmTerm') ?? null,
+        utmContent: pick('utmContent') ?? null,
+        gclid: pick('gclid') ?? null,
+        fbclid: pick('fbclid') ?? null,
+        landingPage: dto.landingPage ?? visit?.pagePath ?? null,
+        referrer: pick('referrer') ?? null,
+        keyword: pick('keyword') ?? null,
+        device: ctx.device ?? visit?.device ?? null,
+        userAgent: ctx.userAgent ?? visit?.userAgent ?? null,
+        ipAddress: ctx.ipAddress ?? visit?.ipAddress ?? null,
+        visitId: visit?.id ?? null,
       },
     });
 
@@ -159,6 +177,37 @@ export class LeadsService {
     });
 
     return { duplicate: false, leadId: lead.id, score };
+  }
+
+  /**
+   * Manual add by a logged-in operator (phone-in, walk-in, forwarded WhatsApp).
+   * Runs through the same capture pipeline so dedupe, scoring and the timeline
+   * work identically. Two differences from the public route:
+   *   - defaults source to PHONE instead of OTHER (the common case)
+   *   - assigns to the caller if the lead is brand new (not a re-enquiry),
+   *     so it doesn't land in the unassigned bucket the operator will then
+   *     have to claim in a second click.
+   */
+  async manualCreate(dto: CaptureLeadDto, actor: Actor) {
+    const source = dto.source ?? ('PHONE' as any);
+    const result = await this.capture({ ...dto, source }, {});
+
+    if (!result.duplicate) {
+      await this.prisma.lead.update({
+        where: { id: result.leadId },
+        data: { assignedToId: actor.id },
+      });
+      await this.prisma.activity.create({
+        data: {
+          leadId: result.leadId,
+          userId: actor.id,
+          type: 'SYSTEM' as any,
+          content: `Added manually by ${actor.id}, auto-assigned`,
+        },
+      });
+    }
+
+    return result;
   }
 
   async findAll(q: QueryLeadsDto, actor: Actor) {
@@ -244,9 +293,10 @@ export class LeadsService {
     if (dto.children !== undefined) data.children = dto.children;
     if (dto.budget !== undefined) data.budget = dto.budget;
     if (dto.lostReason !== undefined) data.lostReason = dto.lostReason;
-    if (dto.travelDate !== undefined) data.travelDate = new Date(dto.travelDate);
+    if (dto.travelDate !== undefined)
+      data.travelDate = toDateOrNull(dto.travelDate);
     if (dto.nextFollowUp !== undefined)
-      data.nextFollowUp = new Date(dto.nextFollowUp);
+      data.nextFollowUp = toDateOrNull(dto.nextFollowUp);
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.assignedToId !== undefined) {
       data.assignedTo = dto.assignedToId

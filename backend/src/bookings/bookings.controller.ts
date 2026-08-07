@@ -3,13 +3,17 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { Role } from '@prisma/client';
 import { BookingsService } from './bookings.service';
+import { PdfService } from '../pdf/pdf.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -18,7 +22,7 @@ import { UpdateCostDto } from './dto/update-cost.dto';
 import { QueryBookingsDto } from './dto/query-bookings.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { LEAD_MODULE_ROLES } from '../common/access';
+import { Actor, BOOKING_MODULE_ROLES } from '../common/access';
 
 /** Money movements are restricted to finance-capable roles. */
 const FINANCE_ROLES: Role[] = [
@@ -28,21 +32,29 @@ const FINANCE_ROLES: Role[] = [
   Role.OPERATIONS,
 ];
 
-@Roles(...LEAD_MODULE_ROLES)
+/**
+ * Staff only — every booking response carries totalNet and actual margin.
+ * The service then scopes each route to the leads the caller owns.
+ */
+@Roles(...BOOKING_MODULE_ROLES)
 @Controller('bookings')
 export class BookingsController {
-  constructor(private readonly bookings: BookingsService) {}
+  constructor(
+    private readonly bookings: BookingsService,
+    private readonly pdf: PdfService,
+  ) {}
 
   @Post()
-  create(@Body() dto: CreateBookingDto, @CurrentUser('id') userId: string) {
-    return this.bookings.create(dto, userId);
+  create(@Body() dto: CreateBookingDto, @CurrentUser() actor: Actor) {
+    return this.bookings.create(dto, actor);
   }
 
   @Get()
-  findAll(@Query() q: QueryBookingsDto) {
-    return this.bookings.findAll(q);
+  findAll(@Query() q: QueryBookingsDto, @CurrentUser() actor: Actor) {
+    return this.bookings.findAll(q, actor);
   }
 
+  /** Agency-wide totals — restricted to roles that already see every lead. */
   @Roles(...FINANCE_ROLES, Role.SALES_MANAGER)
   @Get('stats')
   stats(@Query('from') from?: string, @Query('to') to?: string) {
@@ -50,17 +62,63 @@ export class BookingsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.bookings.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
+    return this.bookings.findOne(id, actor);
+  }
+
+  /**
+   * Client-facing invoice PDF. Access-checked via findOne so a sales exec
+   * cannot download an invoice for a booking they cannot read. Vendor costs
+   * are deliberately NOT included in the PDF — clients never see what Glitz
+   * pays a hotel.
+   */
+  @Get(':id/invoice.pdf')
+  @Header('Content-Type', 'application/pdf')
+  async downloadInvoice(
+    @Param('id') id: string,
+    @CurrentUser() actor: Actor,
+    @Res() res: Response,
+  ) {
+    const b = await this.bookings.findOne(id, actor);
+    const buf = await this.pdf.renderInvoice({
+      bookingNumber: b.bookingNumber,
+      packageName: b.packageName,
+      travelStartDate: b.travelStartDate,
+      travelEndDate: b.travelEndDate,
+      adults: b.adults,
+      children: b.children,
+      nights: b.nights,
+      totalSell: b.totalSell,
+      totalReceived: b.totalReceived,
+      createdAt: b.createdAt,
+      notes: b.notes,
+      lead: {
+        name: b.lead.name,
+        phone: b.lead.phone,
+        email: b.lead.email,
+      },
+      payments: b.payments.map((p: any) => ({
+        receivedAt: p.receivedAt,
+        amount: p.amount,
+        mode: p.mode,
+        reference: p.reference,
+        isRefund: p.isRefund,
+      })),
+    });
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="Invoice-${b.bookingNumber}.pdf"`,
+    );
+    res.send(buf);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateBookingDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser() actor: Actor,
   ) {
-    return this.bookings.update(id, dto, userId);
+    return this.bookings.update(id, dto, actor);
   }
 
   // --- payments ------------------------------------------------------------

@@ -17,8 +17,15 @@ import { UpdateRateDto } from './dto/update-rate.dto';
 import { QueryVendorsDto } from './dto/query-vendors.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { VENDOR_WRITE_ACCESS } from '../common/access';
+import { VENDOR_READ_ACCESS, VENDOR_WRITE_ACCESS } from '../common/access';
 
+/**
+ * Every route here exposes netRate. VENDOR_READ_ACCESS is staff-only by
+ * design; when a B2B partner portal is built it must NOT reuse this
+ * controller — it needs its own read model that returns sell prices without
+ * cost.
+ */
+@Roles(...VENDOR_READ_ACCESS)
 @Controller('vendors')
 export class VendorsController {
   constructor(private readonly vendors: VendorsService) {}
@@ -35,7 +42,7 @@ export class VendorsController {
     return this.vendors.findAll(q, role);
   }
 
-  /** Rate lookup for building quotes. */
+  /** Rate lookup for building quotes. Only rates valid on `on` are returned. */
   @Get('rates/search')
   searchRates(
     @Query('city') city: string,
@@ -43,6 +50,7 @@ export class VendorsController {
     @Query('season') season: string,
     @Query('variant') variant: string,
     @Query('maxNet') maxNet: string,
+    @Query('on') on: string,
     @CurrentUser('role') role: Role,
   ) {
     return this.vendors.searchRates(
@@ -52,6 +60,7 @@ export class VendorsController {
         season: season || undefined,
         variant,
         maxNet: maxNet ? parseInt(maxNet, 10) : undefined,
+        on: on || undefined,
       },
       role,
     );

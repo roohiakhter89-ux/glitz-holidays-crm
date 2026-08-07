@@ -12,7 +12,12 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: DATABASE_URL
-        sync: false        # set this in the Render dashboard (Supabase URI)
+        sync: false        # set in the Render dashboard — Supabase POOLED URI (6543)
+      - key: DIRECT_URL
+        sync: false        # set in the Render dashboard — Supabase DIRECT URI (5432).
+                           # Required: schema.prisma declares directUrl, and the
+                           # start command runs `prisma migrate deploy`, which
+                           # cannot go through pgbouncer.
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN

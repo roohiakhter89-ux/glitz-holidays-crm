@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityType, LeadStatus, MarkupMode } from '@prisma/client';
+import { ActivityType, LeadStatus, MarkupMode, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { Actor, canSeeAllLeads } from '../common/access';
+import { toDateOrNull } from '../common/dates';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { CreateOptionDto } from './dto/create-option.dto';
@@ -21,6 +23,66 @@ export class QuotesService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
   ) {}
+
+  // --- access scoping ------------------------------------------------------
+  //
+  // A quote carries net cost and margin for every line, so it inherits the
+  // access rules of the lead it belongs to. Without this a sales exec could
+  // GET /api/quotes and read the whole agency's cost structure.
+  //
+  // These throw 404 rather than 403 so an exec cannot probe which ids exist —
+  // same convention as LeadsService.assertCanTouch.
+
+  /** Scope fragment for list queries. */
+  private leadScope(actor: Actor): Prisma.QuoteWhereInput {
+    return canSeeAllLeads(actor.role)
+      ? {}
+      : { lead: { assignedToId: actor.id } };
+  }
+
+  private async assertQuoteAccess(quoteId: string, actor: Actor) {
+    if (canSeeAllLeads(actor.role)) return;
+    const quote = await this.prisma.quote.findUnique({
+      where: { id: quoteId },
+      select: { lead: { select: { assignedToId: true } } },
+    });
+    if (!quote || quote.lead.assignedToId !== actor.id) {
+      throw new NotFoundException('Quote not found');
+    }
+  }
+
+  private async assertLeadAccess(leadId: string, actor: Actor) {
+    if (canSeeAllLeads(actor.role)) return;
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { assignedToId: true },
+    });
+    if (!lead || lead.assignedToId !== actor.id) {
+      throw new NotFoundException('Lead not found');
+    }
+  }
+
+  /** Resolve a tier back to its quote, then check access on that quote. */
+  private async assertOptionAccess(optionId: string, actor: Actor) {
+    const option = await this.prisma.quoteOption.findUnique({
+      where: { id: optionId },
+      select: { quoteId: true },
+    });
+    if (!option) throw new NotFoundException('Option not found');
+    await this.assertQuoteAccess(option.quoteId, actor);
+    return option.quoteId;
+  }
+
+  /** Resolve a line back to its quote, then check access on that quote. */
+  private async assertLineAccess(lineId: string, actor: Actor) {
+    const line = await this.prisma.quoteLine.findUnique({
+      where: { id: lineId },
+      select: { optionId: true, option: { select: { quoteId: true } } },
+    });
+    if (!line) throw new NotFoundException('Line not found');
+    await this.assertQuoteAccess(line.option.quoteId, actor);
+    return line.optionId;
+  }
 
   /** GLZ-2026-0001 style, sequential per year. */
   private async nextQuoteNumber(): Promise<string> {
@@ -73,28 +135,29 @@ export class QuotesService {
 
   // --- quotes --------------------------------------------------------------
 
-  async create(dto: CreateQuoteDto, userId?: string) {
+  async create(dto: CreateQuoteDto, actor: Actor) {
     const lead = await this.prisma.lead.findUnique({
       where: { id: dto.leadId },
     });
     if (!lead) throw new NotFoundException('Lead not found');
+    await this.assertLeadAccess(dto.leadId, actor);
 
     const quote = await this.prisma.quote.create({
       data: {
         quoteNumber: await this.nextQuoteNumber(),
         leadId: dto.leadId,
         title: dto.title ?? null,
-        validUntil: dto.validUntil ? new Date(dto.validUntil) : null,
+        validUntil: toDateOrNull(dto.validUntil),
         notes: dto.notes ?? null,
         terms: dto.terms ?? null,
-        createdById: userId ?? null,
+        createdById: actor.id,
       },
     });
 
     await this.prisma.activity.create({
       data: {
         leadId: dto.leadId,
-        userId: userId ?? null,
+        userId: actor.id,
         type: ActivityType.SYSTEM,
         content: `Quote ${quote.quoteNumber} created`,
       },
@@ -103,9 +166,12 @@ export class QuotesService {
     return quote;
   }
 
-  findAll(leadId?: string) {
+  findAll(leadId: string | undefined, actor: Actor) {
     return this.prisma.quote.findMany({
-      where: leadId ? { leadId } : {},
+      where: {
+        ...(leadId ? { leadId } : {}),
+        ...this.leadScope(actor),
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         options: { orderBy: { sortOrder: 'asc' } },
@@ -114,7 +180,9 @@ export class QuotesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor: Actor) {
+    await this.assertQuoteAccess(id, actor);
+
     const quote = await this.prisma.quote.findUnique({
       where: { id },
       include: {
@@ -138,9 +206,10 @@ export class QuotesService {
     };
   }
 
-  async update(id: string, dto: UpdateQuoteDto, userId?: string) {
+  async update(id: string, dto: UpdateQuoteDto, actor: Actor) {
     const quote = await this.prisma.quote.findUnique({ where: { id } });
     if (!quote) throw new NotFoundException('Quote not found');
+    await this.assertQuoteAccess(id, actor);
 
     const updated = await this.prisma.quote.update({
       where: { id },
@@ -150,7 +219,7 @@ export class QuotesService {
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
         ...(dto.terms !== undefined ? { terms: dto.terms } : {}),
         ...(dto.validUntil !== undefined
-          ? { validUntil: new Date(dto.validUntil) }
+          ? { validUntil: toDateOrNull(dto.validUntil) }
           : {}),
       },
     });
@@ -160,7 +229,7 @@ export class QuotesService {
       await this.prisma.activity.create({
         data: {
           leadId: quote.leadId,
-          userId: userId ?? null,
+          userId: actor.id,
           type: ActivityType.SYSTEM,
           content: `Quote ${quote.quoteNumber}: ${quote.status} -> ${dto.status}`,
         },
@@ -176,18 +245,20 @@ export class QuotesService {
     return updated;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor: Actor) {
     const quote = await this.prisma.quote.findUnique({ where: { id } });
     if (!quote) throw new NotFoundException('Quote not found');
+    await this.assertQuoteAccess(id, actor);
     await this.prisma.quote.delete({ where: { id } });
     return { deleted: true, id };
   }
 
   // --- options (tiers) -----------------------------------------------------
 
-  async addOption(quoteId: string, dto: CreateOptionDto) {
+  async addOption(quoteId: string, dto: CreateOptionDto, actor: Actor) {
     const quote = await this.prisma.quote.findUnique({ where: { id: quoteId } });
     if (!quote) throw new NotFoundException('Quote not found');
+    await this.assertQuoteAccess(quoteId, actor);
 
     const option = await this.prisma.quoteOption.create({
       data: {
@@ -204,11 +275,8 @@ export class QuotesService {
     return option;
   }
 
-  async updateOption(optionId: string, dto: UpdateOptionDto) {
-    const exists = await this.prisma.quoteOption.findUnique({
-      where: { id: optionId },
-    });
-    if (!exists) throw new NotFoundException('Option not found');
+  async updateOption(optionId: string, dto: UpdateOptionDto, actor: Actor) {
+    await this.assertOptionAccess(optionId, actor);
 
     await this.prisma.quoteOption.update({
       where: { id: optionId },
@@ -218,17 +286,16 @@ export class QuotesService {
     return this.recalcOption(optionId);
   }
 
-  async removeOption(optionId: string) {
-    const exists = await this.prisma.quoteOption.findUnique({
-      where: { id: optionId },
-    });
-    if (!exists) throw new NotFoundException('Option not found');
+  async removeOption(optionId: string, actor: Actor) {
+    await this.assertOptionAccess(optionId, actor);
     await this.prisma.quoteOption.delete({ where: { id: optionId } });
     return { deleted: true, id: optionId };
   }
 
   /** Copy a tier (build "Deluxe" by duplicating "Standard" and editing). */
-  async duplicateOption(optionId: string, newName: string) {
+  async duplicateOption(optionId: string, newName: string, actor: Actor) {
+    await this.assertOptionAccess(optionId, actor);
+
     const src = await this.prisma.quoteOption.findUnique({
       where: { id: optionId },
       include: { lines: true },
@@ -271,11 +338,8 @@ export class QuotesService {
 
   // --- lines ---------------------------------------------------------------
 
-  async addLine(optionId: string, dto: CreateLineDto) {
-    const option = await this.prisma.quoteOption.findUnique({
-      where: { id: optionId },
-    });
-    if (!option) throw new NotFoundException('Option not found');
+  async addLine(optionId: string, dto: CreateLineDto, actor: Actor) {
+    await this.assertOptionAccess(optionId, actor);
 
     await this.prisma.quoteLine.create({
       data: {
@@ -303,7 +367,10 @@ export class QuotesService {
     rateId: string,
     quantity: number,
     units: number,
+    actor: Actor,
   ) {
+    await this.assertOptionAccess(optionId, actor);
+
     const rate = await this.prisma.vendorRate.findUnique({
       where: { id: rateId },
       include: { vendor: true },
@@ -338,25 +405,19 @@ export class QuotesService {
     return this.recalcOption(optionId);
   }
 
-  async updateLine(lineId: string, dto: UpdateLineDto) {
-    const line = await this.prisma.quoteLine.findUnique({
-      where: { id: lineId },
-    });
-    if (!line) throw new NotFoundException('Line not found');
+  async updateLine(lineId: string, dto: UpdateLineDto, actor: Actor) {
+    const optionId = await this.assertLineAccess(lineId, actor);
 
     await this.prisma.quoteLine.update({
       where: { id: lineId },
       data: { ...dto },
     });
-    return this.recalcOption(line.optionId);
+    return this.recalcOption(optionId);
   }
 
-  async removeLine(lineId: string) {
-    const line = await this.prisma.quoteLine.findUnique({
-      where: { id: lineId },
-    });
-    if (!line) throw new NotFoundException('Line not found');
+  async removeLine(lineId: string, actor: Actor) {
+    const optionId = await this.assertLineAccess(lineId, actor);
     await this.prisma.quoteLine.delete({ where: { id: lineId } });
-    return this.recalcOption(line.optionId);
+    return this.recalcOption(optionId);
   }
 }

@@ -49,6 +49,16 @@ export class LeadsController {
     });
   }
 
+  /**
+   * Manual add by a logged-in operator (phone-in, walk-in).
+   * Same dedupe + scoring path as public capture, but auto-assigns to caller.
+   */
+  @Roles(...LEAD_MODULE_ROLES)
+  @Post()
+  manualCreate(@Body() dto: CaptureLeadDto, @CurrentUser() actor: Actor) {
+    return this.leads.manualCreate(dto, actor);
+  }
+
   @Roles(...LEAD_MODULE_ROLES)
   @Get()
   findAll(@Query() q: QueryLeadsDto, @CurrentUser() actor: Actor) {

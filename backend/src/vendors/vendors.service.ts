@@ -36,6 +36,20 @@ export class VendorsService {
     return copy as T;
   }
 
+  /**
+   * Where-fragment matching rates whose contract period covers `on`.
+   * Null validFrom/validTo mean "open ended" and always match — a rate with no
+   * dates is undated, not expired.
+   */
+  private validOn(on: Date): Prisma.VendorRateWhereInput {
+    return {
+      AND: [
+        { OR: [{ validFrom: null }, { validFrom: { lte: on } }] },
+        { OR: [{ validTo: null }, { validTo: { gte: on } }] },
+      ],
+    };
+  }
+
   create(dto: CreateVendorDto) {
     return this.prisma.vendor.create({ data: { ...dto } });
   }
@@ -43,6 +57,7 @@ export class VendorsService {
   async findAll(q: QueryVendorsDto, role: Role) {
     const page = q.page ?? 1;
     const limit = q.limit ?? 25;
+    const on = q.on ? new Date(q.on) : new Date();
 
     const where: Prisma.VendorWhereInput = {};
     if (q.type) where.type = q.type;
@@ -64,10 +79,14 @@ export class VendorsService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
+          // Browsing view — only rates you can actually sell today.
+          // The management view (listRates / findOne) still shows every rate
+          // so ops can renew expired contracts.
           rates: {
             where: {
               isActive: true,
               ...(q.season ? { season: q.season } : {}),
+              ...this.validOn(on),
             },
             orderBy: [{ season: 'asc' }, { netRate: 'asc' }],
           },
@@ -172,6 +191,10 @@ export class VendorsService {
   /**
    * Rate lookup for quoting: "Deluxe hotels in Gulmarg, peak season, MAP".
    * Returns rates with their vendor (redacted per role).
+   *
+   * Only rates whose contract period covers `on` (default: today) are
+   * returned. Quoting last season's expired rate is how a 20% margin file
+   * lands at 4%.
    */
   async searchRates(
     params: {
@@ -180,12 +203,17 @@ export class VendorsService {
       season?: any;
       variant?: string;
       maxNet?: number;
+      /** ISO date the rate must be valid on. Defaults to today. */
+      on?: string;
     },
     role: Role,
   ) {
+    const on = params.on ? new Date(params.on) : new Date();
+
     const rates = await this.prisma.vendorRate.findMany({
       where: {
         isActive: true,
+        ...this.validOn(on),
         ...(params.season ? { season: params.season } : {}),
         ...(params.variant
           ? { variant: { contains: params.variant, mode: 'insensitive' } }

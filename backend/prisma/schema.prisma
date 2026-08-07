@@ -11,6 +11,11 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+/// Every Role is an internal staff account. External parties (hotels /
+/// transport / B2B agents / prospective clients) are DATA — Vendor, Partner,
+/// Lead — never logins. Do not add VENDOR, AGENT or GUEST back here; the
+/// supplier-protection story falls apart the moment any outsider gets a
+/// session token.
 enum Role {
   SUPER_ADMIN
   OWNER
@@ -19,9 +24,6 @@ enum Role {
   ACCOUNTS
   MARKETING
   OPERATIONS
-  VENDOR
-  AGENT
-  GUEST
 }
 
 enum LeadStatus {
@@ -34,6 +36,279 @@ enum LeadStatus {
   CANCELLED
   LOST
   FUTURE_FOLLOWUP
+}
+
+// ============================================================================
+// PHASE 11 — HR module
+// ============================================================================
+//
+// The Employee is a person on payroll — separate from User (login account),
+// because not every employee has CRM access and not every login is on payroll.
+// Optional userId links the two when they overlap. Salary slips and interview
+// records live off Employee so history is retained if the person leaves.
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  CONSULTANT
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  NOTICE
+  EXITED
+}
+
+enum InterviewOutcome {
+  PENDING
+  SELECTED
+  ON_HOLD
+  REJECTED
+}
+
+model Employee {
+  id String @id @default(cuid())
+
+  /// Human-friendly code, e.g. GLZ-EMP-0001. Sequential per year — same
+  /// pattern as quoteNumber / bookingNumber so ops recognise it on sight.
+  code String @unique
+
+  // --- identity ---
+  fullName    String
+  fatherName  String?
+  photoUrl    String?
+  bloodGroup  String?
+  dob         DateTime?
+  gender      String?
+  nationality String? @default("Indian")
+
+  // --- contact ---
+  phone       String
+  altPhone    String?
+  email       String?
+  addressLine String?
+  city        String?
+  state       String?
+  pincode     String?
+
+  // --- emergency ---
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  // --- ID + tax ---
+  aadhaar String?
+  pan     String?
+
+  // --- employment ---
+  designation      String
+  department       String?
+  employmentType   EmploymentType   @default(FULL_TIME)
+  status           EmploymentStatus @default(ACTIVE)
+  joinedOn         DateTime
+  confirmedOn      DateTime?
+  exitedOn         DateTime?
+  reportsToId      String?
+  reportsTo        Employee?        @relation("EmployeeReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports          Employee[]       @relation("EmployeeReportsTo")
+
+  /// Optional link to the login account. Set when the employee also has CRM
+  /// access. Nullable because most HR records outlive their login (or never
+  /// need one — e.g. driver, admin support).
+  userId String? @unique
+  user   User?   @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  // --- pay structure (monthly, in paise-consistent integer INR) ---
+  ctcMonthly    Int?
+  basicMonthly  Int?
+  hraMonthly    Int?
+  allowMonthly  Int?
+  pfMonthly     Int?
+  esiMonthly    Int?
+  taxMonthly    Int?
+  otherDedMonthly Int?
+  bankName      String?
+  accountNumber String?
+  ifsc          String?
+
+  // --- free-form ---
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  salarySlips    SalarySlip[]
+  interviews     Interview[]  @relation("InterviewInterviewer")
+
+  @@index([status])
+  @@index([department])
+  @@index([reportsToId])
+}
+
+/// A salary slip is a FROZEN snapshot for a month. We store the components
+/// even though they're on Employee today, because HR raises will change the
+/// Employee row and slips from prior months must not shift.
+model SalarySlip {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// The month this slip is for. First day of month at 00:00 UTC.
+  periodMonth DateTime
+
+  daysWorked Int?
+  daysInMonth Int?
+  lop        Int?  // loss of pay days
+
+  // ---- earnings (all in whole rupees) ----
+  basic       Int @default(0)
+  hra         Int @default(0)
+  allowances  Int @default(0)
+  bonus       Int @default(0)
+  arrears     Int @default(0)
+
+  // ---- deductions ----
+  pf         Int @default(0)
+  esi        Int @default(0)
+  tax        Int @default(0)
+  otherDed   Int @default(0)
+
+  // ---- computed and stored so historic slips never drift ----
+  grossPay Int @default(0)
+  totalDed Int @default(0)
+  netPay   Int @default(0)
+
+  paidOn    DateTime?
+  reference String?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, periodMonth])
+  @@index([periodMonth])
+}
+
+model Interview {
+  id String @id @default(cuid())
+
+  // --- candidate ---
+  candidateName   String
+  candidatePhone  String
+  candidateEmail  String?
+  role            String
+  scheduledAt     DateTime
+  durationMinutes Int?    @default(45)
+
+  // --- interviewer (optional link to Employee) ---
+  interviewerId   String?
+  interviewer     Employee? @relation("InterviewInterviewer", fields: [interviewerId], references: [id], onDelete: SetNull)
+  interviewerName String?
+
+  // --- structured feedback ---
+  /// Array of { question, answer, rating }. Kept as JSON so the sheet template
+  /// can evolve without a schema migration on every tweak.
+  questionnaire Json? @default("[]")
+
+  overallRating Int?  // 1..5
+  strengths     String?
+  concerns      String?
+  outcome       InterviewOutcome @default(PENDING)
+  outcomeNote   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outcome])
+  @@index([scheduledAt])
+}
+
+// ============================================================================
+// PHASE 12 — SEO
+// ============================================================================
+
+model SeoSite {
+  id String @id @default(cuid())
+
+  /// Human name — "Glitz main site", "Kashmir landing pages".
+  name String
+  /// Homepage URL — the crawler starts here.
+  url  String @unique
+
+  /// Paths to include in every audit (relative or absolute). e.g. ["/",
+  /// "/kashmir", "/ladakh"]. Empty array = just the homepage.
+  crawlPaths String[]
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audits SeoAudit[]
+
+  @@index([isActive])
+}
+
+/// An audit is a single point-in-time crawl of one page. Multiple pages under
+/// one SeoSite produce multiple audit rows sharing a runId so the UI can
+/// group them into a single "audit run".
+model SeoAudit {
+  id String @id @default(cuid())
+
+  siteId String
+  site   SeoSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  /// Shared across every page audited in the same trigger.
+  runId String
+  /// The exact URL audited.
+  url   String
+
+  /// 0-100 composite. Weighted average of checks + PageSpeed scores.
+  score Int @default(0)
+
+  /// PageSpeed Insights scores (0-100). Nullable when the API was skipped
+  /// or returned an error.
+  perfScore   Int?
+  a11yScore   Int?
+  bpScore     Int?
+  seoScore    Int?
+
+  /// Core Web Vitals (LCP ms, CLS x1000, INP ms).
+  lcpMs  Int?
+  clsX1k Int?
+  inpMs  Int?
+
+  /// Full structured check list — pass/fail per rule. Stored as JSON so the
+  /// rule set can evolve without schema churn.
+  /// Shape: { passed: [...], failed: [...], warnings: [...] }
+  checks Json?
+
+  /// Actionable task list generated from failed checks. UI shows this as the
+  /// "do today" queue.
+  tasks Json?
+
+  /// Non-empty when the crawl or PageSpeed call raised.
+  errors String?
+
+  createdAt DateTime @default(now())
+
+  @@index([siteId, createdAt])
+  @@index([runId])
+}
+
+enum AdChannel {
+  GOOGLE_ADS
+  META_ADS
+  INSTAGRAM
+  YOUTUBE
+  LINKEDIN
+  SEO
+  EMAIL
+  AFFILIATE
+  OTHER
 }
 
 enum LeadSource {
@@ -81,6 +356,9 @@ model User {
   createdBookings Booking[]        @relation("BookingCreator")
   recordedPayments BookingPayment[] @relation("PaymentRecorder")
   activities    Activity[]
+
+  /// Set when this login corresponds to a person on payroll.
+  employee      Employee? @relation("EmployeeUser")
 
   @@index([role])
 }
@@ -135,6 +413,12 @@ model Lead {
   lastContact  DateTime?
   nextFollowUp DateTime?
 
+  /// Optional link to the Visit that produced this lead. Set only when the
+  /// landing page beacon has fired and the form carried the returned visitId.
+  /// Kept nullable because manual adds and re-enquiries do not have a visit.
+  visitId String?
+  visit   Visit?  @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -147,6 +431,131 @@ model Lead {
   @@index([phone])
   @@index([assignedToId])
   @@index([createdAt])
+  @@index([visitId])
+}
+
+// ============================================================================
+// PHASE 10 — Attribution: landing pages, visits, ad spend
+// ============================================================================
+//
+// The point of this module is one number: cost per lead by campaign, by page,
+// by day. Storing a single daily total across all channels — the tempting
+// shortcut — makes it impossible to tell which ad is losing you money, which
+// is the reason to measure spend in the first place.
+//
+// The chain is:  AdSpend(channel, campaign, page, day)
+//                     -> Visit(landingPage, utms, gclid/fbclid)
+//                     -> Lead(visitId)
+//                     -> Quote -> Booking (revenue).
+// Everything above Lead is data you own; nothing here calls Google or Meta.
+// Offline conversion upload back to Google Ads is a later job that reads
+// Lead.gclid and Booking.totalSell.
+
+model LandingPage {
+  id   String @id @default(cuid())
+  /// URL slug, e.g. "kashmir-honeymoon-2026". Not the full URL — the page can
+  /// live under multiple hostnames (staging, prod, apex, www) and still be
+  /// the same funnel.
+  slug String @unique
+  name String
+  /// Optional canonical URL for display on the dashboard.
+  url  String?
+
+  /// Free-form label — "honeymoon", "family", "adventure". Used to roll the
+  /// dashboard up by intent rather than exact page.
+  campaign String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visits Visit[]
+  spend  AdSpend[]
+
+  @@index([isActive])
+}
+
+model Visit {
+  id String @id @default(cuid())
+
+  /// The visitor's first-party cookie (set by the landing page snippet).
+  /// A returning visitor keeps the same visitorId but produces a new Visit
+  /// row per session so time-to-lead stays measurable.
+  visitorId String
+  /// One row per SESSION per PAGE. If the same visitor lands on the same
+  /// page again more than 30 minutes later, that is a new visit.
+  sessionId String
+
+  landingPageId String?
+  landingPage   LandingPage? @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
+  /// Path or slug the beacon reported. Kept even when landingPageId is null
+  /// so unregistered pages still show up in the dashboard.
+  pagePath String
+
+  // --- attribution copied straight off the URL ---
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  gclid       String?
+  fbclid      String?
+  referrer    String?
+  keyword     String?
+
+  // --- context ---
+  device    String?
+  userAgent String?
+  ipAddress String?
+  country   String?
+
+  createdAt DateTime @default(now())
+
+  leads Lead[]
+
+  @@index([visitorId])
+  @@index([sessionId])
+  @@index([landingPageId, createdAt])
+  @@index([createdAt])
+}
+
+/// Daily spend broken down as far as the source data allows. One row per
+/// (date, channel, campaign, page) — DO NOT collapse to one row per day.
+/// Without the split, cost-per-lead is a company-wide average and cannot
+/// answer "which ad should I kill".
+model AdSpend {
+  id String @id @default(cuid())
+
+  /// Midnight UTC of the spend day. Aggregations key on this.
+  spendDate DateTime
+  channel   AdChannel @default(GOOGLE_ADS)
+
+  /// The ad-platform's campaign name/id, exactly as reported.
+  campaign String?
+  /// Optional ad-group / ad-set breakdown.
+  adGroup  String?
+
+  landingPageId String?
+  landingPage   LandingPage? @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
+
+  /// Amount in the smallest currency unit (paise for INR) to match the rest
+  /// of the schema. 12345 = ₹123.45.
+  amount   Int
+  currency String @default("INR")
+
+  /// Optional volumetric detail from the ad platform for CPC/CTR later.
+  impressions Int?
+  clicks      Int?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([spendDate, channel, campaign, landingPageId], map: "AdSpend_natural_key")
+  @@index([spendDate])
+  @@index([channel])
+  @@index([landingPageId])
 }
 
 model Activity {
@@ -278,9 +687,17 @@ model VendorRate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// The natural key of a rate line in a contract. Stops the same rate being
+  /// entered twice with different prices, where whichever sorted first would
+  /// silently win the quote.
+  /// CAVEAT: Postgres treats NULLs as distinct in a unique index, so this only
+  /// bites once mealPlan / rateBasis / validFrom are actually filled in.
+  /// Always set validFrom — a rate contract without a start date is a guess.
+  @@unique([vendorId, variant, season, mealPlan, rateBasis, validFrom], map: "VendorRate_natural_key")
   @@index([vendorId])
   @@index([season])
   @@index([isActive])
+  @@index([validFrom, validTo])
 }
 
 // ============================================================================

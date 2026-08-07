@@ -19,10 +19,48 @@ import { CreateCostDto } from './dto/create-cost.dto';
 import { UpdateCostDto } from './dto/update-cost.dto';
 import { QueryBookingsDto } from './dto/query-bookings.dto';
 import { computeBookingFinancials, deriveStatus } from './booking-math';
+import { Actor, canSeeAllLeads } from '../common/access';
+import { toDateOrNull } from '../common/dates';
 
 @Injectable()
 export class BookingsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // --- access scoping ------------------------------------------------------
+  //
+  // A booking exposes totalNet and actual margin, so it inherits the access
+  // rules of its lead. 404 rather than 403, matching LeadsService.
+  //
+  // The money routes (payments, costs) are already restricted to finance
+  // roles, all of which have full lead access — they use detail() directly.
+
+  private leadScope(actor: Actor): Prisma.BookingWhereInput {
+    return canSeeAllLeads(actor.role)
+      ? {}
+      : { lead: { assignedToId: actor.id } };
+  }
+
+  private async assertBookingAccess(bookingId: string, actor: Actor) {
+    if (canSeeAllLeads(actor.role)) return;
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { lead: { select: { assignedToId: true } } },
+    });
+    if (!booking || booking.lead.assignedToId !== actor.id) {
+      throw new NotFoundException('Booking not found');
+    }
+  }
+
+  private async assertLeadAccess(leadId: string, actor: Actor) {
+    if (canSeeAllLeads(actor.role)) return;
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { assignedToId: true },
+    });
+    if (!lead || lead.assignedToId !== actor.id) {
+      throw new NotFoundException('Lead not found');
+    }
+  }
 
   private async nextBookingNumber(): Promise<string> {
     const year = new Date().getFullYear();
@@ -69,7 +107,8 @@ export class BookingsService {
     });
   }
 
-  async create(dto: CreateBookingDto, userId?: string) {
+  async create(dto: CreateBookingDto, actor: Actor) {
+    const userId = actor.id;
     let leadId = dto.leadId;
     let totalSell = dto.totalSell ?? 0;
     let totalNet = dto.totalNet ?? 0;
@@ -112,6 +151,7 @@ export class BookingsService {
 
     const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
+    await this.assertLeadAccess(leadId, actor);
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -122,10 +162,8 @@ export class BookingsService {
         createdById: userId ?? null,
         status: BookingStatus.CONFIRMED,
         packageName,
-        travelStartDate: dto.travelStartDate
-          ? new Date(dto.travelStartDate)
-          : null,
-        travelEndDate: dto.travelEndDate ? new Date(dto.travelEndDate) : null,
+        travelStartDate: toDateOrNull(dto.travelStartDate),
+        travelEndDate: toDateOrNull(dto.travelEndDate),
         adults,
         children,
         nights,
@@ -158,11 +196,11 @@ export class BookingsService {
     return booking;
   }
 
-  async findAll(q: QueryBookingsDto) {
+  async findAll(q: QueryBookingsDto, actor: Actor) {
     const page = q.page ?? 1;
     const limit = q.limit ?? 25;
 
-    const where: Prisma.BookingWhereInput = {};
+    const where: Prisma.BookingWhereInput = { ...this.leadScope(actor) };
     if (q.status) where.status = q.status;
     if (q.leadId) where.leadId = q.leadId;
     if (q.from || q.to) {
@@ -211,7 +249,13 @@ export class BookingsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor: Actor) {
+    await this.assertBookingAccess(id, actor);
+    return this.detail(id);
+  }
+
+  /** Unscoped read — callers must have checked access first. */
+  private async detail(id: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
       include: {
@@ -233,9 +277,11 @@ export class BookingsService {
     };
   }
 
-  async update(id: string, dto: UpdateBookingDto, userId?: string) {
+  async update(id: string, dto: UpdateBookingDto, actor: Actor) {
+    const userId = actor.id;
     const booking = await this.prisma.booking.findUnique({ where: { id } });
     if (!booking) throw new NotFoundException('Booking not found');
+    await this.assertBookingAccess(id, actor);
 
     const data: Prisma.BookingUpdateInput = {};
     if (dto.status !== undefined) data.status = dto.status;
@@ -248,9 +294,9 @@ export class BookingsService {
     if (dto.cancelledReason !== undefined)
       data.cancelledReason = dto.cancelledReason;
     if (dto.travelStartDate !== undefined)
-      data.travelStartDate = new Date(dto.travelStartDate);
+      data.travelStartDate = toDateOrNull(dto.travelStartDate);
     if (dto.travelEndDate !== undefined)
-      data.travelEndDate = new Date(dto.travelEndDate);
+      data.travelEndDate = toDateOrNull(dto.travelEndDate);
 
     await this.prisma.booking.update({ where: { id }, data });
 
@@ -271,7 +317,7 @@ export class BookingsService {
       }
     }
 
-    return this.findOne(id);
+    return this.detail(id);
   }
 
   // --- payments (money in) -------------------------------------------------
@@ -314,7 +360,7 @@ export class BookingsService {
     });
 
     await this.refresh(bookingId);
-    return this.findOne(bookingId);
+    return this.detail(bookingId);
   }
 
   async removePayment(paymentId: string) {
@@ -324,7 +370,7 @@ export class BookingsService {
     if (!payment) throw new NotFoundException('Payment not found');
     await this.prisma.bookingPayment.delete({ where: { id: paymentId } });
     await this.refresh(payment.bookingId);
-    return this.findOne(payment.bookingId);
+    return this.detail(payment.bookingId);
   }
 
   // --- costs (money out) ---------------------------------------------------
@@ -349,7 +395,7 @@ export class BookingsService {
     });
 
     await this.refresh(bookingId);
-    return this.findOne(bookingId);
+    return this.detail(bookingId);
   }
 
   async updateCost(costId: string, dto: UpdateCostDto) {
@@ -364,7 +410,7 @@ export class BookingsService {
 
     await this.prisma.bookingCost.update({ where: { id: costId }, data });
     await this.refresh(cost.bookingId);
-    return this.findOne(cost.bookingId);
+    return this.detail(cost.bookingId);
   }
 
   async removeCost(costId: string) {
@@ -374,7 +420,7 @@ export class BookingsService {
     if (!cost) throw new NotFoundException('Cost not found');
     await this.prisma.bookingCost.delete({ where: { id: costId } });
     await this.refresh(cost.bookingId);
-    return this.findOne(cost.bookingId);
+    return this.detail(cost.bookingId);
   }
 
   /** Copy the quote's lines in as expected vendor costs — no retyping. */
@@ -411,7 +457,7 @@ export class BookingsService {
     }
 
     await this.refresh(bookingId);
-    return this.findOne(bookingId);
+    return this.detail(bookingId);
   }
 
   // --- reporting -----------------------------------------------------------
