@@ -147,3 +147,47 @@ export interface Paged<T> {
   pages: number;
   data: T[];
 }
+
+export interface ActivityRow {
+  id: string;
+  type: string;
+  content: string;
+  createdAt: string;
+  user?: { id: string; name: string } | null;
+}
+
+export interface LeadDetail extends LeadRow {
+  city: string | null;
+  country: string | null;
+  travelDate: string | null;
+  nights: number | null;
+  adults: number | null;
+  children: number | null;
+  budget: number | null;
+  message: string | null;
+  scoreNotes: string | null;
+  lostReason: string | null;
+  enquiryCount: number;
+  lastContact: string | null;
+  nextFollowUp: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  gclid: string | null;
+  fbclid: string | null;
+  landingPage: string | null;
+  referrer: string | null;
+  keyword: string | null;
+  device: string | null;
+  activities: ActivityRow[];
+}
+
+export interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+}
