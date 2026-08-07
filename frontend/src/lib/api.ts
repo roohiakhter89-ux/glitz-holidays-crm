@@ -191,3 +191,102 @@ export interface UserRow {
   role: string;
   isActive: boolean;
 }
+
+// ---- quotes ---------------------------------------------------------------
+
+export interface QuoteLineRow {
+  id: string;
+  serviceType: string;
+  description: string;
+  vendorId: string | null;
+  vendorRateId: string | null;
+  quantity: number;
+  units: number;
+  unitNet: number;
+  markupMode: string;
+  markupValue: number | null;
+  lineNet: number;
+  lineSell: number;
+  sortOrder: number;
+  notes: string | null;
+}
+
+export interface Advisory {
+  breakEvenPerFile: number | null;
+  minSellForPolicy: number;
+  minSellForBreakEven: number | null;
+  suggestedMinSell: number;
+  shortfall: number;
+  ok: boolean;
+  warnings: string[];
+}
+
+export interface QuoteOptionRow {
+  id: string;
+  quoteId: string;
+  name: string;
+  sortOrder: number;
+  isRecommended: boolean;
+  adults: number;
+  children: number;
+  nights: number;
+  markupPercent: number | null;
+  totalNet: number;
+  totalSell: number;
+  totalMargin: number;
+  marginPercent: number;
+  markupPercentEffective: number;
+  perPersonSell: number;
+  lines: QuoteLineRow[];
+  advisory?: Advisory;
+}
+
+export interface QuoteDetail {
+  id: string;
+  quoteNumber: string;
+  title: string | null;
+  status: string;
+  leadId: string;
+  validUntil: string | null;
+  notes: string | null;
+  terms: string | null;
+  createdAt: string;
+  lead: { id: string; name: string; phone: string; email: string | null };
+  options: QuoteOptionRow[];
+}
+
+export interface QuoteListRow {
+  id: string;
+  quoteNumber: string;
+  title: string | null;
+  status: string;
+  createdAt: string;
+  lead: { id: string; name: string; phone: string };
+  options: { id: string; name: string; totalSell: number; marginPercent: number }[];
+}
+
+export interface VendorRateRow {
+  id: string;
+  variant: string;
+  season: string;
+  mealPlan: string | null;
+  rateBasis: string;
+  netRate: number;
+  rackRate: number | null;
+  vendor: {
+    id: string;
+    name: string;
+    type: string;
+    city: string | null;
+    contactRedacted?: boolean;
+  };
+}
+
+export interface PricingSettings {
+  defaultMarkupPercent: number;
+  minMarginPercent: number;
+  monthlyOverhead: number | null;
+  filesPerMonth: number | null;
+  roundTo: number;
+  gstPercent: number;
+}

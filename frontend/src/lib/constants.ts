@@ -49,3 +49,40 @@ export function whatsappHref(phone: string, text?: string): string {
   const q = text ? `?text=${encodeURIComponent(text)}` : '';
   return `https://wa.me/${withCode}${q}`;
 }
+
+export const SERVICE_TYPES = [
+  'HOTEL',
+  'TRANSPORT',
+  'ACTIVITY',
+  'FLIGHT',
+  'GUIDE',
+  'MEAL',
+  'PERMIT',
+  'MISC',
+] as const;
+
+export const MARKUP_MODES = [
+  { value: 'INHERIT', label: 'Default markup' },
+  { value: 'PERCENT', label: 'Percent' },
+  { value: 'FIXED', label: 'Flat amount' },
+  { value: 'MANUAL', label: 'Set sell price' },
+] as const;
+
+export const SEASONS = ['PEAK', 'SHOULDER', 'OFF', 'FESTIVE'] as const;
+
+export const QUOTE_STATUSES = [
+  'DRAFT',
+  'SENT',
+  'ACCEPTED',
+  'REJECTED',
+  'EXPIRED',
+  'REVISED',
+] as const;
+
+/** What the markupValue field means for each mode. */
+export const MARKUP_HINT: Record<string, string> = {
+  INHERIT: 'Uses your settings for this service type',
+  PERCENT: '% on this line',
+  FIXED: '₹ added on top',
+  MANUAL: '₹ total sell for this line',
+};
