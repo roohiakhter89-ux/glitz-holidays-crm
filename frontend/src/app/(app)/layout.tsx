@@ -14,6 +14,7 @@ import {
   TrendingUp,
   UserCog,
   Globe,
+  Map,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
   { href: '/quotes', label: 'Quotations', icon: FileText },
+  { href: '/itineraries', label: 'Itineraries', icon: Map },
   { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
   { href: '/attribution', label: 'Attribution', icon: TrendingUp },
   { href: '/seo', label: 'SEO', icon: Globe },

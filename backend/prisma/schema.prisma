@@ -39,6 +39,105 @@ enum LeadStatus {
 }
 
 // ============================================================================
+// PHASE 18 — Itinerary builder
+// ============================================================================
+//
+// A quotation shows the PRICE the client will pay. An itinerary shows the
+// day-by-day PLAN — pickup at the airport, hotel for two nights, shikara
+// ride, gondola in Gulmarg. They're two separate artefacts that get sent
+// together. The itinerary lives on the Lead (same as quotations) so both
+// can be produced before the lead is confirmed as a booking.
+
+enum ItineraryItemKind {
+  STAY         // hotel / houseboat night
+  TRANSFER     // pickup, drop, inter-city drive
+  SIGHTSEEING  // gardens, monuments, viewpoints
+  MEAL         // breakfast, lunch, dinner
+  ACTIVITY     // shikara, skiing, trekking
+  FREE_TIME
+  NOTE
+}
+
+model Itinerary {
+  id   String @id @default(cuid())
+  /// Sequential per year — GLZ-ITI-2026-0001. Same convention as quotes and
+  /// bookings; race-safe via withNumberRetry.
+  code String @unique
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?   @relation("ItineraryCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // --- client-facing cover ---
+  title    String
+  headline String?
+  intro    String?
+  totalPax Int     @default(2)
+
+  // Optional inclusion / exclusion lists (free-form, one per line).
+  inclusions String?
+  exclusions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  days ItineraryDay[]
+
+  @@index([leadId])
+}
+
+model ItineraryDay {
+  id           String @id @default(cuid())
+  itineraryId  String
+  itinerary    Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  /// 1-based, unique per itinerary. Reordering days re-numbers this — see
+  /// ItinerariesService.reorderDays.
+  dayNumber Int
+  /// Optional — leave blank for a flexible plan.
+  date      DateTime?
+  city      String?
+  headline  String?
+  summary   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ItineraryItem[]
+
+  @@unique([itineraryId, dayNumber])
+  @@index([itineraryId])
+}
+
+model ItineraryItem {
+  id    String       @id @default(cuid())
+  dayId String
+  day   ItineraryDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  kind        ItineraryItemKind @default(SIGHTSEEING)
+  /// Free-form time hint — "09:00", "Afternoon", "Evening" — kept as text
+  /// because tour operators use both clock times and named parts of day.
+  time        String?
+  title       String
+  description String?
+  location    String?
+
+  /// Optional vendor link — used to auto-fill title/description from a
+  /// stored hotel or transport vendor.
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dayId, sortOrder])
+}
+
+// ============================================================================
 // PHASE 11 — HR module
 // ============================================================================
 //
@@ -354,6 +453,7 @@ model User {
   assignedLeads Lead[]     @relation("LeadAssignee")
   createdQuotes Quote[]    @relation("QuoteCreator")
   createdBookings Booking[]        @relation("BookingCreator")
+  createdItineraries Itinerary[]   @relation("ItineraryCreator")
   recordedPayments BookingPayment[] @relation("PaymentRecorder")
   activities    Activity[]
 
@@ -425,6 +525,7 @@ model Lead {
   activities Activity[]
   quotes     Quote[]
   bookings   Booking[]
+  itineraries Itinerary[]
 
   @@index([status])
   @@index([source])
@@ -652,6 +753,7 @@ model Vendor {
   updatedAt DateTime @updatedAt
 
   rates VendorRate[]
+  itineraryItems ItineraryItem[]
 
   @@index([type])
   @@index([city])

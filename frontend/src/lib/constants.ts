@@ -84,6 +84,33 @@ export const VENDOR_TYPES = [
 
 export const MEAL_PLANS = ['EP', 'CP', 'MAP', 'AP'] as const;
 
+export const ITINERARY_ITEM_KINDS = [
+  'STAY',
+  'TRANSFER',
+  'SIGHTSEEING',
+  'MEAL',
+  'ACTIVITY',
+  'FREE_TIME',
+  'NOTE',
+] as const;
+
+/**
+ * Colour + short label per itinerary item kind. Kept centralised so the
+ * chips in the editor and the marks in the PDF stay visually aligned.
+ */
+export const KIND_META: Record<
+  (typeof ITINERARY_ITEM_KINDS)[number],
+  { label: string; short: string; tone: string }
+> = {
+  STAY:        { label: 'Stay',        short: 'STAY',     tone: 'bg-signal-600'     },
+  TRANSFER:    { label: 'Transfer',    short: 'TRANSFER', tone: 'bg-signal-500'     },
+  SIGHTSEEING: { label: 'Sightseeing', short: 'SEE',      tone: 'bg-brand-600'      },
+  MEAL:        { label: 'Meal',        short: 'MEAL',     tone: 'bg-warn-500'       },
+  ACTIVITY:    { label: 'Activity',    short: 'ACTIVITY', tone: 'bg-healthy-500'    },
+  FREE_TIME:   { label: 'Free time',   short: 'FREE',     tone: 'bg-ink-500'        },
+  NOTE:        { label: 'Note',        short: 'NOTE',     tone: 'bg-ink-400'        },
+};
+
 export const RATE_BASES = [
   'PER_ROOM_NIGHT',
   'PER_PERSON',

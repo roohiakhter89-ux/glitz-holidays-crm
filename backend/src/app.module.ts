@@ -15,6 +15,7 @@ import { AttributionModule } from './attribution/attribution.module';
 import { PdfModule } from './pdf/pdf.module';
 import { HrModule } from './hr/hr.module';
 import { SeoModule } from './seo/seo.module';
+import { ItinerariesModule } from './itineraries/itineraries.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -37,6 +38,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     PdfModule,
     HrModule,
     SeoModule,
+    ItinerariesModule,
   ],
   providers: [
     // Order: rate limit -> authenticate -> authorize.

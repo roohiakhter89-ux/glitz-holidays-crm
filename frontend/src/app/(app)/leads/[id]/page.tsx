@@ -199,6 +199,33 @@ export default function LeadDetailPage() {
               </a>
             </Button>
           )}
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const it = await api.post<{ id: string }>('/itineraries', {
+                  leadId: lead.id,
+                  title: lead.destination
+                    ? `${lead.destination} itinerary`
+                    : `Itinerary for ${lead.name}`,
+                  totalPax:
+                    (lead.adults ?? 2) + (lead.children ?? 0),
+                });
+                router.push(`/itineraries/${it.id}`);
+              } catch (e) {
+                setError(
+                  e instanceof ApiError ? e.message : 'Could not create.',
+                );
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            Build itinerary
+          </Button>
           <Button asChild size="sm">
             <Link href={`/quotes/new?leadId=${lead.id}`}>Build quotation</Link>
           </Button>

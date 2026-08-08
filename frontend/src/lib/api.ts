@@ -325,6 +325,58 @@ export interface VendorRateRow {
   };
 }
 
+// ---- Itineraries -----------------------------------------------------------
+
+export type ItineraryItemKind =
+  | 'STAY' | 'TRANSFER' | 'SIGHTSEEING' | 'MEAL' | 'ACTIVITY' | 'FREE_TIME' | 'NOTE';
+
+export interface ItineraryItemRow {
+  id: string;
+  kind: ItineraryItemKind;
+  time: string | null;
+  title: string;
+  description: string | null;
+  location: string | null;
+  vendorId: string | null;
+  sortOrder: number;
+  vendor?: { id: string; name: string; type: string } | null;
+}
+
+export interface ItineraryDayRow {
+  id: string;
+  dayNumber: number;
+  date: string | null;
+  city: string | null;
+  headline: string | null;
+  summary: string | null;
+  items: ItineraryItemRow[];
+}
+
+export interface ItineraryListRow {
+  id: string;
+  code: string;
+  title: string;
+  headline: string | null;
+  totalPax: number;
+  createdAt: string;
+  lead: { id: string; name: string; phone: string } | null;
+  _count: { days: number };
+}
+
+export interface ItineraryDetail {
+  id: string;
+  code: string;
+  title: string;
+  headline: string | null;
+  intro: string | null;
+  totalPax: number;
+  inclusions: string | null;
+  exclusions: string | null;
+  createdAt: string;
+  lead: { id: string; name: string; phone: string; email: string | null };
+  days: ItineraryDayRow[];
+}
+
 export interface VendorRow {
   id: string;
   name: string;
