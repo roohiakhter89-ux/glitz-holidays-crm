@@ -260,7 +260,7 @@ export default function BookingDetailPage() {
             mutate(() => api.del(`/bookings/costs/${costId}`))
           }
           onSeed={() =>
-            mutate(() => api.post(`/bookings/${id}/costs/from-quote`))
+            mutate(() => api.post(`/bookings/${id}/costs/from-itinerary`))
           }
         />
       </div>
@@ -492,7 +492,7 @@ function CostsPanel({
   onSeed: () => void;
 }) {
   const canSeed =
-    booking.quoteOptionId !== null && booking.costs.length === 0;
+    booking.itineraryOptionId !== null && booking.costs.length === 0;
 
   return (
     <Panel>
@@ -511,7 +511,7 @@ function CostsPanel({
           <p className="text-[13px] text-ink-300">No costs recorded</p>
           <p className="mt-1 text-[12px] text-ink-500">
             {canSeed
-              ? 'Copy the quotation lines in as expected costs, or add manually.'
+              ? 'Copy the itinerary tier’s priced items in as expected costs, or add manually.'
               : 'Add each vendor payable below.'}
           </p>
           {canSeed && (
@@ -523,7 +523,7 @@ function CostsPanel({
               onClick={onSeed}
             >
               <Sparkles className="size-4" strokeWidth={1.75} />
-              Seed from quotation
+              Seed from itinerary
             </Button>
           )}
         </PanelBody>

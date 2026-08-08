@@ -374,7 +374,7 @@ export class HrService {
     const [
       leadsAssigned,
       leadsConverted,
-      quotesCreated,
+      itinerariesCreated,
       bookingsCreated,
       bookingsAgg,
     ] = await Promise.all([
@@ -391,7 +391,7 @@ export class HrService {
           ...(hasRange ? { createdAt: range } : {}),
         },
       }),
-      this.prisma.quote.count({
+      this.prisma.itinerary.count({
         where: {
           createdById: emp.userId,
           ...(hasRange ? { createdAt: range } : {}),
@@ -424,7 +424,7 @@ export class HrService {
       leadsConverted,
       conversionPercent:
         leadsAssigned > 0 ? (leadsConverted / leadsAssigned) * 100 : 0,
-      quotesCreated,
+      itinerariesCreated,
       bookingsCreated,
       revenue,
       grossProfit,

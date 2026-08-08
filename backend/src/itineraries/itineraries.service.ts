@@ -16,7 +16,7 @@ import { Actor, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
 import { withNumberRetry } from '../common/sequence';
 import { SettingsService } from '../settings/settings.service';
-import { SettingsLike } from '../quotes/pricing';
+import { SettingsLike } from '../common/pricing';
 import {
   computeItemPricing,
   computeOptionTotals,

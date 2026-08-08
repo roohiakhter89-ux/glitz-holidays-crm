@@ -1,5 +1,5 @@
 import { MarkupMode, ServiceType } from '@prisma/client';
-import { computeLine, computeOptionTotals, SettingsLike } from '../quotes/pricing';
+import { computeLine, computeOptionTotals, SettingsLike } from '../common/pricing';
 
 /**
  * Bridge from ItineraryItem/Pricing → the shared pricing helpers in

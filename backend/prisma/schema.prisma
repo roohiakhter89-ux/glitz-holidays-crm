@@ -539,7 +539,6 @@ model User {
   updatedAt    DateTime @updatedAt
 
   assignedLeads Lead[]     @relation("LeadAssignee")
-  createdQuotes Quote[]    @relation("QuoteCreator")
   createdBookings Booking[]        @relation("BookingCreator")
   createdItineraries Itinerary[]   @relation("ItineraryCreator")
   recordedPayments BookingPayment[] @relation("PaymentRecorder")
@@ -611,7 +610,6 @@ model Lead {
   updatedAt DateTime @updatedAt
 
   activities Activity[]
-  quotes     Quote[]
   bookings   Booking[]
   itineraries Itinerary[]
 
@@ -916,14 +914,6 @@ enum MarkupMode {
   MANUAL
 }
 
-enum QuoteStatus {
-  DRAFT
-  SENT
-  ACCEPTED
-  REJECTED
-  EXPIRED
-  REVISED
-}
 
 /// Singleton config row (id is always "default").
 model PricingSettings {
@@ -956,105 +946,6 @@ model PricingSettings {
   currency  String   @default("INR")
   updatedAt DateTime @updatedAt
 }
-
-model Quote {
-  id          String      @id @default(cuid())
-  quoteNumber String      @unique
-  title       String?
-  status      QuoteStatus @default(DRAFT)
-
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  createdById String?
-  createdBy   User?   @relation("QuoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
-
-  validUntil DateTime?
-  notes      String?
-  terms      String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  options QuoteOption[]
-
-  @@index([leadId])
-  @@index([status])
-}
-
-/// A package tier the client can choose between (Budget / Standard / Deluxe...).
-model QuoteOption {
-  id      String @id @default(cuid())
-  quoteId String
-  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-
-  name          String
-  sortOrder     Int     @default(0)
-  isRecommended Boolean @default(false)
-
-  adults   Int @default(2)
-  children Int @default(0)
-  nights   Int @default(0)
-
-  /// Option-level markup override. Null = use service-type / global default.
-  markupPercent Float?
-
-  // --- computed on every save (denormalised so lists stay fast) ---
-  totalNet      Int   @default(0)
-  totalSell     Int   @default(0)
-  totalMargin   Int   @default(0)
-  /// profit / sell  * 100
-  marginPercent Float @default(0)
-  /// profit / cost  * 100  (NOT the same number as marginPercent)
-  markupPercentEffective Float @default(0)
-  perPersonSell Int   @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  lines QuoteLine[]
-
-  @@index([quoteId])
-}
-
-model QuoteLine {
-  id       String      @id @default(cuid())
-  optionId String
-  option   QuoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-
-  serviceType ServiceType @default(HOTEL)
-  description String
-
-  vendorId     String?
-  vendorRateId String?
-
-  /// e.g. 2 rooms / 1 vehicle
-  quantity Int @default(1)
-  /// e.g. 3 nights / 4 days
-  units    Int @default(1)
-  /// net cost per unit per quantity
-  unitNet  Int
-
-  markupMode  MarkupMode @default(INHERIT)
-  /// percent when PERCENT, rupees when FIXED, total sell when MANUAL
-  markupValue Float?
-
-  // --- computed ---
-  lineNet  Int @default(0)
-  lineSell Int @default(0)
-
-  sortOrder Int     @default(0)
-  notes     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([optionId])
-}
-
-// ============================================================================
-// PHASE 5 — Pricing + Quotations
-// ============================================================================
 
 
 // ============================================================================
@@ -1089,13 +980,9 @@ model Booking {
   leadId String
   lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  /// Where it came from. Kept for traceability only — the numbers below are
-  /// a frozen snapshot and do NOT follow later edits to the quote or
-  /// itinerary. Exactly one of (quoteOptionId, itineraryOptionId) is set for
-  /// a normal booking; both are nullable so a legacy or lead-only booking
-  /// can still exist.
-  quoteId            String?
-  quoteOptionId      String?
+  /// Where it came from. Frozen snapshot — the totals below do NOT follow
+  /// later edits to the itinerary tier. Nullable so a manual lead-only
+  /// booking (no plan behind it) can still exist.
   itineraryId        String?
   itineraryOptionId  String?
 

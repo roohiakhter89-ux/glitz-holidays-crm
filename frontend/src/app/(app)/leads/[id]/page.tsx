@@ -226,9 +226,6 @@ export default function LeadDetailPage() {
           >
             Build itinerary
           </Button>
-          <Button asChild size="sm">
-            <Link href={`/quotes/new?leadId=${lead.id}`}>Build quotation</Link>
-          </Button>
         </div>
       </header>
 

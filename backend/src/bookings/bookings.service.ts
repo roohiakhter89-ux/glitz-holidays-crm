@@ -9,7 +9,6 @@ import {
   LeadStatus,
   PaymentMode,
   Prisma,
-  QuoteStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -109,49 +108,17 @@ export class BookingsService {
   }
 
   async create(dto: CreateBookingDto, actor: Actor) {
-    if (dto.quoteOptionId && dto.itineraryOptionId) {
-      throw new BadRequestException(
-        'Provide either quoteOptionId or itineraryOptionId, not both.',
-      );
-    }
-
     const userId = actor.id;
     let leadId = dto.leadId;
     let totalSell = dto.totalSell ?? 0;
     let totalNet = dto.totalNet ?? 0;
-    let quoteId: string | null = null;
     let itineraryId: string | null = null;
     let packageName = dto.packageName ?? null;
     let adults = dto.adults ?? 2;
     let children = dto.children ?? 0;
     let nights = dto.nights ?? 0;
 
-    // --- build from a quote tier: snapshot its numbers ---
-    if (dto.quoteOptionId) {
-      const option = await this.prisma.quoteOption.findUnique({
-        where: { id: dto.quoteOptionId },
-        include: { quote: true },
-      });
-      if (!option) throw new NotFoundException('Quote option not found');
-
-      leadId = option.quote.leadId;
-      quoteId = option.quoteId;
-      totalSell = option.totalSell;
-      totalNet = option.totalNet;
-      packageName =
-        packageName ?? `${option.quote.title ?? 'Package'} — ${option.name}`;
-      adults = dto.adults ?? option.adults;
-      children = dto.children ?? option.children;
-      nights = dto.nights ?? option.nights;
-
-      if (totalSell <= 0) {
-        throw new BadRequestException(
-          'That quote tier has no priced lines yet — add lines before booking.',
-        );
-      }
-    }
-
-    // --- build from an itinerary tier: same snapshot pattern ---
+    // --- build from an itinerary tier: snapshot its numbers ---
     if (dto.itineraryOptionId) {
       const option = await this.prisma.itineraryOption.findUnique({
         where: { id: dto.itineraryOptionId },
@@ -187,7 +154,7 @@ export class BookingsService {
 
     if (!leadId) {
       throw new BadRequestException(
-        'Provide either quoteOptionId, itineraryOptionId, or leadId.',
+        'Provide either itineraryOptionId or leadId.',
       );
     }
 
@@ -202,8 +169,6 @@ export class BookingsService {
         data: {
           bookingNumber,
           leadId,
-          quoteId,
-          quoteOptionId: dto.quoteOptionId ?? null,
           itineraryId,
           itineraryOptionId: dto.itineraryOptionId ?? null,
           createdById: userId ?? null,
@@ -226,12 +191,6 @@ export class BookingsService {
       where: { id: leadId },
       data: { status: LeadStatus.CONFIRMED },
     });
-    if (quoteId) {
-      await this.prisma.quote.update({
-        where: { id: quoteId },
-        data: { status: QuoteStatus.ACCEPTED },
-      });
-    }
     await this.prisma.activity.create({
       data: {
         leadId,
@@ -471,15 +430,23 @@ export class BookingsService {
     return this.detail(cost.bookingId);
   }
 
-  /** Copy the quote's lines in as expected vendor costs — no retyping. */
-  async seedCostsFromQuote(bookingId: string) {
+  /**
+   * Copy the itinerary tier's priced items in as expected vendor costs.
+   * Description comes from the ItineraryItem ("Grand Mumtaz Deluxe"), amount
+   * from the pricing row's frozen lineNet. Vendor is copied through when the
+   * rate was picked from stored rates so payables show up under the right
+   * supplier automatically.
+   */
+  async seedCostsFromItinerary(bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: { costs: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (!booking.quoteOptionId) {
-      throw new BadRequestException('This booking was not created from a quote.');
+    if (!booking.itineraryOptionId) {
+      throw new BadRequestException(
+        'This booking was not created from an itinerary tier.',
+      );
     }
     if (booking.costs.length > 0) {
       throw new BadRequestException(
@@ -487,18 +454,18 @@ export class BookingsService {
       );
     }
 
-    const lines = await this.prisma.quoteLine.findMany({
-      where: { optionId: booking.quoteOptionId },
-      orderBy: { sortOrder: 'asc' },
+    const pricings = await this.prisma.itineraryItemPricing.findMany({
+      where: { optionId: booking.itineraryOptionId },
+      include: { item: { select: { title: true } } },
     });
 
-    for (const l of lines) {
+    for (const p of pricings) {
       await this.prisma.bookingCost.create({
         data: {
           bookingId,
-          vendorId: l.vendorId,
-          description: l.description,
-          amountDue: l.lineNet,
+          vendorId: p.vendorId,
+          description: p.item.title,
+          amountDue: p.lineNet,
           amountPaid: 0,
         },
       });

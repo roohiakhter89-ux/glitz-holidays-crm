@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
-  FileText,
   CalendarCheck,
   Building2,
   Settings,
@@ -15,6 +14,8 @@ import {
   UserCog,
   Globe,
   Map,
+  BarChart3,
+  ShieldCheck,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -23,13 +24,14 @@ import { Button } from '@/components/ui/button';
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
-  { href: '/quotes', label: 'Quotations', icon: FileText },
   { href: '/itineraries', label: 'Itineraries', icon: Map },
   { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
   { href: '/attribution', label: 'Attribution', icon: TrendingUp },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/seo', label: 'SEO', icon: Globe },
   { href: '/vendors', label: 'Suppliers', icon: Building2 },
   { href: '/people', label: 'People', icon: UserCog },
+  { href: '/users', label: 'Access', icon: ShieldCheck },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

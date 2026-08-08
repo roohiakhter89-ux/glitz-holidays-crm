@@ -8,16 +8,13 @@ import {
 } from 'class-validator';
 
 export class CreateBookingDto {
-  /** Build from an accepted quote tier — pricing is snapshotted from it. */
-  @IsOptional() @IsString() quoteOptionId?: string;
-
   /**
    * Build from an accepted itinerary tier — pricing is snapshotted from it.
-   * Preferred over quoteOptionId now that itineraries carry the price.
+   * This is the normal path.
    */
   @IsOptional() @IsString() itineraryOptionId?: string;
 
-  /** Required only when NOT building from a quote or itinerary option. */
+  /** Required only when NOT building from an itinerary option. */
   @IsOptional() @IsString() leadId?: string;
 
   @IsOptional() @IsString() @MaxLength(200) packageName?: string;

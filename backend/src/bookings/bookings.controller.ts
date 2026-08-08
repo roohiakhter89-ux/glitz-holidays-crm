@@ -153,11 +153,11 @@ export class BookingsController {
     return this.bookings.addCost(id, dto);
   }
 
-  /** Pull the quote's lines in as expected vendor costs. */
+  /** Pull the itinerary tier's priced items in as expected vendor costs. */
   @Roles(...FINANCE_ROLES)
-  @Post(':id/costs/from-quote')
+  @Post(':id/costs/from-itinerary')
   seedCosts(@Param('id') id: string) {
-    return this.bookings.seedCostsFromQuote(id);
+    return this.bookings.seedCostsFromItinerary(id);
   }
 
   @Roles(...FINANCE_ROLES)
