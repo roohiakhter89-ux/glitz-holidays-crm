@@ -420,6 +420,42 @@ export interface VendorRow {
   rates: VendorRateFullRow[];
 }
 
+export interface VendorLedgerRow {
+  id: string;
+  createdAt: string;
+  description: string;
+  amountDue: number;
+  amountPaid: number;
+  paidAt: string | null;
+  reference: string | null;
+  notes: string | null;
+  booking: {
+    id: string;
+    bookingNumber: string;
+    packageName: string | null;
+    travelStartDate: string | null;
+    status: string;
+    clientName: string;
+  };
+}
+
+export interface VendorLedgerResponse {
+  vendor: {
+    id: string;
+    name: string;
+    type: string;
+    city: string | null;
+    isActive: boolean;
+  };
+  totals: {
+    rowCount: number;
+    totalDue: number;
+    totalPaid: number;
+    outstanding: number;
+  };
+  rows: VendorLedgerRow[];
+}
+
 export interface VendorRateFullRow {
   id: string;
   variant: string;

@@ -71,6 +71,21 @@ export class VendorsController {
     return this.vendors.findOne(id, role);
   }
 
+  /**
+   * Supplier ledger — payables + payments history for one vendor. Gated on
+   * VENDOR_WRITE_ACCESS (owner/ops/admin) rather than the read gate, because
+   * it exposes cross-booking spend which is finance-sensitive.
+   */
+  @Roles(...VENDOR_WRITE_ACCESS)
+  @Get(':id/ledger')
+  ledger(
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.vendors.ledger(id, { from, to });
+  }
+
   @Roles(...VENDOR_WRITE_ACCESS)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateVendorDto) {

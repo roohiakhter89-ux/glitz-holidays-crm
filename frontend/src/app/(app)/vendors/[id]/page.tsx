@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   ArrowLeft,
   Building2,
@@ -11,10 +12,12 @@ import {
   Landmark,
   Plus,
   Trash2,
+  BookOpen,
 } from 'lucide-react';
 import {
   api, ApiError,
   type VendorRow, type VendorRateFullRow,
+  type VendorLedgerResponse,
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
@@ -136,6 +139,7 @@ export default function VendorDetailPage() {
             onAdd={(body) => mutate(() => api.post(`/vendors/${id}/rates`, body))}
             onDelete={(rid) => mutate(() => api.del(`/vendors/rates/${rid}`))}
           />
+          <LedgerPanel vendorId={vendor.id} />
         </div>
 
         <div className="space-y-4">
@@ -455,6 +459,217 @@ function AddRate({
           Add rate
         </Button>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Supplier ledger — every payable the CRM has raised for this vendor, plus
+ * a running total. Lazy-loaded on first expand so the vendor page stays
+ * fast for the majority of visits that don't need it.
+ */
+function LedgerPanel({ vendorId }: { vendorId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [data, setData] = useState<VendorLedgerResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await api.get<VendorLedgerResponse>(`/vendors/${vendorId}/ledger`));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load ledger.');
+    } finally {
+      setLoading(false);
+    }
+  }, [vendorId]);
+
+  useEffect(() => {
+    // Fire the fetch when the operator expands the panel, not on mount —
+    // most visits to a vendor page are about rates, not history.
+    if (expanded && !data && !loading) load();
+  }, [expanded, data, loading, load]);
+
+  return (
+    <Panel>
+      <PanelHeader>
+        <PanelTitle className="flex items-center gap-2">
+          <BookOpen className="size-3.5" strokeWidth={1.75} />
+          Ledger
+        </PanelTitle>
+        <div className="flex items-center gap-2">
+          {data && data.totals.outstanding > 0 && (
+            <span className="tabular text-[11.5px] text-warn-500">
+              {money(data.totals.outstanding)} outstanding
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setExpanded((x) => !x)}
+          >
+            {expanded ? 'Hide' : 'Show'}
+          </Button>
+        </div>
+      </PanelHeader>
+
+      {expanded && (
+        <>
+          {error && (
+            <p role="alert" className="px-5 py-3 text-[12.5px] text-loss-500">
+              {error}
+            </p>
+          )}
+
+          {loading ? (
+            <div className="space-y-2 px-5 py-4">
+              <div className="h-3 w-40 rounded shimmer" />
+              <div className="h-3 w-64 rounded shimmer" />
+              <div className="h-3 w-32 rounded shimmer" />
+            </div>
+          ) : data ? (
+            data.totals.rowCount === 0 ? (
+              <PanelBody className="py-8 text-center">
+                <p className="text-[13px] text-ink-300">
+                  No payables recorded for this supplier yet
+                </p>
+                <p className="mt-1 text-[12px] text-ink-500">
+                  Costs land here when you book something priced against this
+                  vendor and seed costs from the itinerary.
+                </p>
+              </PanelBody>
+            ) : (
+              <>
+                {/* Totals strip */}
+                <div className="grid grid-cols-3 gap-3 border-y border-ink-800 bg-ink-950/50 px-5 py-3">
+                  <TotalCell
+                    label="Total business"
+                    value={money(data.totals.totalDue)}
+                    sub={`${data.totals.rowCount} row${data.totals.rowCount === 1 ? '' : 's'}`}
+                  />
+                  <TotalCell
+                    label="Paid to date"
+                    value={money(data.totals.totalPaid)}
+                    tone="healthy"
+                  />
+                  <TotalCell
+                    label="Outstanding"
+                    value={money(data.totals.outstanding)}
+                    tone={data.totals.outstanding > 0 ? 'warn' : 'healthy'}
+                  />
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[13px]">
+                    <thead>
+                      <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
+                        <th className="px-5 py-2.5 font-medium">Recorded</th>
+                        <th className="px-2 py-2.5 font-medium">Booking</th>
+                        <th className="px-2 py-2.5 font-medium">Description</th>
+                        <th className="px-2 py-2.5 text-right font-medium">Due</th>
+                        <th className="px-5 py-2.5 text-right font-medium">
+                          Balance
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.rows.map((r) => {
+                        const bal = r.amountDue - r.amountPaid;
+                        return (
+                          <tr
+                            key={r.id}
+                            className="border-b border-ink-800/60 last:border-0 hover:bg-ink-850/70"
+                          >
+                            <td className="tabular px-5 py-2.5 text-[12px] text-ink-500">
+                              {shortDate(r.createdAt)}
+                            </td>
+                            <td className="px-2 py-2.5">
+                              <Link
+                                href={`/bookings/${r.booking.id}`}
+                                className="tabular text-[12px] text-signal-600 hover:text-signal-500"
+                              >
+                                {r.booking.bookingNumber}
+                              </Link>
+                              <div className="text-[10.5px] text-ink-500">
+                                {r.booking.clientName}
+                              </div>
+                            </td>
+                            <td className="px-2 py-2.5 text-[12.5px] text-ink-300">
+                              {r.description}
+                              {r.reference && (
+                                <div className="tabular text-[10.5px] text-ink-500">
+                                  ref {r.reference}
+                                </div>
+                              )}
+                            </td>
+                            <td className="tabular px-2 py-2.5 text-right text-ink-100">
+                              {money(r.amountDue)}
+                            </td>
+                            <td className="tabular px-5 py-2.5 text-right">
+                              {bal === 0 ? (
+                                <Chip className="border-healthy-500/40 text-healthy-500">
+                                  Paid
+                                </Chip>
+                              ) : r.amountPaid > 0 ? (
+                                <>
+                                  <span className="text-warn-500">
+                                    {money(bal)}
+                                  </span>
+                                  <div className="text-[10.5px] text-ink-500">
+                                    of {money(r.amountDue)}
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="text-warn-500">
+                                  {money(bal)}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          ) : null}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function TotalCell({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: 'healthy' | 'warn';
+}) {
+  const toneCls =
+    tone === 'healthy'
+      ? 'text-healthy-500'
+      : tone === 'warn'
+        ? 'text-warn-500'
+        : 'text-ink-100';
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-[0.09em] text-ink-500">
+        {label}
+      </p>
+      <p className={`tabular mt-0.5 text-[15px] font-semibold ${toneCls}`}>
+        {value}
+      </p>
+      {sub && <p className="text-[10.5px] text-ink-500">{sub}</p>}
     </div>
   );
 }

@@ -114,6 +114,84 @@ export class VendorsService {
     return this.redact(vendor, role);
   }
 
+  /**
+   * Supplier ledger — every BookingCost row we've ever raised for this vendor,
+   * plus the running totals. Answers "how much business has Hotel X actually
+   * done with us this year, and what do we still owe them" without the ops
+   * team stitching bookings together in a spreadsheet.
+   *
+   * Optional [from, to] range filters by BookingCost.createdAt (when the
+   * cost was recorded, not when travel happened — matches how vendor
+   * statements are usually reconciled).
+   */
+  async ledger(id: string, params: { from?: string; to?: string }) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      select: { id: true, name: true, type: true, city: true, isActive: true },
+    });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    const range: Prisma.DateTimeFilter = {};
+    if (params.from) range.gte = new Date(params.from);
+    if (params.to) range.lte = new Date(params.to);
+    const hasRange = params.from !== undefined || params.to !== undefined;
+
+    const rows = await this.prisma.bookingCost.findMany({
+      where: {
+        vendorId: id,
+        ...(hasRange ? { createdAt: range } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        booking: {
+          select: {
+            id: true,
+            bookingNumber: true,
+            packageName: true,
+            travelStartDate: true,
+            status: true,
+            lead: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    let totalDue = 0;
+    let totalPaid = 0;
+    for (const r of rows) {
+      totalDue += r.amountDue;
+      totalPaid += r.amountPaid;
+    }
+
+    return {
+      vendor,
+      totals: {
+        rowCount: rows.length,
+        totalDue,
+        totalPaid,
+        outstanding: Math.max(0, totalDue - totalPaid),
+      },
+      rows: rows.map((r: any) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        description: r.description,
+        amountDue: r.amountDue,
+        amountPaid: r.amountPaid,
+        paidAt: r.paidAt,
+        reference: r.reference,
+        notes: r.notes,
+        booking: {
+          id: r.booking.id,
+          bookingNumber: r.booking.bookingNumber,
+          packageName: r.booking.packageName,
+          travelStartDate: r.booking.travelStartDate,
+          status: r.booking.status,
+          clientName: r.booking.lead.name,
+        },
+      })),
+    };
+  }
+
   async update(id: string, dto: UpdateVendorDto) {
     const exists = await this.prisma.vendor.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Vendor not found');
