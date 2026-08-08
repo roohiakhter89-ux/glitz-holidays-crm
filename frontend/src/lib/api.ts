@@ -330,6 +330,32 @@ export interface VendorRateRow {
 export type ItineraryItemKind =
   | 'STAY' | 'TRANSFER' | 'SIGHTSEEING' | 'MEAL' | 'ACTIVITY' | 'FREE_TIME' | 'NOTE';
 
+export interface ItineraryItemPricingRow {
+  id: string;
+  itemId: string;
+  optionId: string;
+  vendorRateId: string | null;
+  vendorId: string | null;
+  unitNet: number;
+  markupPercent: number | null;
+  lineNet: number;
+  lineSell: number;
+}
+
+export interface ItineraryOptionRow {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isRecommended: boolean;
+  markupPercent: number | null;
+  totalNet: number;
+  totalSell: number;
+  totalMargin: number;
+  marginPercent: number;
+  markupPercentEffective: number;
+  perPersonSell: number;
+}
+
 export interface ItineraryItemRow {
   id: string;
   kind: ItineraryItemKind;
@@ -339,7 +365,11 @@ export interface ItineraryItemRow {
   location: string | null;
   vendorId: string | null;
   sortOrder: number;
+  quantity: number;
+  units: number;
+  priceable: boolean;
   vendor?: { id: string; name: string; type: string } | null;
+  pricing?: ItineraryItemPricingRow[];
 }
 
 export interface ItineraryDayRow {
@@ -374,6 +404,7 @@ export interface ItineraryDetail {
   exclusions: string | null;
   createdAt: string;
   lead: { id: string; name: string; phone: string; email: string | null };
+  options: ItineraryOptionRow[];
   days: ItineraryDayRow[];
 }
 

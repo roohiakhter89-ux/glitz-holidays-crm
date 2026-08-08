@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
 import { ItineraryItemKind } from '@prisma/client';
 
 export class UpsertItemDto {
@@ -9,4 +9,10 @@ export class UpsertItemDto {
   @IsOptional() @IsString() @MaxLength(200)  location?: string;
   @IsOptional() @IsString()                  vendorId?: string;
   @IsOptional() @IsInt() @Min(0)             sortOrder?: number;
+
+  /** Structural — SHARED across price tiers. */
+  @IsOptional() @IsInt() @Min(1)             quantity?: number;
+  @IsOptional() @IsInt() @Min(1)             units?: number;
+  /** Default depends on kind; operator can override either way. */
+  @IsOptional() @IsBoolean()                 priceable?: boolean;
 }

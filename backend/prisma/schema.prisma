@@ -83,9 +83,45 @@ model Itinerary {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  days ItineraryDay[]
+  days    ItineraryDay[]
+  options ItineraryOption[]
 
   @@index([leadId])
+}
+
+/// Price tiers for the same day-by-day plan (e.g. Budget / Standard / Deluxe).
+/// The days + items structure is shared; each option carries its own hotel /
+/// transport picks via ItineraryItemPricing rows. Every itinerary always
+/// has at least one option — the service auto-creates a "Package" on new
+/// itineraries so simple single-price flows still work.
+model ItineraryOption {
+  id          String @id @default(cuid())
+  itineraryId String
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  name          String
+  sortOrder     Int     @default(0)
+  isRecommended Boolean @default(false)
+
+  /// Option-level markup override. Null = fall back to service-type default.
+  markupPercent Float?
+
+  // --- computed, denormalised on every pricing write ---
+  totalNet      Int   @default(0)
+  totalSell     Int   @default(0)
+  totalMargin   Int   @default(0)
+  /// profit / sell * 100
+  marginPercent Float @default(0)
+  /// profit / cost * 100
+  markupPercentEffective Float @default(0)
+  perPersonSell Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pricing ItineraryItemPricing[]
+
+  @@index([itineraryId])
 }
 
 model ItineraryDay {
@@ -125,16 +161,68 @@ model ItineraryItem {
   location    String?
 
   /// Optional vendor link — used to auto-fill title/description from a
-  /// stored hotel or transport vendor.
+  /// stored hotel or transport vendor. Distinct from per-option vendorRateId
+  /// on ItineraryItemPricing: this one is the "structural" hotel choice, used
+  /// for text; pricing rows carry the actual RATE the tier is priced at.
   vendorId String?
   vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  /// Structural quantity + units — SHARED across price tiers because they
+  /// describe the plan (2 rooms × 3 nights), not the money. Only the unit
+  /// rate differs between Budget and Deluxe.
+  quantity Int @default(1)
+  units    Int @default(1)
+
+  /// True when this item contributes to the option totals. Defaults per
+  /// kind: STAY / TRANSFER / ACTIVITY / MEAL default true; SIGHTSEEING /
+  /// FREE_TIME / NOTE default false. Operator can override.
+  priceable Boolean @default(false)
 
   sortOrder Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  pricing ItineraryItemPricing[]
+
   @@index([dayId, sortOrder])
+}
+
+/// Per-item, per-option price cell. A row is written when an operator picks
+/// a rate (or types a manual price) for a specific priceable item under a
+/// specific tier. Absence = "not priced yet under this tier" (contributes 0
+/// to the tier's totals but flagged in the UI).
+model ItineraryItemPricing {
+  id String @id @default(cuid())
+
+  itemId String
+  item   ItineraryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  optionId String
+  option   ItineraryOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  /// Optional pointer to the stored VendorRate this came from. Convenient
+  /// for auditing ("which rate contract was this priced under?") — the
+  /// numbers are frozen either way.
+  vendorRateId String?
+  /// Optional vendor for display when the rate wasn't picked from stored
+  /// rates (e.g. one-off transport quote).
+  vendorId String?
+
+  /// REQUIRED. Net cost per unit per quantity (whole rupees).
+  unitNet Int
+  /// Line-level markup override. Null = use option / global default.
+  markupPercent Float?
+
+  // --- computed ---
+  lineNet  Int @default(0)
+  lineSell Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([itemId, optionId])
+  @@index([optionId])
 }
 
 // ============================================================================

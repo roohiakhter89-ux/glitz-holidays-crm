@@ -37,7 +37,9 @@ import {
   type ItineraryDayRow,
   type ItineraryItemRow,
   type ItineraryItemKind,
+  type ItineraryOptionRow,
 } from '@/lib/api';
+import { money, percent, marginHealth, healthText } from '@/lib/format';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
@@ -45,6 +47,7 @@ import { Select, Textarea } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
 import { ITINERARY_ITEM_KINDS, KIND_META, humanise } from '@/lib/constants';
 import { shortDate } from '@/lib/format';
+import { Star } from 'lucide-react';
 
 /**
  * Day-by-day editor.
@@ -61,6 +64,7 @@ export default function ItineraryEditorPage() {
 
   const [it, setIt] = useState<ItineraryDetail | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +78,13 @@ export default function ItineraryEditorPage() {
           ? cur
           : (data.days[0]?.id ?? null),
       );
+      // Preserve current active option if it still exists, otherwise pick
+      // the recommended one, otherwise the first.
+      setActiveOptionId((cur) => {
+        if (cur && data.options.some((o) => o.id === cur)) return cur;
+        const rec = data.options.find((o) => o.isRecommended) ?? data.options[0];
+        return rec?.id ?? null;
+      });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load itinerary.');
     } finally {
@@ -182,6 +193,48 @@ export default function ItineraryEditorPage() {
 
       <CoverPanel it={it} busy={busy} onSave={(body) => mutate(() => api.patch(`/itineraries/${id}`, body))} />
 
+      <TiersStrip
+        options={it.options}
+        activeId={activeOptionId}
+        busy={busy}
+        onSelect={setActiveOptionId}
+        onAdd={() =>
+          mutate(async () => {
+            const created: any = await api.post(`/itineraries/${id}/options`, {
+              name: `Tier ${it.options.length + 1}`,
+            });
+            setActiveOptionId(created.id);
+          })
+        }
+        onDuplicate={(optionId, currentName) =>
+          mutate(async () => {
+            const created: any = await api.post(
+              `/itineraries/options/${optionId}/duplicate`,
+              { name: `${currentName} copy` },
+            );
+            setActiveOptionId(created.id);
+          })
+        }
+        onRename={(optionId, name) =>
+          mutate(() => api.patch(`/itineraries/options/${optionId}`, { name }))
+        }
+        onMarkRecommended={(optionId) =>
+          mutate(async () => {
+            // A single recommended tier at a time — flip the current one off
+            // if needed, then flip the target on.
+            for (const o of it.options) {
+              if (o.isRecommended && o.id !== optionId) {
+                await api.patch(`/itineraries/options/${o.id}`, { isRecommended: false });
+              }
+            }
+            await api.patch(`/itineraries/options/${optionId}`, { isRecommended: true });
+          })
+        }
+        onDelete={(optionId) =>
+          mutate(() => api.del(`/itineraries/options/${optionId}`))
+        }
+      />
+
       <div className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
         <DayList
           days={it.days}
@@ -202,12 +255,21 @@ export default function ItineraryEditorPage() {
           <DayEditor
             key={selectedDay.id}
             day={selectedDay}
+            activeOptionId={activeOptionId}
             busy={busy}
             onSaveDay={(body) => mutate(() => api.patch(`/itineraries/days/${selectedDay.id}`, body))}
             onAddItem={(body) => mutate(() => api.post(`/itineraries/days/${selectedDay.id}/items`, body))}
             onSaveItem={(itemId, body) => mutate(() => api.patch(`/itineraries/items/${itemId}`, body))}
             onDeleteItem={(itemId) => mutate(() => api.del(`/itineraries/items/${itemId}`))}
             onReorderItems={(ids) => mutate(() => api.post(`/itineraries/days/${selectedDay.id}/items/reorder`, { ids }))}
+            onPriceItem={(itemId, body) =>
+              mutate(() =>
+                api.post(
+                  `/itineraries/items/${itemId}/pricing/${activeOptionId}`,
+                  body,
+                ),
+              )
+            }
           />
         ) : (
           <Panel>
@@ -464,31 +526,37 @@ function SortableDay({
 
 function DayEditor({
   day,
+  activeOptionId,
   busy,
   onSaveDay,
   onAddItem,
   onSaveItem,
   onDeleteItem,
   onReorderItems,
+  onPriceItem,
 }: {
   day: ItineraryDayRow;
+  activeOptionId: string | null;
   busy: boolean;
   onSaveDay: (body: Record<string, unknown>) => void;
   onAddItem: (body: Record<string, unknown>) => void;
   onSaveItem: (itemId: string, body: Record<string, unknown>) => void;
   onDeleteItem: (itemId: string) => void;
   onReorderItems: (ids: string[]) => void;
+  onPriceItem: (itemId: string, body: Record<string, unknown>) => void;
 }) {
   return (
     <div className="space-y-4">
       <DayHeaderPanel day={day} busy={busy} onSave={onSaveDay} />
       <ItemsPanel
         day={day}
+        activeOptionId={activeOptionId}
         busy={busy}
         onAdd={onAddItem}
         onSave={onSaveItem}
         onDelete={onDeleteItem}
         onReorder={onReorderItems}
+        onPrice={onPriceItem}
       />
     </div>
   );
@@ -571,18 +639,22 @@ function DayHeaderPanel({
 
 function ItemsPanel({
   day,
+  activeOptionId,
   busy,
   onAdd,
   onSave,
   onDelete,
   onReorder,
+  onPrice,
 }: {
   day: ItineraryDayRow;
+  activeOptionId: string | null;
   busy: boolean;
   onAdd: (body: Record<string, unknown>) => void;
   onSave: (itemId: string, body: Record<string, unknown>) => void;
   onDelete: (itemId: string) => void;
   onReorder: (ids: string[]) => void;
+  onPrice: (itemId: string, body: Record<string, unknown>) => void;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -616,9 +688,11 @@ function ItemsPanel({
                 <SortableItem
                   key={item.id}
                   item={item}
+                  activeOptionId={activeOptionId}
                   busy={busy}
                   onSave={(body) => onSave(item.id, body)}
                   onDelete={() => onDelete(item.id)}
+                  onPrice={(body) => onPrice(item.id, body)}
                 />
               ))}
             </ul>
@@ -635,14 +709,18 @@ function ItemsPanel({
 
 function SortableItem({
   item,
+  activeOptionId,
   busy,
   onSave,
   onDelete,
+  onPrice,
 }: {
   item: ItineraryItemRow;
+  activeOptionId: string | null;
   busy: boolean;
   onSave: (body: Record<string, unknown>) => void;
   onDelete: () => void;
+  onPrice: (body: Record<string, unknown>) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
@@ -690,6 +768,16 @@ function SortableItem({
                 <span className="tabular mr-2 text-[11px] text-ink-500">{item.time}</span>
               )}
               {item.title}
+              {item.priceable && item.kind === 'STAY' && (
+                <span className="tabular ml-2 text-[10.5px] text-ink-500">
+                  {item.quantity} × {item.units}N
+                </span>
+              )}
+              {item.priceable && item.kind === 'TRANSFER' && (
+                <span className="tabular ml-2 text-[10.5px] text-ink-500">
+                  {item.quantity} × {item.units}D
+                </span>
+              )}
             </p>
             {item.location && (
               <p className="mt-0.5 flex items-center gap-1 text-[11.5px] text-ink-500">
@@ -702,6 +790,16 @@ function SortableItem({
               </p>
             )}
           </div>
+
+          {item.priceable && activeOptionId && (
+            <PriceCell
+              item={item}
+              activeOptionId={activeOptionId}
+              busy={busy}
+              onPrice={onPrice}
+            />
+          )}
+
           <button
             onClick={() => setEditing(true)}
             className="rounded px-1.5 py-1 text-[11px] text-ink-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-signal-600"
@@ -839,5 +937,238 @@ function AddItem({
         Add item
       </Button>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tier strip: pick which option's prices you're editing, add/duplicate/
+ * delete tiers, mark one recommended. Compact so it sits above the days
+ * grid without pushing content down.
+ */
+function TiersStrip({
+  options,
+  activeId,
+  busy,
+  onSelect,
+  onAdd,
+  onDuplicate,
+  onRename,
+  onMarkRecommended,
+  onDelete,
+}: {
+  options: ItineraryOptionRow[];
+  activeId: string | null;
+  busy: boolean;
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+  onDuplicate: (id: string, currentName: string) => void;
+  onRename: (id: string, name: string) => void;
+  onMarkRecommended: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  function commitRename() {
+    if (renamingId && renameValue.trim()) {
+      onRename(renamingId, renameValue.trim());
+    }
+    setRenamingId(null);
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-stretch gap-2">
+      {options
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((o) => {
+          const active = o.id === activeId;
+          const health = marginHealth(o.marginPercent);
+          const isRenaming = renamingId === o.id;
+
+          return (
+            <div
+              key={o.id}
+              onClick={() => !isRenaming && onSelect(o.id)}
+              className={`group relative min-w-[180px] cursor-pointer rounded-xl border px-4 py-3 transition-all duration-200 ${
+                active
+                  ? 'border-signal-500/60 bg-ink-900 shadow-[0_2px_10px_-4px_rgba(11,74,90,0.2)]'
+                  : 'border-ink-800 bg-ink-900/80 hover:-translate-y-px hover:border-ink-700'
+              }`}
+            >
+              {o.isRecommended && (
+                <span className="absolute -top-2 left-3 flex items-center gap-1 rounded-full bg-brand-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-ink-950">
+                  <Star className="size-2.5" fill="currentColor" strokeWidth={0} />
+                  Recommended
+                </span>
+              )}
+
+              {isRenaming ? (
+                <Input
+                  autoFocus
+                  className="h-7"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRename();
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                />
+              ) : (
+                <p
+                  className={`text-[13px] font-medium ${active ? 'text-signal-600' : 'text-ink-100'}`}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setRenamingId(o.id);
+                    setRenameValue(o.name);
+                  }}
+                >
+                  {o.name}
+                </p>
+              )}
+
+              {o.totalSell > 0 ? (
+                <>
+                  <p className="tabular mt-1 text-[17px] font-semibold text-ink-100">
+                    {money(o.totalSell)}
+                  </p>
+                  <p className="tabular mt-0.5 text-[11px]">
+                    <span className={healthText[health]}>
+                      {percent(o.marginPercent)}
+                    </span>
+                    <span className="text-ink-500"> margin</span>
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-[11.5px] text-ink-500">Not priced yet</p>
+              )}
+
+              {/* per-tier menu */}
+              <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {!o.isRecommended && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onMarkRecommended(o.id); }}
+                    className="rounded p-1 text-ink-500 hover:bg-ink-850 hover:text-brand-500"
+                    aria-label="Mark recommended"
+                    disabled={busy}
+                  >
+                    <Star className="size-3" strokeWidth={1.75} />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDuplicate(o.id, o.name); }}
+                  className="rounded px-1.5 py-1 text-[10px] uppercase tracking-[0.09em] text-ink-500 hover:bg-ink-850 hover:text-ink-200"
+                  disabled={busy}
+                >
+                  Duplicate
+                </button>
+                {options.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete tier "${o.name}"?`)) onDelete(o.id);
+                    }}
+                    className="rounded p-1 text-ink-500 hover:bg-ink-850 hover:text-loss-500"
+                    aria-label="Delete tier"
+                    disabled={busy}
+                  >
+                    <Trash2 className="size-3" strokeWidth={1.75} />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+      <button
+        onClick={onAdd}
+        disabled={busy}
+        className="min-w-[150px] rounded-xl border border-dashed border-ink-700 px-4 py-3 text-[13px] text-ink-500 transition-colors duration-150 hover:border-ink-600 hover:text-ink-300"
+      >
+        <Plus className="mr-1.5 inline size-4" strokeWidth={1.75} />
+        Add tier
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Per-item, per-tier price cell. Compact: shows the sell amount when priced,
+ * and an inline unit-net editor when clicked. Manual net-cost entry only for
+ * now — the RatePicker upgrade for choosing stored vendor rates lands in a
+ * follow-up pass.
+ */
+function PriceCell({
+  item,
+  activeOptionId,
+  busy,
+  onPrice,
+}: {
+  item: ItineraryItemRow;
+  activeOptionId: string;
+  busy: boolean;
+  onPrice: (body: Record<string, unknown>) => void;
+}) {
+  const pricing = (item.pricing ?? []).find((p) => p.optionId === activeOptionId);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(pricing ? String(pricing.unitNet) : '');
+  useEffect(() => {
+    setValue(pricing ? String(pricing.unitNet) : '');
+  }, [pricing]);
+
+  function commit() {
+    const n = Number(value);
+    if (!Number.isNaN(n) && n > 0) onPrice({ unitNet: n });
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-ink-500">₹</span>
+        <Input
+          type="number" min={0} autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          className="h-7 w-[100px] text-right tabular"
+        />
+      </div>
+    );
+  }
+
+  if (!pricing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        disabled={busy}
+        className="rounded border border-dashed border-ink-700 px-2 py-1 text-[11px] text-ink-500 hover:border-signal-500/50 hover:text-signal-600"
+      >
+        Set price
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      disabled={busy}
+      className="text-right"
+      title={`Net ${pricing.lineNet} · Sell ${pricing.lineSell}`}
+    >
+      <p className="tabular text-[13px] font-semibold text-ink-100">
+        {money(pricing.lineSell)}
+      </p>
+      <p className="tabular text-[10.5px] text-ink-500">
+        net {money(pricing.lineNet)}
+      </p>
+    </button>
   );
 }

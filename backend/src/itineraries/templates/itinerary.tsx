@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Document, Page, View, Text } from '@react-pdf/renderer';
 import { pdfStyles, pdfFonts, brand } from '../../pdf/templates/theme';
-import { BrandHeader, BrandFooter, GoldRule, shortDate } from '../../pdf/templates/primitives';
+import { BrandHeader, BrandFooter, GoldRule, inr, shortDate } from '../../pdf/templates/primitives';
 
 export interface ItineraryInput {
   code: string;
@@ -17,6 +17,16 @@ export interface ItineraryInput {
     phone: string;
     email: string | null;
   };
+  /** Priced tiers. Rendered on the cover as a price comparison block. */
+  options?: {
+    id: string;
+    name: string;
+    isRecommended: boolean;
+    totalSell: number;
+    perPersonSell: number;
+  }[];
+  /** GST rate applied inclusively — see pricing.ts. */
+  gstPercent?: number;
   days: {
     id: string;
     dayNumber: number;
@@ -98,6 +108,77 @@ export function ItineraryDocument({ i }: { i: ItineraryInput }) {
             <Text style={pdfStyles.small}>www.glitzholidays.in</Text>
           </View>
         </View>
+
+        {/* Priced tiers, when at least one option has a price. Skipped when
+            no pricing has been entered yet so the itinerary still previews
+            as a pure plan. */}
+        {i.options && i.options.some((o) => o.totalSell > 0) && (
+          <View style={{ marginTop: 4, marginBottom: 18 }}>
+            <Text style={pdfStyles.sectionLabel}>Package options</Text>
+            <GoldRule width={20} />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+              {i.options
+                .filter((o) => o.totalSell > 0)
+                .map((o) => (
+                  <View
+                    key={o.id}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: o.isRecommended ? brand.gold : brand.border,
+                      backgroundColor: o.isRecommended ? brand.parchment : '#FFFFFF',
+                    }}
+                  >
+                    {o.isRecommended && (
+                      <Text
+                        style={{
+                          fontSize: 7.5,
+                          letterSpacing: 1.2,
+                          color: brand.goldDeep,
+                          fontWeight: 700,
+                          marginBottom: 2,
+                        }}
+                      >
+                        RECOMMENDED
+                      </Text>
+                    )}
+                    <Text
+                      style={{
+                        fontFamily: pdfFonts.display,
+                        fontWeight: 700,
+                        fontSize: 12,
+                        color: brand.ink,
+                      }}
+                    >
+                      {o.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: pdfFonts.display,
+                        fontWeight: 700,
+                        fontSize: 18,
+                        color: brand.teal,
+                        marginTop: 6,
+                        letterSpacing: -0.3,
+                      }}
+                    >
+                      {inr(o.totalSell)}
+                    </Text>
+                    <Text style={{ ...pdfStyles.small, marginTop: 2 }}>
+                      {inr(o.perPersonSell)} / person
+                    </Text>
+                    {typeof i.gstPercent === 'number' && i.gstPercent > 0 && (
+                      <Text style={{ fontSize: 8, color: brand.muted, marginTop: 2 }}>
+                        Incl. {i.gstPercent}% GST
+                      </Text>
+                    )}
+                  </View>
+                ))}
+            </View>
+          </View>
+        )}
 
         {/* At-a-glance mini timeline */}
         <View style={{ marginTop: 6 }}>

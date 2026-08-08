@@ -18,11 +18,14 @@ import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { UpsertDayDto } from './dto/upsert-day.dto';
 import { UpsertItemDto } from './dto/upsert-item.dto';
+import { UpsertOptionDto } from './dto/upsert-option.dto';
+import { UpsertPricingDto } from './dto/upsert-pricing.dto';
 import { ReorderDto } from './dto/reorder.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Actor, LEAD_MODULE_ROLES } from '../common/access';
 import { ItineraryDocument } from './templates/itinerary';
+import { SettingsService } from '../settings/settings.service';
 
 /**
  * Itineraries are client-facing (no cost/margin leaked) — safe to open to
@@ -32,7 +35,10 @@ import { ItineraryDocument } from './templates/itinerary';
 @Roles(...LEAD_MODULE_ROLES)
 @Controller('itineraries')
 export class ItinerariesController {
-  constructor(private readonly svc: ItinerariesService) {}
+  constructor(
+    private readonly svc: ItinerariesService,
+    private readonly settings: SettingsService,
+  ) {}
 
   // ---- itineraries -------------------------------------------------------
 
@@ -72,7 +78,10 @@ export class ItinerariesController {
     @CurrentUser() actor: Actor,
     @Res() res: Response,
   ) {
-    const i = await this.svc.findOne(id, actor);
+    const [i, pricing] = await Promise.all([
+      this.svc.findOne(id, actor),
+      this.settings.getPricing(),
+    ]);
     const buf = await renderToBuffer(
       React.createElement(ItineraryDocument, {
         i: {
@@ -84,6 +93,14 @@ export class ItinerariesController {
           inclusions: i.inclusions,
           exclusions: i.exclusions,
           createdAt: i.createdAt,
+          gstPercent: pricing.gstPercent,
+          options: (i as any).options?.map((o: any) => ({
+            id: o.id,
+            name: o.name,
+            isRecommended: o.isRecommended,
+            totalSell: o.totalSell,
+            perPersonSell: o.perPersonSell,
+          })),
           lead: {
             name: i.lead.name,
             phone: i.lead.phone,
@@ -183,5 +200,63 @@ export class ItinerariesController {
     @CurrentUser() actor: Actor,
   ) {
     return this.svc.reorderItems(dayId, dto, actor);
+  }
+
+  // ---- options (tiers) ---------------------------------------------------
+
+  @Post(':id/options')
+  addOption(
+    @Param('id') id: string,
+    @Body() dto: UpsertOptionDto,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.svc.addOption(id, dto, actor);
+  }
+
+  @Patch('options/:optionId')
+  updateOption(
+    @Param('optionId') optionId: string,
+    @Body() dto: UpsertOptionDto,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.svc.updateOption(optionId, dto, actor);
+  }
+
+  @Post('options/:optionId/duplicate')
+  duplicateOption(
+    @Param('optionId') optionId: string,
+    @Body('name') name: string,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.svc.duplicateOption(optionId, name || 'Copy', actor);
+  }
+
+  @Delete('options/:optionId')
+  removeOption(
+    @Param('optionId') optionId: string,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.svc.removeOption(optionId, actor);
+  }
+
+  // ---- pricing (per item, per option) ------------------------------------
+
+  @Post('items/:itemId/pricing/:optionId')
+  upsertPricing(
+    @Param('itemId') itemId: string,
+    @Param('optionId') optionId: string,
+    @Body() dto: UpsertPricingDto,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.svc.upsertPricing(itemId, optionId, dto, actor);
+  }
+
+  @Delete('items/:itemId/pricing/:optionId')
+  removePricing(
+    @Param('itemId') itemId: string,
+    @Param('optionId') optionId: string,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.svc.removePricing(itemId, optionId, actor);
   }
 }
