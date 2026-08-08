@@ -432,10 +432,16 @@ export class BookingsService {
 
   /**
    * Copy the itinerary tier's priced items in as expected vendor costs.
-   * Description comes from the ItineraryItem ("Grand Mumtaz Deluxe"), amount
-   * from the pricing row's frozen lineNet. Vendor is copied through when the
-   * rate was picked from stored rates so payables show up under the right
-   * supplier automatically.
+   *
+   * Deduplicated by vendor. A hotel that appears on multiple items — same
+   * supplier billed under two meal plans, or a stay + a transfer both keyed
+   * to the same vendor — collapses into one payable row with amounts
+   * summed. That matches how invoices actually arrive: the hotel sends one
+   * bill for the whole stay, not one per row.
+   *
+   * Items without a linked vendor (manually-priced lines) stay individual —
+   * we don't know they're the same supplier, so combining them silently
+   * would be wrong.
    */
   async seedCostsFromItinerary(bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
@@ -456,16 +462,56 @@ export class BookingsService {
 
     const pricings = await this.prisma.itineraryItemPricing.findMany({
       where: { optionId: booking.itineraryOptionId },
-      include: { item: { select: { title: true } } },
+      include: {
+        item: { select: { title: true } },
+      },
     });
 
+    // Group by vendorId. Rows with a null vendor go into their own bucket
+    // each so they're never accidentally merged with each other.
+    const grouped = new Map<
+      string,
+      { vendorId: string | null; titles: string[]; amountDue: number }
+    >();
     for (const p of pricings) {
+      const key = p.vendorId ?? `__null_${p.id}`;
+      const bucket = grouped.get(key) ?? {
+        vendorId: p.vendorId,
+        titles: [],
+        amountDue: 0,
+      };
+      bucket.titles.push(p.item.title);
+      bucket.amountDue += p.lineNet;
+      grouped.set(key, bucket);
+    }
+
+    // Look up vendor names for the grouped rows so the payable description
+    // reads "Grand Mumtaz Deluxe (2 items)" instead of "Item 1 + Item 2".
+    const vendorIds = Array.from(grouped.values())
+      .map((b) => b.vendorId)
+      .filter((v): v is string => v !== null);
+    const vendors = vendorIds.length
+      ? await this.prisma.vendor.findMany({
+          where: { id: { in: vendorIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const vendorName = new Map(vendors.map((v: any) => [v.id, v.name]));
+
+    for (const bucket of grouped.values()) {
+      const label = bucket.vendorId
+        ? vendorName.get(bucket.vendorId) ?? bucket.titles[0]
+        : bucket.titles[0];
+      const description =
+        bucket.titles.length === 1
+          ? label
+          : `${label} (${bucket.titles.length} items)`;
       await this.prisma.bookingCost.create({
         data: {
           bookingId,
-          vendorId: p.vendorId,
-          description: p.item.title,
-          amountDue: p.lineNet,
+          vendorId: bucket.vendorId,
+          description,
+          amountDue: bucket.amountDue,
           amountPaid: 0,
         },
       });
