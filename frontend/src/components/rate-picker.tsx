@@ -15,15 +15,30 @@ const SEASONS = ['PEAK', 'SHOULDER', 'OFF', 'FESTIVE'];
 const TYPES = ['HOTEL', 'HOUSEBOAT', 'TRANSPORT', 'GUIDE', 'ACTIVITY'];
 
 /**
- * Pulls a stored supplier rate straight into a quote so nobody retypes a net
- * cost from memory. Quantity and units are asked for at insert time because
- * "2 rooms x 3 nights" is the actual unit of thought, not a rate id.
+ * Pulls a stored supplier rate. Two shapes:
+ *   1. Default (quote lines): also captures quantity + units at insert time,
+ *      because "2 rooms x 3 nights" is the actual unit of thought.
+ *   2. `simple` mode (itinerary pricing): qty + units already live on the
+ *      ItineraryItem, so we just return the rate id and let the parent's
+ *      structural values drive the math.
+ *
+ * The trigger button label and the callback signature switch based on mode.
  */
-export function RatePicker({
-  onPick,
-}: {
-  onPick: (rateId: string, quantity: number, units: number) => Promise<void>;
-}) {
+type FullPick = (rateId: string, quantity: number, units: number) => Promise<void>;
+type SimplePick = (rateId: string) => Promise<void>;
+
+interface RatePickerProps {
+  triggerLabel?: string;
+  onPick: FullPick;
+}
+interface SimpleRatePickerProps {
+  simple: true;
+  triggerLabel?: string;
+  onPick: SimplePick;
+}
+
+export function RatePicker(props: RatePickerProps | SimpleRatePickerProps) {
+  const simple = 'simple' in props && props.simple;
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<VendorRateRow[]>([]);
   const [city, setCity] = useState('');
@@ -61,7 +76,15 @@ export function RatePicker({
   async function pick(rate: VendorRateRow) {
     setBusyId(rate.id);
     try {
-      await onPick(rate.id, Number(qty) || 1, Number(units) || 1);
+      if (simple) {
+        await (props.onPick as SimplePick)(rate.id);
+      } else {
+        await (props.onPick as FullPick)(
+          rate.id,
+          Number(qty) || 1,
+          Number(units) || 1,
+        );
+      }
       setOpen(false);
     } finally {
       setBusyId(null);
@@ -73,13 +96,17 @@ export function RatePicker({
       <DialogTrigger asChild>
         <Button variant="secondary" size="sm">
           <Plus className="size-4" strokeWidth={1.75} />
-          From supplier rates
+          {props.triggerLabel ?? (simple ? 'Pick rate' : 'From supplier rates')}
         </Button>
       </DialogTrigger>
 
       <DialogContent
         title="Supplier rates"
-        description="Net costs from your rate book. Quantity x units is applied on insert."
+        description={
+          simple
+            ? 'Net cost is copied from the picked rate. Quantity × units come from the item itself.'
+            : 'Net costs from your rate book. Quantity x units is applied on insert.'
+        }
       >
         <div className="border-b border-ink-800 px-5 py-3">
           <div className="flex flex-wrap gap-2">
@@ -126,29 +153,31 @@ export function RatePicker({
             </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
-              Insert as
-            </span>
-            <Input
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              className="h-8 w-16 text-center"
-              aria-label="Quantity, e.g. rooms"
-            />
-            <span className="text-[12px] text-ink-500">rooms/units ×</span>
-            <Input
-              type="number"
-              min={1}
-              value={units}
-              onChange={(e) => setUnits(e.target.value)}
-              className="h-8 w-16 text-center"
-              aria-label="Units, e.g. nights"
-            />
-            <span className="text-[12px] text-ink-500">nights/days</span>
-          </div>
+          {!simple && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
+                Insert as
+              </span>
+              <Input
+                type="number"
+                min={1}
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                className="h-8 w-16 text-center"
+                aria-label="Quantity, e.g. rooms"
+              />
+              <span className="text-[12px] text-ink-500">rooms/units ×</span>
+              <Input
+                type="number"
+                min={1}
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                className="h-8 w-16 text-center"
+                aria-label="Units, e.g. nights"
+              />
+              <span className="text-[12px] text-ink-500">nights/days</span>
+            </div>
+          )}
         </div>
 
         <div className="max-h-[46vh] overflow-y-auto">

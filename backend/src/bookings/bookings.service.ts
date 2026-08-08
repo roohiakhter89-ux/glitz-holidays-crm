@@ -109,11 +109,18 @@ export class BookingsService {
   }
 
   async create(dto: CreateBookingDto, actor: Actor) {
+    if (dto.quoteOptionId && dto.itineraryOptionId) {
+      throw new BadRequestException(
+        'Provide either quoteOptionId or itineraryOptionId, not both.',
+      );
+    }
+
     const userId = actor.id;
     let leadId = dto.leadId;
     let totalSell = dto.totalSell ?? 0;
     let totalNet = dto.totalNet ?? 0;
     let quoteId: string | null = null;
+    let itineraryId: string | null = null;
     let packageName = dto.packageName ?? null;
     let adults = dto.adults ?? 2;
     let children = dto.children ?? 0;
@@ -144,9 +151,43 @@ export class BookingsService {
       }
     }
 
+    // --- build from an itinerary tier: same snapshot pattern ---
+    if (dto.itineraryOptionId) {
+      const option = await this.prisma.itineraryOption.findUnique({
+        where: { id: dto.itineraryOptionId },
+        include: {
+          itinerary: {
+            include: {
+              days: { select: { dayNumber: true } },
+            },
+          },
+        },
+      });
+      if (!option) throw new NotFoundException('Itinerary option not found');
+
+      leadId = option.itinerary.leadId;
+      itineraryId = option.itineraryId;
+      totalSell = option.totalSell;
+      totalNet = option.totalNet;
+      packageName =
+        packageName ?? `${option.itinerary.title} — ${option.name}`;
+      adults = dto.adults ?? option.itinerary.totalPax;
+      children = dto.children ?? 0;
+      // Infer nights from the number of days if the operator didn't override.
+      // Standard convention: N days = N-1 nights (arrival + last day travel).
+      const dayCount = option.itinerary.days.length;
+      nights = dto.nights ?? Math.max(0, dayCount - 1);
+
+      if (totalSell <= 0) {
+        throw new BadRequestException(
+          'That itinerary tier has no pricing yet — set rates on the priceable items first.',
+        );
+      }
+    }
+
     if (!leadId) {
       throw new BadRequestException(
-        'Provide either quoteOptionId or leadId.',
+        'Provide either quoteOptionId, itineraryOptionId, or leadId.',
       );
     }
 
@@ -163,6 +204,8 @@ export class BookingsService {
           leadId,
           quoteId,
           quoteOptionId: dto.quoteOptionId ?? null,
+          itineraryId,
+          itineraryOptionId: dto.itineraryOptionId ?? null,
           createdById: userId ?? null,
           status: BookingStatus.CONFIRMED,
           packageName,

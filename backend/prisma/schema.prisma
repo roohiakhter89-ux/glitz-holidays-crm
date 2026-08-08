@@ -1090,9 +1090,14 @@ model Booking {
   lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   /// Where it came from. Kept for traceability only — the numbers below are
-  /// a frozen snapshot and do NOT follow later edits to the quote.
-  quoteId       String?
-  quoteOptionId String?
+  /// a frozen snapshot and do NOT follow later edits to the quote or
+  /// itinerary. Exactly one of (quoteOptionId, itineraryOptionId) is set for
+  /// a normal booking; both are nullable so a legacy or lead-only booking
+  /// can still exist.
+  quoteId            String?
+  quoteOptionId      String?
+  itineraryId        String?
+  itineraryOptionId  String?
 
   createdById String?
   createdBy   User?   @relation("BookingCreator", fields: [createdById], references: [id], onDelete: SetNull)

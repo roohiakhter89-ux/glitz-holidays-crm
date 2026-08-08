@@ -11,6 +11,7 @@ import {
   GripVertical,
   MapPin,
   Users2,
+  CalendarCheck,
 } from 'lucide-react';
 import {
   DndContext,
@@ -48,6 +49,7 @@ import { Chip } from '@/components/ui/badge';
 import { ITINERARY_ITEM_KINDS, KIND_META, humanise } from '@/lib/constants';
 import { shortDate } from '@/lib/format';
 import { Star } from 'lucide-react';
+import { RatePicker } from '@/components/rate-picker';
 
 /**
  * Day-by-day editor.
@@ -233,6 +235,24 @@ export default function ItineraryEditorPage() {
         onDelete={(optionId) =>
           mutate(() => api.del(`/itineraries/options/${optionId}`))
         }
+        onBook={(optionId, name, totalSell) => {
+          if (totalSell <= 0) {
+            setError('This tier has no pricing yet. Set rates on the priceable items first.');
+            return;
+          }
+          if (
+            !confirm(
+              `Confirm booking for "${name}" at ${money(totalSell)}?\n\nThis freezes the price and moves the lead to Confirmed.`,
+            )
+          )
+            return;
+          mutate(async () => {
+            const booking: any = await api.post('/bookings', {
+              itineraryOptionId: optionId,
+            });
+            router.push(`/bookings/${booking.id}`);
+          });
+        }}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -957,6 +977,7 @@ function TiersStrip({
   onRename,
   onMarkRecommended,
   onDelete,
+  onBook,
 }: {
   options: ItineraryOptionRow[];
   activeId: string | null;
@@ -967,6 +988,7 @@ function TiersStrip({
   onRename: (id: string, name: string) => void;
   onMarkRecommended: (id: string) => void;
   onDelete: (id: string) => void;
+  onBook: (id: string, name: string, totalSell: number) => void;
 }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -1047,7 +1069,18 @@ function TiersStrip({
               )}
 
               {/* per-tier menu */}
-              <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="mt-2 flex flex-wrap gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {o.totalSell > 0 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onBook(o.id, o.name, o.totalSell); }}
+                    className="flex items-center gap-1 rounded bg-signal-600/10 px-1.5 py-1 text-[10px] font-medium uppercase tracking-[0.09em] text-signal-600 hover:bg-signal-600 hover:text-ink-950"
+                    disabled={busy}
+                    title="Confirm booking with this tier's price"
+                  >
+                    <CalendarCheck className="size-3" strokeWidth={1.75} />
+                    Book
+                  </button>
+                )}
                 {!o.isRecommended && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onMarkRecommended(o.id); }}
@@ -1144,31 +1177,48 @@ function PriceCell({
     );
   }
 
+  // Reusable rate-picker trigger — same in both empty and priced states.
+  const pickRate = (
+    <RatePicker
+      simple
+      triggerLabel={pricing ? 'Change rate' : 'Pick rate'}
+      onPick={async (rateId: string) => {
+        await Promise.resolve(onPrice({ vendorRateId: rateId }));
+      }}
+    />
+  );
+
   if (!pricing) {
     return (
-      <button
-        onClick={() => setEditing(true)}
-        disabled={busy}
-        className="rounded border border-dashed border-ink-700 px-2 py-1 text-[11px] text-ink-500 hover:border-signal-500/50 hover:text-signal-600"
-      >
-        Set price
-      </button>
+      <div className="flex items-center gap-1">
+        {pickRate}
+        <button
+          onClick={() => setEditing(true)}
+          disabled={busy}
+          className="rounded border border-dashed border-ink-700 px-2 py-1 text-[11px] text-ink-500 hover:border-signal-500/50 hover:text-signal-600"
+        >
+          Set manually
+        </button>
+      </div>
     );
   }
 
   return (
-    <button
-      onClick={() => setEditing(true)}
-      disabled={busy}
-      className="text-right"
-      title={`Net ${pricing.lineNet} · Sell ${pricing.lineSell}`}
-    >
-      <p className="tabular text-[13px] font-semibold text-ink-100">
-        {money(pricing.lineSell)}
-      </p>
-      <p className="tabular text-[10.5px] text-ink-500">
-        net {money(pricing.lineNet)}
-      </p>
-    </button>
+    <div className="flex items-center gap-2">
+      {pickRate}
+      <button
+        onClick={() => setEditing(true)}
+        disabled={busy}
+        className="text-right"
+        title={`Net ${pricing.lineNet} · Sell ${pricing.lineSell}`}
+      >
+        <p className="tabular text-[13px] font-semibold text-ink-100">
+          {money(pricing.lineSell)}
+        </p>
+        <p className="tabular text-[10.5px] text-ink-500">
+          net {money(pricing.lineNet)}
+        </p>
+      </button>
+    </div>
   );
 }
