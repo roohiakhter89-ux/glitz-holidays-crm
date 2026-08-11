@@ -70,7 +70,7 @@ export default function BookingDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="h-4 w-48 animate-pulse rounded bg-ink-800" />
       </div>
     );
@@ -78,7 +78,7 @@ export default function BookingDetailPage() {
 
   if (!booking) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Button variant="ghost" size="sm" onClick={() => router.push('/bookings')}>
           <ArrowLeft className="size-4" strokeWidth={1.75} />
           Bookings
@@ -100,7 +100,7 @@ export default function BookingDetailPage() {
     f.totalCostDue > 0 ? f.actualMarginPercent : f.quotedMarginPercent;
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <Button
         variant="ghost"
         size="sm"

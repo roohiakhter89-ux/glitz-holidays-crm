@@ -58,7 +58,7 @@ export default function FinancePage() {
   const marginHealth = margin >= 15 ? 'healthy' : (stats && stats.bookings > 0 ? 'warn' : 'muted');
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <header className="mb-6">
         <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
           Finance
@@ -310,7 +310,7 @@ function AgingPanel({
           <p className="pt-4 text-center text-[12px] text-ink-500">Nothing outstanding — clean books.</p>
         ) : (
           <div className="-mx-4 overflow-x-auto">
-            <table className="w-full text-left text-[12.5px]">
+            <table className="w-full min-w-[640px] text-left text-[12.5px]">
               <thead>
                 <tr className="border-b border-ink-800/60 text-[10px] uppercase tracking-[0.09em] text-ink-500">
                   {headers.map((h, i) => (

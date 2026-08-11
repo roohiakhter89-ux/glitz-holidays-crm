@@ -72,7 +72,7 @@ export default function PersonDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="h-4 w-48 rounded shimmer" />
       </div>
     );
@@ -80,7 +80,7 @@ export default function PersonDetailPage() {
 
   if (!emp) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Button variant="ghost" size="sm" onClick={() => router.push('/people')}>
           <ArrowLeft className="size-4" strokeWidth={1.75} />
           People
@@ -95,7 +95,7 @@ export default function PersonDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <Button
         variant="ghost" size="sm"
         className="mb-4 -ml-3"

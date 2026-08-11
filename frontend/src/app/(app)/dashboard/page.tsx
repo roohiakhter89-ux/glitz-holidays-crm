@@ -181,13 +181,13 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="relative mx-auto max-w-[1180px] px-8 py-10">
-        <header className="mb-8 flex flex-wrap items-end justify-between gap-6">
+      <div className="relative mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-[11.5px] font-medium uppercase tracking-[0.14em] text-signal-600">
               {today}
             </p>
-            <h1 className="display mt-2 text-[34px] font-semibold leading-tight text-ink-100">
+            <h1 className="display mt-2 text-[26px] font-semibold leading-tight text-ink-100 sm:text-[30px] md:text-[34px]">
               {greeting},{' '}
               <span className="text-brand-600">{name}</span>.
             </h1>
@@ -200,7 +200,9 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <WeatherStrip />
+          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+            <WeatherStrip />
+          </div>
         </header>
 
         {error && (
@@ -371,7 +373,7 @@ export default function DashboardPage() {
               />
             </PanelBody>
           ) : (
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[720px] text-left text-[13px]">
               <thead>
                 <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
                   <th className="px-5 py-2.5 font-medium">Name</th>

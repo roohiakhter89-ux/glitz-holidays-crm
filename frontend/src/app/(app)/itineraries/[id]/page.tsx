@@ -112,7 +112,7 @@ export default function ItineraryEditorPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="h-4 w-40 rounded shimmer" />
       </div>
     );
@@ -120,7 +120,7 @@ export default function ItineraryEditorPage() {
 
   if (!it) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Button variant="ghost" size="sm" onClick={() => router.push('/itineraries')}>
           <ArrowLeft className="size-4" strokeWidth={1.75} />
           Itineraries
@@ -137,7 +137,7 @@ export default function ItineraryEditorPage() {
   const selectedDay = it.days.find((d) => d.id === selectedDayId) ?? null;
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <Button
         variant="ghost" size="sm" className="mb-4 -ml-3"
         onClick={() => router.push('/itineraries')}

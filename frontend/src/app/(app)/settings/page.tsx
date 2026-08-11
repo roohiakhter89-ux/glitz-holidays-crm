@@ -98,7 +98,7 @@ export default function SettingsPage() {
 
   if (loading || !draft) {
     return (
-      <div className="mx-auto max-w-[900px] px-8 py-8">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="h-4 w-40 rounded shimmer" />
       </div>
     );
@@ -117,7 +117,7 @@ export default function SettingsPage() {
       : null;
 
   return (
-    <div className="mx-auto max-w-[1080px] px-8 py-8">
+    <div className="mx-auto max-w-[1080px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">

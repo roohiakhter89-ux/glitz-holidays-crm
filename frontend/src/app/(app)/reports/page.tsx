@@ -130,7 +130,7 @@ export default function ReportsPage() {
   }, [revenue]);
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
@@ -226,7 +226,7 @@ export default function ReportsPage() {
               Nothing to report yet.
             </PanelBody>
           ) : (
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[720px] text-left text-[13px]">
               <thead>
                 <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
                   <th className="px-5 py-2.5 font-medium">Name</th>
@@ -316,7 +316,7 @@ export default function ReportsPage() {
               No vendor costs recorded in this range.
             </PanelBody>
           ) : (
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[720px] text-left text-[13px]">
               <thead>
                 <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
                   <th className="px-5 py-2.5 font-medium">Supplier</th>

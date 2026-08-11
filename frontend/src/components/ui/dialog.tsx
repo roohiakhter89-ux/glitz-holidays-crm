@@ -29,8 +29,12 @@ export function DialogContent({
       />
       <DialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2',
-          'max-h-[85vh] overflow-hidden rounded-[10px] border border-ink-700 bg-ink-900',
+          // Full-screen on mobile so form fields don't get cramped; centered
+          // sheet on tablet+ desktop.
+          'fixed inset-0 z-50 w-full overflow-hidden bg-ink-900',
+          'sm:left-1/2 sm:top-1/2 sm:inset-auto sm:w-[min(92vw,720px)]',
+          'sm:-translate-x-1/2 sm:-translate-y-1/2',
+          'sm:max-h-[85vh] sm:rounded-[10px] sm:border sm:border-ink-700',
           'shadow-[0_24px_64px_-16px_rgba(0,0,0,0.9)]',
           'data-[state=open]:animate-[popIn_180ms_cubic-bezier(0.16,1,0.3,1)]',
           className,

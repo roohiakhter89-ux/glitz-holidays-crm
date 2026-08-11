@@ -55,14 +55,14 @@ export default function InterviewDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[900px] px-8 py-8">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="h-4 w-48 rounded shimmer" />
       </div>
     );
   }
   if (!iv) {
     return (
-      <div className="mx-auto max-w-[900px] px-8 py-8">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Button variant="ghost" size="sm" onClick={() => router.push('/interviews')}>
           <ArrowLeft className="size-4" strokeWidth={1.75} />
           Interviews
@@ -77,7 +77,7 @@ export default function InterviewDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[900px] px-8 py-8">
+    <div className="mx-auto max-w-[900px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <Button
         variant="ghost" size="sm" className="mb-4 -ml-3"
         onClick={() => router.push('/interviews')}

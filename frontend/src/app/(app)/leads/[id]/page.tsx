@@ -104,7 +104,7 @@ export default function LeadDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="h-4 w-40 animate-pulse rounded bg-ink-800" />
       </div>
     );
@@ -112,7 +112,7 @@ export default function LeadDetailPage() {
 
   if (error && !lead) {
     return (
-      <div className="mx-auto max-w-[1180px] px-8 py-8">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Button variant="ghost" size="sm" onClick={() => router.push('/leads')}>
           <ArrowLeft className="size-4" strokeWidth={1.75} />
           Back to leads
@@ -141,7 +141,7 @@ export default function LeadDetailPage() {
   ].filter(([, v]) => Boolean(v)) as [string, string][];
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 py-8">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <Button
         variant="ghost"
         size="sm"

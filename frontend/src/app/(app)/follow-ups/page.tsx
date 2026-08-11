@@ -67,7 +67,7 @@ export default function FollowUpsPage() {
     (data?.upcoming.length ?? 0);
 
   return (
-    <div className="mx-auto max-w-[1100px] px-8 py-8">
+    <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <header className="mb-6">
         <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
           Follow-ups

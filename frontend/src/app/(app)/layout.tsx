@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   Wallet,
   AlarmClock,
+  Menu,
+  X,
+  Search,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -47,6 +50,7 @@ export default function AppLayout({
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const u = tokenStore.user();
@@ -57,6 +61,23 @@ export default function AppLayout({
     setUser(u);
     setReady(true);
   }, [router]);
+
+  // Close the drawer whenever the route changes — otherwise it'd stay open
+  // after tapping a nav link on mobile.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll while the drawer is open so the page underneath
+  // doesn't rubber-band.
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [drawerOpen]);
 
   if (!ready) {
     return (
@@ -71,83 +92,137 @@ export default function AppLayout({
     router.replace('/login');
   }
 
-  return (
-    <div className="grid min-h-screen grid-cols-[232px_1fr]">
-      <aside className="flex flex-col border-r border-ink-800/60 bg-ink-900 shadow-[1px_0_0_rgba(217,200,163,0.15)]">
-        <div className="border-b border-ink-800/60 px-5 py-4">
-          {/*
-            Wordmark echoes the logo: marigold GLITZ + teal HOLIDAYS. Kept
-            typographic (no image) so it stays crisp at any density and swaps
-            colours cleanly with the theme.
-          */}
-          <div className="flex items-baseline gap-1.5 font-semibold tracking-tight">
-            <span className="text-[17px] text-brand-500 display">Glitz</span>
-            <span className="text-[13px] uppercase tracking-[0.14em] text-signal-600">
-              Holidays
-            </span>
-          </div>
+  const sidebar = (
+    <>
+      <div className="border-b border-ink-800/60 px-5 py-4">
+        <div className="flex items-baseline gap-1.5 font-semibold tracking-tight">
+          <span className="text-[17px] text-brand-500 display">Glitz</span>
+          <span className="text-[13px] uppercase tracking-[0.14em] text-signal-600">
+            Holidays
+          </span>
         </div>
+      </div>
 
-        <nav className="flex-1 space-y-0.5 p-3">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]',
-                  'transition-[background-color,color,transform] duration-150 ease-out',
-                  active
-                    ? 'bg-signal-600/8 text-signal-600 font-medium'
-                    : 'text-ink-400 hover:bg-ink-850 hover:text-ink-200 hover:translate-x-0.5',
-                )}
-              >
-                {active && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-brand-500"
-                  />
-                )}
-                <Icon className="size-4" strokeWidth={1.75} />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-ink-800/60 p-3">
-          <p className="mb-2 px-2 text-[10.5px] text-ink-500">
-            Press{' '}
-            <kbd className="tabular rounded border border-ink-700 bg-ink-950 px-1 py-0.5">⌘K</kbd>{' '}
-            to search anything
-          </p>
-          <div className="flex items-center gap-2.5 px-2 pb-2">
-            {/* Monogram avatar tinted with brand gradient — cheap identity. */}
-            <div
-              aria-hidden
-              className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-signal-500 text-[11px] font-semibold text-ink-950"
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+        {NAV.map(({ href, label, icon: Icon }) => {
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]',
+                'transition-[background-color,color,transform] duration-150 ease-out',
+                active
+                  ? 'bg-signal-600/8 text-signal-600 font-medium'
+                  : 'text-ink-400 hover:bg-ink-850 hover:text-ink-200 hover:translate-x-0.5',
+              )}
             >
-              {(user?.name ?? 'U').slice(0, 1).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[13px] text-ink-200">{user?.name}</p>
-              <p className="truncate text-[10.5px] uppercase tracking-[0.1em] text-ink-500">
-                {user?.role.replace(/_/g, ' ').toLowerCase()}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={signOut}
-            className="w-full justify-start"
+              {active && (
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-brand-500"
+                />
+              )}
+              <Icon className="size-4" strokeWidth={1.75} />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-ink-800/60 p-3">
+        <p className="mb-2 hidden px-2 text-[10.5px] text-ink-500 md:block">
+          Press{' '}
+          <kbd className="tabular rounded border border-ink-700 bg-ink-950 px-1 py-0.5">⌘K</kbd>{' '}
+          to search anything
+        </p>
+        <div className="flex items-center gap-2.5 px-2 pb-2">
+          <div
+            aria-hidden
+            className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-signal-500 text-[11px] font-semibold text-ink-950"
           >
-            <LogOut className="size-4" strokeWidth={1.75} />
-            Sign out
-          </Button>
+            {(user?.name ?? 'U').slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] text-ink-200">{user?.name}</p>
+            <p className="truncate text-[10.5px] uppercase tracking-[0.1em] text-ink-500">
+              {user?.role.replace(/_/g, ' ').toLowerCase()}
+            </p>
+          </div>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={signOut}
+          className="w-full justify-start"
+        >
+          <LogOut className="size-4" strokeWidth={1.75} />
+          Sign out
+        </Button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen md:grid md:grid-cols-[232px_1fr]">
+      {/* Mobile top bar — only visible below md */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-800/60 bg-ink-900/95 px-4 py-3 backdrop-blur md:hidden">
+        <button
+          aria-label="Open menu"
+          onClick={() => setDrawerOpen(true)}
+          className="grid size-9 place-items-center rounded-md text-ink-300 hover:bg-ink-850 hover:text-ink-100"
+        >
+          <Menu className="size-5" strokeWidth={1.75} />
+        </button>
+        <div className="flex items-baseline gap-1 font-semibold tracking-tight">
+          <span className="text-[15px] text-brand-500 display">Glitz</span>
+          <span className="text-[11px] uppercase tracking-[0.14em] text-signal-600">
+            Holidays
+          </span>
+        </div>
+        <button
+          aria-label="Search"
+          onClick={() => {
+            // Fake a Ctrl-K keypress so the palette opens with its existing
+            // listener — one source of truth for the toggle.
+            window.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }),
+            );
+          }}
+          className="grid size-9 place-items-center rounded-md text-ink-300 hover:bg-ink-850 hover:text-ink-100"
+        >
+          <Search className="size-5" strokeWidth={1.75} />
+        </button>
+      </header>
+
+      {/* Desktop sidebar — always mounted, hidden below md */}
+      <aside className="hidden flex-col border-r border-ink-800/60 bg-ink-900 shadow-[1px_0_0_rgba(217,200,163,0.15)] md:flex">
+        {sidebar}
       </aside>
+
+      {/* Mobile drawer — off-canvas, shows above the app */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button
+            aria-label="Close menu"
+            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-[260px] max-w-[85%] flex-col border-r border-ink-800/60 bg-ink-900 shadow-2xl">
+            <div className="absolute right-2 top-2">
+              <button
+                aria-label="Close menu"
+                onClick={() => setDrawerOpen(false)}
+                className="grid size-9 place-items-center rounded-md text-ink-400 hover:bg-ink-850 hover:text-ink-100"
+              >
+                <X className="size-5" strokeWidth={1.75} />
+              </button>
+            </div>
+            {sidebar}
+          </aside>
+        </div>
+      )}
 
       <main className="min-w-0 overflow-x-hidden">{children}</main>
       <CommandPalette />
