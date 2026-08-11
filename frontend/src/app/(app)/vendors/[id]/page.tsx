@@ -157,6 +157,9 @@ export default function VendorDetailPage() {
         </div>
 
         <div className="space-y-4">
+          {(vendor.type === 'HOTEL' || vendor.type === 'HOUSEBOAT') && (
+            <PropertyPanel vendor={vendor} />
+          )}
           <ContactPanel vendor={vendor} />
           <BankPanel vendor={vendor} />
           {vendor.notes && (
@@ -176,6 +179,60 @@ export default function VendorDetailPage() {
 }
 
 /* ------------------------------------------------------------------ */
+
+function PropertyPanel({ vendor: v }: { vendor: VendorRow }) {
+  const hasAnything =
+    v.checkInTime || v.checkOutTime || v.roomCount || (v.amenities?.length ?? 0) > 0;
+  return (
+    <Panel>
+      <PanelHeader>
+        <PanelTitle>Property</PanelTitle>
+      </PanelHeader>
+      <PanelBody className="space-y-3 py-4 text-[13px]">
+        {!hasAnything && (
+          <p className="text-[12.5px] text-ink-500">
+            No property details yet. Edit the supplier to add check-in/out times, room count and amenities.
+          </p>
+        )}
+        {(v.checkInTime || v.checkOutTime) && (
+          <div className="grid grid-cols-2 gap-2 text-ink-300">
+            <div>
+              <p className="text-[10.5px] uppercase tracking-[0.09em] text-ink-500">Check-in</p>
+              <p className="tabular mt-0.5">{v.checkInTime ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10.5px] uppercase tracking-[0.09em] text-ink-500">Check-out</p>
+              <p className="tabular mt-0.5">{v.checkOutTime ?? '—'}</p>
+            </div>
+          </div>
+        )}
+        {v.roomCount != null && (
+          <div>
+            <p className="text-[10.5px] uppercase tracking-[0.09em] text-ink-500">Rooms</p>
+            <p className="tabular mt-0.5 text-ink-300">{v.roomCount}</p>
+          </div>
+        )}
+        {(v.amenities?.length ?? 0) > 0 && (
+          <div>
+            <p className="text-[10.5px] uppercase tracking-[0.09em] text-ink-500">
+              Amenities
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {v.amenities.map((a) => (
+                <span
+                  key={a}
+                  className="rounded-full border border-ink-800 bg-ink-950 px-2 py-0.5 text-[11px] text-ink-400"
+                >
+                  {a}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </PanelBody>
+    </Panel>
+  );
+}
 
 function ContactPanel({ vendor: v }: { vendor: VendorRow }) {
   if (v.contactRedacted) {
@@ -352,6 +409,22 @@ function RateRow({
   );
 }
 
+/**
+ * Common hotel room categories in the DMC world. Free text is still allowed
+ * for non-standard names ("Maharaja Suite") but the dropdown covers 90% of
+ * inventory and stops typos becoming three "Deluxe" rows that don't group.
+ */
+const HOTEL_VARIANTS = [
+  'Standard',
+  'Deluxe',
+  'Super Deluxe',
+  'Premium',
+  'Executive',
+  'Suite',
+  'Club',
+  'Cottage',
+];
+
 function AddRate({
   vendor: v,
   disabled,
@@ -378,6 +451,9 @@ function AddRate({
   const [rateBasis, setRateBasis] = useState<string>(defaultBasis);
   const [netRate, setNetRate] = useState('');
   const [rackRate, setRackRate] = useState('');
+  const [extraBedRate, setExtraBedRate] = useState('');
+  const [childRate, setChildRate] = useState('');
+  const [maxOccupancy, setMaxOccupancy] = useState('');
   const [validFrom, setValidFrom] = useState('');
   const [validTo, setValidTo] = useState('');
 
@@ -391,23 +467,45 @@ function AddRate({
     };
     if (isHotel) body.mealPlan = mealPlan;
     if (rackRate) body.rackRate = Number(rackRate);
+    if (isHotel && extraBedRate) body.extraBedRate = Number(extraBedRate);
+    if (isHotel && childRate) body.childRate = Number(childRate);
+    if (isHotel && maxOccupancy) body.maxOccupancy = Number(maxOccupancy);
     if (validFrom) body.validFrom = validFrom;
     if (validTo) body.validTo = validTo;
     onAdd(body);
     setVariant(''); setNetRate(''); setRackRate('');
+    setExtraBedRate(''); setChildRate(''); setMaxOccupancy('');
     setValidFrom(''); setValidTo('');
   }
 
   return (
     <div className="grid gap-2 sm:grid-cols-4">
       <div className="space-y-1 sm:col-span-2">
-        <Label htmlFor="r-variant">Variant</Label>
-        <Input
-          id="r-variant" value={variant}
-          onChange={(e) => setVariant(e.target.value)}
-          placeholder={isHotel ? 'Deluxe Room' : v.type === 'TRANSPORT' ? 'Toyota Innova' : 'Standard'}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-        />
+        <Label htmlFor="r-variant">{isHotel ? 'Room type' : 'Variant'}</Label>
+        {isHotel ? (
+          <Input
+            id="r-variant"
+            list="room-variants"
+            value={variant}
+            onChange={(e) => setVariant(e.target.value)}
+            placeholder="Deluxe"
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+          />
+        ) : (
+          <Input
+            id="r-variant" value={variant}
+            onChange={(e) => setVariant(e.target.value)}
+            placeholder={v.type === 'TRANSPORT' ? 'Toyota Innova' : 'Standard'}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+          />
+        )}
+        {isHotel && (
+          <datalist id="room-variants">
+            {HOTEL_VARIANTS.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
+        )}
       </div>
       <div className="space-y-1">
         <Label htmlFor="r-season">Season</Label>
@@ -433,7 +531,9 @@ function AddRate({
         </div>
       )}
       <div className="space-y-1">
-        <Label htmlFor="r-net">Net rate (₹) *</Label>
+        <Label htmlFor="r-net">
+          {isHotel ? 'Double occupancy (₹) *' : 'Net rate (₹) *'}
+        </Label>
         <Input
           id="r-net" type="number" min={0}
           value={netRate}
@@ -453,6 +553,42 @@ function AddRate({
           className="text-right tabular"
         />
       </div>
+
+      {isHotel && (
+        <>
+          <div className="space-y-1">
+            <Label htmlFor="r-extra">Extra adult (₹)</Label>
+            <Input
+              id="r-extra" type="number" min={0}
+              value={extraBedRate}
+              onChange={(e) => setExtraBedRate(e.target.value)}
+              placeholder="1500"
+              className="text-right tabular"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="r-child">Child w/bed (₹)</Label>
+            <Input
+              id="r-child" type="number" min={0}
+              value={childRate}
+              onChange={(e) => setChildRate(e.target.value)}
+              placeholder="1000"
+              className="text-right tabular"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="r-occ">Max occupancy</Label>
+            <Input
+              id="r-occ" type="number" min={1} max={10}
+              value={maxOccupancy}
+              onChange={(e) => setMaxOccupancy(e.target.value)}
+              placeholder="3"
+              className="text-right tabular"
+            />
+          </div>
+        </>
+      )}
+
       <div className="space-y-1">
         <Label htmlFor="r-from">Valid from</Label>
         <Input

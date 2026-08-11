@@ -456,6 +456,10 @@ export interface VendorRow {
   panNumber: string | null;
   paymentTerms: string | null;
   unionZone: string | null;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  roomCount: number | null;
+  amenities: string[];
   notes: string | null;
   isActive: boolean;
   contactRedacted?: boolean;

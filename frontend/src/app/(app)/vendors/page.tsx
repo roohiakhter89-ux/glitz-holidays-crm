@@ -7,12 +7,11 @@ import { Search, X, Building2 } from 'lucide-react';
 import { api, ApiError, type VendorRow, type Paged } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/badge';
 import { RowActions } from '@/components/ui/row-actions';
 import { AddVendorDialog } from '@/components/add-vendor-dialog';
-import { VENDOR_TYPES, humanise } from '@/lib/constants';
+import { humanise } from '@/lib/constants';
 import { money } from '@/lib/format';
 
 export default function VendorsPage() {
@@ -65,6 +64,35 @@ export default function VendorsPage() {
         <AddVendorDialog onCreated={(id) => router.push(`/vendors/${id}`)} />
       </header>
 
+      {/* Type tabs — the DMC only cares about hotel-vs-transport-vs-rest 90%
+          of the time. Rare types live in "All". */}
+      <div className="mb-4 flex flex-wrap items-center gap-1">
+        {[
+          { value: '', label: 'All' },
+          { value: 'HOTEL', label: 'Hotels' },
+          { value: 'HOUSEBOAT', label: 'Houseboats' },
+          { value: 'TRANSPORT', label: 'Transport' },
+          { value: 'GUIDE', label: 'Guides' },
+          { value: 'ACTIVITY', label: 'Activities' },
+          { value: 'RESTAURANT', label: 'Restaurants' },
+        ].map((t) => {
+          const active = type === t.value;
+          return (
+            <button
+              key={t.value || 'all'}
+              onClick={() => { setType(t.value); setPage(1); }}
+              className={
+                active
+                  ? 'rounded-full border border-signal-500 bg-signal-500/12 px-3 py-1.5 text-[12px] font-medium text-signal-600'
+                  : 'rounded-full border border-transparent px-3 py-1.5 text-[12px] text-ink-400 hover:bg-ink-850 hover:text-ink-200'
+              }
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search
@@ -78,19 +106,6 @@ export default function VendorsPage() {
             className="pl-8"
             aria-label="Search suppliers"
           />
-        </div>
-
-        <div className="w-[168px]">
-          <Select
-            value={type}
-            onChange={(e) => { setType(e.target.value); setPage(1); }}
-            aria-label="Filter by type"
-          >
-            <option value="">All types</option>
-            {VENDOR_TYPES.map((t) => (
-              <option key={t} value={t}>{humanise(t)}</option>
-            ))}
-          </Select>
         </div>
 
         <div className="w-[168px]">

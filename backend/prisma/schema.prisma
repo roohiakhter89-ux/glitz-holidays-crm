@@ -832,6 +832,19 @@ model Vendor {
   // transport only — Kashmir union taxi zone constraints
   unionZone String?
 
+  // --- hotel / property specifics -----------------------------------------
+  // All optional. Filled in for HOTEL/HOUSEBOAT/RESORT; ignored for TRANSPORT etc.
+  /// "14:00" — kept as a HH:MM string so timezone confusion can't creep in.
+  checkInTime  String?
+  /// "11:00" — checkout is the number ops needs on the client voucher.
+  checkOutTime String?
+  /// Total rooms in inventory. Not a live count — used to size availability
+  /// gut-check, not for booking allocation.
+  roomCount    Int?
+  /// Free-form tags. Deliberately not an enum — hotel amenity lingo shifts
+  /// too fast (spa, e-vehicle charging, halal kitchen, etc.).
+  amenities    String[]
+
   notes    String?
   isActive Boolean @default(true)
 

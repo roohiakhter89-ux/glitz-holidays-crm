@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import {
   Dialog,
@@ -18,7 +18,28 @@ import { VENDOR_TYPES, humanise } from '@/lib/constants';
  * New supplier. Contact + bank fields are collected here because they're
  * write-once (once entered, only the owner sees them); rates get added on
  * the detail page where a live table is easier.
+ *
+ * Hotel/houseboat types unlock the property panel (check-in/out, room count,
+ * amenities). Everything else keeps a lean form.
  */
+const COMMON_AMENITIES = [
+  'Wi-Fi',
+  'Parking',
+  'Restaurant',
+  'Room service',
+  'Airport transfer',
+  'Spa',
+  'Gym',
+  'Pool',
+  'Heating',
+  'Air conditioning',
+  'Pet friendly',
+  'Wheelchair access',
+  'Kitchenette',
+  'Fireplace',
+  'Balcony / lake view',
+];
+
 export function AddVendorDialog({
   onCreated,
 }: {
@@ -39,11 +60,35 @@ export function AddVendorDialog({
   const [gstin, setGstin] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Property specifics — only used when type is hotel-like.
+  const [checkInTime, setCheckInTime] = useState('14:00');
+  const [checkOutTime, setCheckOutTime] = useState('11:00');
+  const [roomCount, setRoomCount] = useState('');
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [customAmenity, setCustomAmenity] = useState('');
+
+  const isProperty = type === 'HOTEL' || type === 'HOUSEBOAT';
+
   function reset() {
     setName(''); setType('HOTEL'); setCity(''); setArea('');
     setContactPerson(''); setPhone(''); setEmail('');
     setStarRating(''); setGstin(''); setNotes('');
+    setCheckInTime('14:00'); setCheckOutTime('11:00');
+    setRoomCount(''); setAmenities([]); setCustomAmenity('');
     setError(null);
+  }
+
+  function toggleAmenity(a: string) {
+    setAmenities((prev) =>
+      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a],
+    );
+  }
+
+  function addCustomAmenity() {
+    const v = customAmenity.trim();
+    if (!v) return;
+    if (!amenities.includes(v)) setAmenities((prev) => [...prev, v]);
+    setCustomAmenity('');
   }
 
   async function submit(e: React.FormEvent) {
@@ -64,6 +109,13 @@ export function AddVendorDialog({
       if (starRating) body.starRating = Number(starRating);
       if (gstin.trim()) body.gstin = gstin.trim();
       if (notes.trim()) body.notes = notes.trim();
+
+      if (isProperty) {
+        if (checkInTime) body.checkInTime = checkInTime;
+        if (checkOutTime) body.checkOutTime = checkOutTime;
+        if (roomCount) body.roomCount = Number(roomCount);
+        if (amenities.length) body.amenities = amenities;
+      }
 
       const res = await api.post<{ id: string }>('/vendors', body);
       setOpen(false);
@@ -167,8 +219,113 @@ export function AddVendorDialog({
                 onChange={(e) => setGstin(e.target.value.toUpperCase())}
               />
             </div>
+          </div>
 
-            <div className="space-y-1 sm:col-span-2">
+          {isProperty && (
+            <div className="mt-5 border-t border-ink-800 pt-4">
+              <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.09em] text-ink-500">
+                Property specifics
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="v-checkin">Check-in</Label>
+                  <Input
+                    id="v-checkin" type="time"
+                    value={checkInTime}
+                    onChange={(e) => setCheckInTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="v-checkout">Check-out</Label>
+                  <Input
+                    id="v-checkout" type="time"
+                    value={checkOutTime}
+                    onChange={(e) => setCheckOutTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="v-rooms">Total rooms</Label>
+                  <Input
+                    id="v-rooms" type="number" min={1}
+                    value={roomCount}
+                    onChange={(e) => setRoomCount(e.target.value)}
+                    placeholder="42"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <Label>Amenities</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {COMMON_AMENITIES.map((a) => {
+                    const on = amenities.includes(a);
+                    return (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => toggleAmenity(a)}
+                        className={
+                          on
+                            ? 'rounded-full border border-signal-500 bg-signal-500/12 px-2.5 py-1 text-[11.5px] text-signal-600 transition-colors'
+                            : 'rounded-full border border-ink-700 bg-ink-900 px-2.5 py-1 text-[11.5px] text-ink-400 transition-colors hover:border-ink-600 hover:text-ink-200'
+                        }
+                      >
+                        {a}
+                      </button>
+                    );
+                  })}
+                </div>
+                {amenities.filter((a) => !COMMON_AMENITIES.includes(a)).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {amenities
+                      .filter((a) => !COMMON_AMENITIES.includes(a))
+                      .map((a) => (
+                        <span
+                          key={a}
+                          className="inline-flex items-center gap-1 rounded-full border border-brand-400/60 bg-brand-400/10 px-2.5 py-1 text-[11.5px] text-brand-600"
+                        >
+                          {a}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${a}`}
+                            onClick={() => toggleAmenity(a)}
+                            className="text-brand-500/80 hover:text-brand-600"
+                          >
+                            <X className="size-3" strokeWidth={2} />
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Custom amenity"
+                    value={customAmenity}
+                    onChange={(e) => setCustomAmenity(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addCustomAmenity();
+                      }
+                    }}
+                    className="h-8 text-[12.5px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={addCustomAmenity}
+                    disabled={!customAmenity.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 grid gap-4">
+            <div className="space-y-1">
               <Label htmlFor="v-notes">Notes</Label>
               <Textarea
                 id="v-notes" rows={2}
