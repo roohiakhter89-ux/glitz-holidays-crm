@@ -843,7 +843,7 @@ model Vendor {
   roomCount    Int?
   /// Free-form tags. Deliberately not an enum — hotel amenity lingo shifts
   /// too fast (spa, e-vehicle charging, halal kitchen, etc.).
-  amenities    String[]
+  amenities    String[] @default([])
 
   notes    String?
   isActive Boolean @default(true)
