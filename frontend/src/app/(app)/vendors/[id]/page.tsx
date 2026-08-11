@@ -21,6 +21,7 @@ import {
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { DeactivateButton } from '@/components/ui/deactivate-button';
 import { Input, Label } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
@@ -123,6 +124,19 @@ export default function VendorDetailPage() {
             </p>
           </div>
         </div>
+        <DeactivateButton
+          disabled={busy || !vendor.isActive}
+          label="Deactivate supplier"
+          confirmMessage={`Deactivate ${vendor.name}? Rates and history stay; new bookings won't see them in the picker. Blocked if the ledger still has an outstanding balance.`}
+          onConfirm={async () => {
+            try {
+              await api.del(`/vendors/${id}`);
+              router.push('/vendors');
+            } catch (e) {
+              setError(e instanceof ApiError ? e.message : 'Could not deactivate this supplier.');
+            }
+          }}
+        />
       </header>
 
       {error && (

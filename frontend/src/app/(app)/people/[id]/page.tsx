@@ -24,6 +24,7 @@ import {
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { DeactivateButton } from '@/components/ui/deactivate-button';
 import { Input, Label } from '@/components/ui/input';
 import { Chip } from '@/components/ui/badge';
 import { money, percent, shortDate } from '@/lib/format';
@@ -138,6 +139,19 @@ export default function PersonDetailPage() {
             </p>
           </div>
         </div>
+        <DeactivateButton
+          disabled={busy || emp.status === 'EXITED'}
+          label="Mark exited"
+          confirmMessage={`Mark ${emp.fullName} as exited? Salary history and interviews stay on record.`}
+          onConfirm={async () => {
+            try {
+              await api.del(`/employees/${id}`);
+              router.push('/people');
+            } catch (e) {
+              setError(e instanceof ApiError ? e.message : 'Could not exit this employee.');
+            }
+          }}
+        />
       </header>
 
       {error && (

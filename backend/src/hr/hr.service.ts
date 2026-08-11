@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EmploymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
@@ -169,6 +169,27 @@ export class HrService {
     }
 
     return this.prisma.employee.update({ where: { id }, data });
+  }
+
+  /**
+   * Soft-exit — flip status to EXITED and stamp exitedOn=today. The row
+   * survives so salary slips, org-chart reports, and interview history
+   * remain intact. Idempotent.
+   */
+  async deactivateEmployee(id: string) {
+    const emp = await this.prisma.employee.findUnique({ where: { id } });
+    if (!emp) throw new NotFoundException('Employee not found');
+    if (emp.status === EmploymentStatus.EXITED) {
+      return { id, alreadyExited: true };
+    }
+    await this.prisma.employee.update({
+      where: { id },
+      data: {
+        status: EmploymentStatus.EXITED,
+        exitedOn: emp.exitedOn ?? new Date(),
+      },
+    });
+    return { id, exited: true };
   }
 
   // ==========================================================================
@@ -341,6 +362,14 @@ export class HrService {
     if (dto.outcomeNote !== undefined) data.outcomeNote = dto.outcomeNote;
 
     return this.prisma.interview.update({ where: { id }, data });
+  }
+
+  /** Hard-delete — interviews have no downstream financial relations. */
+  async removeInterview(id: string) {
+    const exists = await this.prisma.interview.findUnique({ where: { id } });
+    if (!exists) throw new NotFoundException('Interview not found');
+    await this.prisma.interview.delete({ where: { id } });
+    return { id, deleted: true };
   }
 
   // ==========================================================================

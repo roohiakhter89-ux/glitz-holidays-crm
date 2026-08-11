@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Stage, Chip } from '@/components/ui/badge';
+import { RowActions } from '@/components/ui/row-actions';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { AddLeadDialog } from '@/components/add-lead-dialog';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
@@ -187,6 +188,7 @@ export default function LeadsPage() {
                 <th className="px-5 py-2.5 font-medium">Owner</th>
                 <th className="px-5 py-2.5 font-medium">Score</th>
                 <th className="px-5 py-2.5 text-right font-medium">Received</th>
+                <th className="w-10 px-3 py-2.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -226,6 +228,20 @@ export default function LeadsPage() {
                   </td>
                   <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
                     {relativeDate(lead.createdAt)}
+                  </td>
+                  <td className="px-2 py-3">
+                    <RowActions
+                      label={`Close ${lead.name}`}
+                      confirmMessage={`Close this lead? It will be marked LOST. History, bookings and activities stay on record.`}
+                      onDelete={async () => {
+                        try {
+                          await api.del(`/leads/${lead.id}`);
+                          load();
+                        } catch (err) {
+                          alert(err instanceof ApiError ? err.message : 'Could not close that lead.');
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               ))}

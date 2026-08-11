@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
+import { RowActions } from '@/components/ui/row-actions';
 import { humanise } from '@/lib/constants';
 import { shortDate } from '@/lib/format';
 import {
@@ -113,6 +114,7 @@ export default function InterviewsPage() {
                 <th className="px-5 py-2.5 font-medium">Interviewer</th>
                 <th className="px-5 py-2.5 font-medium">Outcome</th>
                 <th className="px-5 py-2.5 text-right font-medium">Scheduled</th>
+                <th className="w-10 px-3 py-2.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -159,6 +161,20 @@ export default function InterviewsPage() {
                   </td>
                   <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
                     {shortDate(iv.scheduledAt)}
+                  </td>
+                  <td className="px-2 py-3">
+                    <RowActions
+                      label={`Delete ${iv.candidateName}`}
+                      confirmMessage={`Delete this interview record for ${iv.candidateName}? This cannot be undone.`}
+                      onDelete={async () => {
+                        try {
+                          await api.del(`/interviews/${iv.id}`);
+                          load();
+                        } catch (err) {
+                          alert(err instanceof ApiError ? err.message : 'Could not delete that interview.');
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               ))}

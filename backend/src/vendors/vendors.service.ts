@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
@@ -201,6 +205,24 @@ export class VendorsService {
   async deactivate(id: string) {
     const exists = await this.prisma.vendor.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Vendor not found');
+
+    // Block if we still owe them money — deactivating a vendor with
+    // outstanding payables makes the balance disappear from most default
+    // filters and the ops team has walked into that trap before.
+    const outstanding = await this.prisma.bookingCost.aggregate({
+      where: { vendorId: id },
+      _sum: { amountDue: true, amountPaid: true },
+    });
+    const due = outstanding._sum.amountDue ?? 0;
+    const paid = outstanding._sum.amountPaid ?? 0;
+    if (due - paid > 0) {
+      throw new BadRequestException(
+        `Cannot deactivate: outstanding balance of ₹${(
+          due - paid
+        ).toLocaleString('en-IN')}. Settle the ledger first.`,
+      );
+    }
+
     return this.prisma.vendor.update({
       where: { id },
       data: { isActive: false },

@@ -21,6 +21,7 @@ import {
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { DeactivateButton } from '@/components/ui/deactivate-button';
 import { Input, Label } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
@@ -174,6 +175,19 @@ export default function BookingDetailPage() {
               ))}
             </Select>
           </div>
+          <DeactivateButton
+            disabled={busy || booking.status === 'CANCELLED'}
+            label="Cancel booking"
+            confirmMessage={`Cancel ${booking.bookingNumber}? The record stays for accounting; the lead status flips to CANCELLED.`}
+            onConfirm={async () => {
+              try {
+                await api.del(`/bookings/${id}`);
+                router.push('/bookings');
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : 'Could not cancel this booking.');
+              }
+            }}
+          />
         </div>
       </header>
 

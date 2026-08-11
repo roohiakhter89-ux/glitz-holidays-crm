@@ -13,6 +13,7 @@ import {
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { DeactivateButton } from '@/components/ui/deactivate-button';
 import { Select, Textarea } from '@/components/ui/select';
 import { Label } from '@/components/ui/input';
 import { Chip } from '@/components/ui/badge';
@@ -226,6 +227,19 @@ export default function LeadDetailPage() {
           >
             Build itinerary
           </Button>
+          <DeactivateButton
+            disabled={saving || lead.status === 'LOST'}
+            label="Close lead"
+            confirmMessage={`Close ${lead.name}? Marks the lead LOST. History, bookings and activities stay on record.`}
+            onConfirm={async () => {
+              try {
+                await api.del(`/leads/${lead.id}`);
+                router.push('/leads');
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : 'Could not close this lead.');
+              }
+            }}
+          />
         </div>
       </header>
 

@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -60,6 +61,16 @@ export class HrController {
   @Patch('employees/:id')
   updateEmployee(@Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
     return this.hr.updateEmployee(id, dto);
+  }
+
+  /**
+   * Soft-exit an employee — flip status to EXITED and stamp exitedOn=today.
+   * The row survives so salary slips, interview history and org-chart
+   * relations stay intact.
+   */
+  @Delete('employees/:id')
+  deactivateEmployee(@Param('id') id: string) {
+    return this.hr.deactivateEmployee(id);
   }
 
   @Get('employees/:id/performance')
@@ -140,6 +151,12 @@ export class HrController {
   @Patch('interviews/:id')
   updateInterview(@Param('id') id: string, @Body() dto: UpdateInterviewDto) {
     return this.hr.updateInterview(id, dto);
+  }
+
+  /** Hard-delete — interviews have no downstream financial relations. */
+  @Delete('interviews/:id')
+  removeInterview(@Param('id') id: string) {
+    return this.hr.removeInterview(id);
   }
 
   @Get('interviews/:id/pdf')

@@ -127,6 +127,20 @@ export class BookingsController {
     return this.bookings.update(id, dto, actor);
   }
 
+  /**
+   * Cancel a booking. Rides on `update` so the same activity trail is written
+   * and the parent lead's status flips to CANCELLED. Optional ?reason=
+   * captures why for the audit — defaults to "Cancelled by operator".
+   */
+  @Delete(':id')
+  cancel(
+    @Param('id') id: string,
+    @Query('reason') reason: string | undefined,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.bookings.cancel(id, reason, actor);
+  }
+
   // --- payments ------------------------------------------------------------
 
   @Roles(...FINANCE_ROLES)

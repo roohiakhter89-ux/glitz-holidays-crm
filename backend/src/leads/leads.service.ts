@@ -338,6 +338,36 @@ export class LeadsService {
     return updated;
   }
 
+  /**
+   * Soft-close a lead — status → LOST with a system reason. We never destroy
+   * the row: it may have bookings, activities and attribution attached that
+   * accountants and marketing still need.
+   */
+  async deactivate(id: string, actor: Actor) {
+    const lead = await this.prisma.lead.findUnique({ where: { id } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    this.assertCanTouch(lead, actor);
+
+    if (lead.status === LeadStatus.LOST) return { id, alreadyClosed: true };
+
+    await this.prisma.lead.update({
+      where: { id },
+      data: {
+        status: LeadStatus.LOST,
+        lostReason: lead.lostReason ?? 'Removed by operator',
+      },
+    });
+    await this.prisma.activity.create({
+      data: {
+        leadId: id,
+        userId: actor.id ?? null,
+        type: ActivityType.STATUS_CHANGE,
+        content: `Status ${lead.status} -> LOST (removed by operator)`,
+      },
+    });
+    return { id, closed: true };
+  }
+
   async addActivity(leadId: string, dto: CreateActivityDto, actor: Actor) {
     const actorId = actor.id;
     const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });

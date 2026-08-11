@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Map, Calendar } from 'lucide-react';
 import { api, ApiError, type ItineraryListRow } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
 import { Chip } from '@/components/ui/badge';
+import { RowActions } from '@/components/ui/row-actions';
 import { relativeDate } from '@/lib/format';
 
 export default function ItinerariesPage() {
@@ -13,15 +14,18 @@ export default function ItinerariesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api
-      .get<ItineraryListRow[]>('/itineraries')
-      .then(setRows)
-      .catch((e) =>
-        setError(e instanceof ApiError ? e.message : 'Could not load itineraries.'),
-      )
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setRows(await api.get<ItineraryListRow[]>('/itineraries'));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load itineraries.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div className="mx-auto max-w-[1180px] px-8 py-8">
@@ -68,6 +72,7 @@ export default function ItinerariesPage() {
                 <th className="px-5 py-2.5 font-medium">Days</th>
                 <th className="px-5 py-2.5 font-medium">Pax</th>
                 <th className="px-5 py-2.5 text-right font-medium">Created</th>
+                <th className="w-10 px-3 py-2.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -105,6 +110,20 @@ export default function ItinerariesPage() {
                   <td className="tabular px-5 py-3 text-ink-400">{it.totalPax}</td>
                   <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
                     {relativeDate(it.createdAt)}
+                  </td>
+                  <td className="px-2 py-3">
+                    <RowActions
+                      label={`Delete ${it.title}`}
+                      confirmMessage={`Delete "${it.title}"? Days, options and pricing are removed. Any bookings already made from this itinerary are not affected.`}
+                      onDelete={async () => {
+                        try {
+                          await api.del(`/itineraries/${it.id}`);
+                          load();
+                        } catch (err) {
+                          alert(err instanceof ApiError ? err.message : 'Could not delete that itinerary.');
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               ))}

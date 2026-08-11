@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/badge';
+import { RowActions } from '@/components/ui/row-actions';
 import { AddVendorDialog } from '@/components/add-vendor-dialog';
 import { VENDOR_TYPES, humanise } from '@/lib/constants';
 import { money } from '@/lib/format';
@@ -142,6 +143,7 @@ export default function VendorsPage() {
                 <th className="px-5 py-2.5 font-medium">City / Area</th>
                 <th className="px-5 py-2.5 font-medium">Contact</th>
                 <th className="px-5 py-2.5 text-right font-medium">Rates</th>
+                <th className="w-10 px-3 py-2.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -210,6 +212,21 @@ export default function VendorsPage() {
                           )}
                         </>
                       )}
+                    </td>
+                    <td className="px-2 py-3">
+                      <RowActions
+                        disabled={!v.isActive}
+                        label={`Deactivate ${v.name}`}
+                        confirmMessage={`Deactivate ${v.name}? Rates and history stay; new bookings won't see them in the picker. Blocked if the ledger still has an outstanding balance.`}
+                        onDelete={async () => {
+                          try {
+                            await api.del(`/vendors/${v.id}`);
+                            load();
+                          } catch (err) {
+                            alert(err instanceof ApiError ? err.message : 'Could not deactivate that supplier.');
+                          }
+                        }}
+                      />
                     </td>
                   </tr>
                 );

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/badge';
+import { RowActions } from '@/components/ui/row-actions';
 import { AddEmployeeDialog } from '@/components/add-employee-dialog';
 import { humanise } from '@/lib/constants';
 import { shortDate } from '@/lib/format';
@@ -139,6 +140,7 @@ export default function PeoplePage() {
                 <th className="px-5 py-2.5 font-medium">Reports to</th>
                 <th className="px-5 py-2.5 font-medium">Type</th>
                 <th className="px-5 py-2.5 text-right font-medium">Joined</th>
+                <th className="w-10 px-3 py-2.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -169,6 +171,20 @@ export default function PeoplePage() {
                   </td>
                   <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
                     {shortDate(e.joinedOn)}
+                  </td>
+                  <td className="px-2 py-3">
+                    <RowActions
+                      label={`Mark ${e.fullName} as exited`}
+                      confirmMessage={`Mark ${e.fullName} as exited? Their salary history and interviews stay on record.`}
+                      onDelete={async () => {
+                        try {
+                          await api.del(`/employees/${e.id}`);
+                          load();
+                        } catch (err) {
+                          alert(err instanceof ApiError ? err.message : 'Could not exit that employee.');
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               ))}

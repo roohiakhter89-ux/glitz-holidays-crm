@@ -10,6 +10,7 @@ import {
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { DeactivateButton } from '@/components/ui/deactivate-button';
 import { Input, Label } from '@/components/ui/input';
 import { Select, Textarea } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
@@ -132,6 +133,19 @@ export default function InterviewDetailPage() {
               ))}
             </Select>
           </div>
+          <DeactivateButton
+            disabled={busy}
+            label="Delete interview"
+            confirmMessage={`Delete this interview record for ${iv.candidateName}? This cannot be undone.`}
+            onConfirm={async () => {
+              try {
+                await api.del(`/interviews/${iv.id}`);
+                router.push('/interviews');
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : 'Could not delete this interview.');
+              }
+            }}
+          />
         </div>
       </header>
 

@@ -43,6 +43,7 @@ import {
 import { money, percent, marginHealth, healthText } from '@/lib/format';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { DeactivateButton } from '@/components/ui/deactivate-button';
 import { Input, Label } from '@/components/ui/input';
 import { Select, Textarea } from '@/components/ui/select';
 import { Chip } from '@/components/ui/badge';
@@ -184,6 +185,19 @@ export default function ItineraryEditorPage() {
             <FileDown className="size-4" strokeWidth={1.75} />
             Itinerary PDF
           </Button>
+          <DeactivateButton
+            disabled={busy}
+            label="Delete itinerary"
+            confirmMessage={`Delete "${it.title}"? Days, options and pricing go with it. Any bookings already made from this itinerary are not affected.`}
+            onConfirm={async () => {
+              try {
+                await api.del(`/itineraries/${id}`);
+                router.push('/itineraries');
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : 'Could not delete this itinerary.');
+              }
+            }}
+          />
         </div>
       </header>
 

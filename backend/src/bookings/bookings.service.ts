@@ -327,6 +327,30 @@ export class BookingsService {
     return this.detail(id);
   }
 
+  /**
+   * Cancel a booking. Thin wrapper over `update` so the CANCELLED transition
+   * writes the audit activity and cascades to the parent lead. Idempotent —
+   * cancelling an already-cancelled booking is a no-op.
+   */
+  async cancel(id: string, reason: string | undefined, actor: Actor) {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    await this.assertBookingAccess(id, actor);
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      return { id, alreadyCancelled: true };
+    }
+    await this.update(
+      id,
+      {
+        status: BookingStatus.CANCELLED,
+        cancelledReason: reason?.trim() || 'Cancelled by operator',
+      } as any,
+      actor,
+    );
+    return { id, cancelled: true };
+  }
+
   // --- payments (money in) -------------------------------------------------
 
   async addPayment(

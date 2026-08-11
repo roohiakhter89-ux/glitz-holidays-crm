@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -85,6 +86,16 @@ export class LeadsController {
     @CurrentUser() actor: Actor,
   ) {
     return this.leads.update(id, dto, actor);
+  }
+
+  /**
+   * Soft-delete: parks the lead in LOST with a system reason. History,
+   * bookings and activities are preserved — we never destroy a client record.
+   */
+  @Roles(...LEAD_MODULE_ROLES)
+  @Delete(':id')
+  deactivate(@Param('id') id: string, @CurrentUser() actor: Actor) {
+    return this.leads.deactivate(id, actor);
   }
 
   @Roles(...LEAD_MODULE_ROLES)

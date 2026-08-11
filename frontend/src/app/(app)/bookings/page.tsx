@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CalendarCheck } from 'lucide-react';
 import { api, ApiError, type BookingRow, type Paged } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
 import { Stage, Chip } from '@/components/ui/badge';
+import { RowActions } from '@/components/ui/row-actions';
 import {
   money,
   percent,
@@ -20,15 +21,21 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api
-      .get<Paged<BookingRow>>('/bookings?limit=50')
-      .then((r) => setRows(r.data))
-      .catch((e) =>
-        setError(e instanceof ApiError ? e.message : 'Could not load bookings.'),
-      )
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const r = await api.get<Paged<BookingRow>>('/bookings?limit=50');
+      setRows(r.data);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load bookings.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return (
     <div className="mx-auto max-w-[1180px] px-8 py-8">
@@ -78,6 +85,7 @@ export default function BookingsPage() {
                 <th className="px-5 py-2.5 text-right font-medium">Sell</th>
                 <th className="px-5 py-2.5 text-right font-medium">Balance</th>
                 <th className="px-5 py-2.5 text-right font-medium">Margin</th>
+                <th className="w-10 px-3 py-2.5" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -141,6 +149,21 @@ export default function BookingsPage() {
                       <div className="text-[11px] text-ink-600">
                         {relativeDate(b.createdAt)}
                       </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      <RowActions
+                        disabled={b.status === 'CANCELLED'}
+                        label={`Cancel ${b.bookingNumber}`}
+                        confirmMessage={`Cancel ${b.bookingNumber}? The record stays for accounting; the lead status flips to CANCELLED.`}
+                        onDelete={async () => {
+                          try {
+                            await api.del(`/bookings/${b.id}`);
+                            load();
+                          } catch (err) {
+                            alert(err instanceof ApiError ? err.message : 'Could not cancel that booking.');
+                          }
+                        }}
+                      />
                     </td>
                   </tr>
                 );
