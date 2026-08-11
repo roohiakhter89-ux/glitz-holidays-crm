@@ -14,42 +14,31 @@ import {
 } from 'lucide-react';
 
 /**
- * Live weather for the three destinations Glitz sells. Uses Open-Meteo
- * (no API key, no auth) and picks a Lucide icon from the WMO weather code.
+ * 7-day Srinagar forecast — the only city that matters for the dashboard
+ * (Ladakh and Himachal moved off; those live on itinerary pages where the
+ * chosen destination drives the fetch).
  *
- * If the fetch fails (offline, blocked) we show the destination card with a
- * dash — a broken widget must never crash the dashboard around it.
+ * Uses Open-Meteo (no key). If the fetch fails we show dashes rather than
+ * throwing — a broken widget must never crash the dashboard around it.
  */
 
-interface Destination {
-  name: string;
-  region: string;
-  lat: number;
-  lon: number;
-}
+const CITY = { name: 'Srinagar', region: 'Kashmir', lat: 34.09, lon: 74.79 };
 
-// Three cities the DMC actually runs: Kashmir, Ladakh, Himachal.
-const DESTINATIONS: Destination[] = [
-  { name: 'Srinagar', region: 'Kashmir', lat: 34.09, lon: 74.79 },
-  { name: 'Leh',      region: 'Ladakh',  lat: 34.15, lon: 77.58 },
-  { name: 'Manali',   region: 'Himachal', lat: 32.24, lon: 77.19 },
-];
-
-interface Reading {
-  tempC: number | null;
+interface DayReading {
+  date: Date;
+  maxC: number | null;
+  minC: number | null;
   code: number | null;
-  isDay: boolean;
-  loading: boolean;
 }
 
-/** WMO weather code → icon + short label. Covers the codes real weather uses. */
-function iconFor(code: number | null, isDay: boolean): {
+/** WMO weather code → icon + short label. */
+function iconFor(code: number | null): {
   Icon: LucideIcon;
   label: string;
   tone: string;
 } {
   if (code === null) return { Icon: Cloud, label: '—', tone: 'text-ink-500' };
-  if (code === 0)   return { Icon: isDay ? Sun : Sun, label: 'Clear', tone: 'text-brand-500' };
+  if (code === 0)   return { Icon: Sun, label: 'Clear', tone: 'text-brand-500' };
   if (code <= 2)    return { Icon: CloudSun, label: 'Partly sunny', tone: 'text-brand-400' };
   if (code === 3)   return { Icon: Cloud, label: 'Overcast', tone: 'text-ink-500' };
   if (code <= 48)   return { Icon: CloudFog, label: 'Fog', tone: 'text-ink-500' };
@@ -62,81 +51,120 @@ function iconFor(code: number | null, isDay: boolean): {
   return { Icon: Cloud, label: '—', tone: 'text-ink-500' };
 }
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 export function WeatherStrip() {
-  const [readings, setReadings] = useState<Reading[]>(() =>
-    DESTINATIONS.map(() => ({ tempC: null, code: null, isDay: true, loading: true })),
-  );
+  const [days, setDays] = useState<DayReading[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // One request per city — Open-Meteo doesn't need auth or batching.
-      const results = await Promise.all(
-        DESTINATIONS.map(async (d) => {
-          try {
-            const url =
-              `https://api.open-meteo.com/v1/forecast` +
-              `?latitude=${d.lat}&longitude=${d.lon}` +
-              `&current=temperature_2m,weather_code,is_day`;
-            const res = await fetch(url, { cache: 'no-store' });
-            if (!res.ok) throw new Error(String(res.status));
-            const j = await res.json();
-            return {
-              tempC: Math.round(j.current?.temperature_2m ?? 0),
-              code: j.current?.weather_code ?? null,
-              isDay: (j.current?.is_day ?? 1) === 1,
-              loading: false,
-            } as Reading;
-          } catch {
-            return { tempC: null, code: null, isDay: true, loading: false };
-          }
-        }),
-      );
-      if (!cancelled) setReadings(results);
+      try {
+        const url =
+          `https://api.open-meteo.com/v1/forecast` +
+          `?latitude=${CITY.lat}&longitude=${CITY.lon}` +
+          `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
+          `&forecast_days=7&timezone=Asia%2FKolkata`;
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error(String(res.status));
+        const j = await res.json();
+        const dates: string[] = j.daily?.time ?? [];
+        const maxes: number[] = j.daily?.temperature_2m_max ?? [];
+        const mins: number[] = j.daily?.temperature_2m_min ?? [];
+        const codes: number[] = j.daily?.weather_code ?? [];
+        const rows: DayReading[] = dates.map((iso, i) => ({
+          date: new Date(iso),
+          maxC: Math.round(maxes[i] ?? 0),
+          minC: Math.round(mins[i] ?? 0),
+          code: codes[i] ?? null,
+        }));
+        if (!cancelled) setDays(rows);
+      } catch {
+        if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const today = days[0];
+  const rest = days.slice(1);
+  const { Icon: TodayIcon, label: todayLabel, tone: todayTone } = iconFor(today?.code ?? null);
+
   return (
-    <div className="flex items-stretch gap-2">
-      {DESTINATIONS.map((d, i) => {
-        const r = readings[i];
-        const { Icon, label, tone } = iconFor(r.code, r.isDay);
-        return (
-          <div
-            key={d.name}
-            className="rise flex min-w-[128px] items-center gap-3 rounded-xl border border-ink-800/60 bg-ink-900 px-3 py-2 shadow-[0_1px_2px_rgba(28,30,40,0.04)]"
-            style={{ animationDelay: `${i * 90}ms` }}
-          >
-            <Icon
-              aria-hidden
-              strokeWidth={1.6}
-              className={`size-6 float ${tone}`}
-              style={{ animationDelay: `${i * 700}ms` }}
-            />
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.09em] text-ink-500">
-                {d.name}
-              </p>
-              <p className="tabular text-[15px] font-semibold text-ink-100">
-                {r.loading ? (
-                  <span className="inline-block h-3 w-8 rounded shimmer align-middle" />
-                ) : r.tempC === null ? (
-                  <span className="text-ink-500">—</span>
-                ) : (
-                  <>
-                    {r.tempC}
-                    <span className="text-ink-500 font-normal text-[12px]">°C</span>
-                  </>
-                )}
-              </p>
-              <p className="text-[10px] text-ink-500">{label}</p>
-            </div>
-          </div>
-        );
-      })}
+    <div className="rise flex min-w-[320px] items-stretch gap-4 rounded-xl border border-ink-800/60 bg-ink-900 px-4 py-3 shadow-[0_1px_2px_rgba(28,30,40,0.04)]">
+      {/* Today — the anchor */}
+      <div className="flex min-w-[130px] items-center gap-3 border-r border-ink-800/70 pr-4">
+        <TodayIcon
+          aria-hidden
+          strokeWidth={1.6}
+          className={`size-8 float ${todayTone}`}
+        />
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.09em] text-ink-500">
+            {CITY.name}
+          </p>
+          <p className="tabular text-[20px] font-semibold leading-none text-ink-100">
+            {loading ? (
+              <span className="inline-block h-4 w-10 rounded shimmer align-middle" />
+            ) : today?.maxC === null || today === undefined ? (
+              <span className="text-ink-500">—</span>
+            ) : (
+              <>
+                {today.maxC}
+                <span className="text-ink-500 font-normal text-[13px]">°</span>
+                <span className="ml-1 text-[13px] font-normal text-ink-500">
+                  / {today.minC}°
+                </span>
+              </>
+            )}
+          </p>
+          <p className="mt-0.5 text-[10px] text-ink-500">
+            {failed ? 'offline' : todayLabel}
+          </p>
+        </div>
+      </div>
+
+      {/* Next 6 days */}
+      <div className="flex flex-1 items-stretch gap-1.5">
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex min-w-[42px] flex-col items-center gap-1 px-1 py-0.5">
+                <span className="h-2 w-6 rounded shimmer" />
+                <span className="h-4 w-4 rounded-full shimmer" />
+                <span className="h-2 w-8 rounded shimmer" />
+              </div>
+            ))
+          : rest.map((d, i) => {
+              const { Icon, tone } = iconFor(d.code);
+              const label = DAY_LABELS[d.date.getDay()];
+              return (
+                <div
+                  key={d.date.toISOString()}
+                  className="flex min-w-[42px] flex-col items-center gap-0.5 px-1 py-0.5"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                  title={`${d.date.toDateString()} · high ${d.maxC}° low ${d.minC}°`}
+                >
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-ink-500">
+                    {label}
+                  </span>
+                  <Icon aria-hidden strokeWidth={1.6} className={`size-4 ${tone}`} />
+                  <span className="tabular text-[11px] text-ink-300">
+                    {d.maxC}
+                    <span className="text-ink-500">°</span>
+                  </span>
+                  <span className="tabular text-[10px] text-ink-500">
+                    {d.minC}°
+                  </span>
+                </div>
+              );
+            })}
+      </div>
     </div>
   );
 }
