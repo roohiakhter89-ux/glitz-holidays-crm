@@ -131,6 +131,28 @@ export class ItinerariesService {
     return created;
   }
 
+  /** Free-text over code + title + client name for the ⌘K palette. */
+  async search(q: string, actor: Actor) {
+    return this.prisma.itinerary.findMany({
+      where: {
+        ...this.leadScope(actor),
+        OR: [
+          { code: { contains: q, mode: 'insensitive' } },
+          { title: { contains: q, mode: 'insensitive' } },
+          { lead: { name: { contains: q, mode: 'insensitive' } } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        lead: { select: { name: true } },
+      },
+    });
+  }
+
   findAll(leadId: string | undefined, actor: Actor) {
     return this.prisma.itinerary.findMany({
       where: {

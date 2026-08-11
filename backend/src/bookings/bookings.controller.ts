@@ -70,6 +70,13 @@ export class BookingsController {
     return this.bookings.aging();
   }
 
+  /** Global search — ⌘K palette. */
+  @Get('search')
+  search(@Query('q') q: string) {
+    if (!q || q.trim().length < 2) return [];
+    return this.bookings.search(q.trim());
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
     return this.bookings.findOne(id, actor);

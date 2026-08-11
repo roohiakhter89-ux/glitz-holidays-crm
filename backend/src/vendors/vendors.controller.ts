@@ -66,6 +66,13 @@ export class VendorsController {
     );
   }
 
+  /** Global search for the ⌘K palette. */
+  @Get('search')
+  search(@Query('q') q: string) {
+    if (!q || q.trim().length < 2) return [];
+    return this.vendors.search(q.trim());
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser('role') role: Role) {
     return this.vendors.findOne(id, role);

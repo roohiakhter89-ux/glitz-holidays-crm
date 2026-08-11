@@ -17,14 +17,17 @@ import {
   BarChart3,
   ShieldCheck,
   Wallet,
+  AlarmClock,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { CommandPalette } from '@/components/command-palette';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
+  { href: '/follow-ups', label: 'Follow-ups', icon: AlarmClock },
   { href: '/itineraries', label: 'Itineraries', icon: Map },
   { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
   { href: '/attribution', label: 'Attribution', icon: TrendingUp },
@@ -114,6 +117,11 @@ export default function AppLayout({
         </nav>
 
         <div className="border-t border-ink-800/60 p-3">
+          <p className="mb-2 px-2 text-[10.5px] text-ink-500">
+            Press{' '}
+            <kbd className="tabular rounded border border-ink-700 bg-ink-950 px-1 py-0.5">⌘K</kbd>{' '}
+            to search anything
+          </p>
           <div className="flex items-center gap-2.5 px-2 pb-2">
             {/* Monogram avatar tinted with brand gradient — cheap identity. */}
             <div
@@ -142,6 +150,7 @@ export default function AppLayout({
       </aside>
 
       <main className="min-w-0 overflow-x-hidden">{children}</main>
+      <CommandPalette />
     </div>
   );
 }

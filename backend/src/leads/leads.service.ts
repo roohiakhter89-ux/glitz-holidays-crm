@@ -430,6 +430,88 @@ export class LeadsService {
   }
 
   /**
+   * Worklist for the /follow-ups page. Returns leads with `nextFollowUp`
+   * set to today or earlier (so they must be actioned today) plus a small
+   * "upcoming this week" bucket so ops can plan ahead.
+   *
+   * Scoped per role — sales execs only see their own queue.
+   */
+  async followUps(actor: Actor) {
+    const scope: Prisma.LeadWhereInput = canSeeAllLeads(actor.role)
+      ? {}
+      : { assignedToId: actor.id };
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    const endOfWeek = new Date(startOfDay);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+    const active = {
+      status: {
+        notIn: [
+          LeadStatus.CONFIRMED,
+          LeadStatus.LOST,
+          LeadStatus.CANCELLED,
+        ],
+      },
+    };
+
+    const [overdue, dueToday, upcoming] = await Promise.all([
+      this.prisma.lead.findMany({
+        where: { ...scope, ...active, nextFollowUp: { lt: startOfDay } },
+        orderBy: { nextFollowUp: 'asc' },
+        include: { assignedTo: { select: { id: true, name: true } } },
+        take: 200,
+      }),
+      this.prisma.lead.findMany({
+        where: {
+          ...scope, ...active,
+          nextFollowUp: { gte: startOfDay, lt: endOfDay },
+        },
+        orderBy: { nextFollowUp: 'asc' },
+        include: { assignedTo: { select: { id: true, name: true } } },
+        take: 200,
+      }),
+      this.prisma.lead.findMany({
+        where: {
+          ...scope, ...active,
+          nextFollowUp: { gte: endOfDay, lt: endOfWeek },
+        },
+        orderBy: { nextFollowUp: 'asc' },
+        include: { assignedTo: { select: { id: true, name: true } } },
+        take: 200,
+      }),
+    ]);
+
+    return { overdue, dueToday, upcoming };
+  }
+
+  /**
+   * Global search — leads only. Bookings/vendors/itineraries each have their
+   * own search endpoints; the ⌘K palette calls them in parallel.
+   */
+  async searchLeads(actor: Actor, q: string) {
+    const scope: Prisma.LeadWhereInput = canSeeAllLeads(actor.role)
+      ? {}
+      : { assignedToId: actor.id };
+    return this.prisma.lead.findMany({
+      where: {
+        ...scope,
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { phone: { contains: q } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+      select: { id: true, name: true, phone: true, status: true },
+    });
+  }
+
+  /**
    * Operational dashboard metrics — what the ops floor should see when they
    * log in. Deliberately distinct from `stats`, which is the pipeline shape
    * used on the finance page and lead-list header.

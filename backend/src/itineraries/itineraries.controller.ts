@@ -52,6 +52,13 @@ export class ItinerariesController {
     return this.svc.findAll(leadId, actor);
   }
 
+  /** Global search for the ⌘K palette. */
+  @Get('search')
+  search(@Query('q') q: string, @CurrentUser() actor: Actor) {
+    if (!q || q.trim().length < 2) return [];
+    return this.svc.search(q.trim(), actor);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
     return this.svc.findOne(id, actor);

@@ -107,6 +107,23 @@ export class VendorsService {
     };
   }
 
+  /** Free-text search — name/area/contact for the ⌘K palette. */
+  async search(q: string) {
+    return this.prisma.vendor.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { area: { contains: q, mode: 'insensitive' } },
+          { city: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: 8,
+      select: { id: true, name: true, type: true, city: true },
+    });
+  }
+
   async findOne(id: string, role: Role) {
     const vendor = await this.prisma.vendor.findUnique({
       where: { id },

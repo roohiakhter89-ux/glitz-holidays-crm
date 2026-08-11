@@ -610,6 +610,28 @@ export class BookingsService {
     };
   }
 
+  /** Free-text search over booking number, package name, and client name. */
+  async search(q: string) {
+    return this.prisma.booking.findMany({
+      where: {
+        OR: [
+          { bookingNumber: { contains: q, mode: 'insensitive' } },
+          { packageName: { contains: q, mode: 'insensitive' } },
+          { lead: { name: { contains: q, mode: 'insensitive' } } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+      select: {
+        id: true,
+        bookingNumber: true,
+        packageName: true,
+        status: true,
+        lead: { select: { name: true } },
+      },
+    });
+  }
+
   /**
    * Aging report for the finance page. Receivables aged from booking
    * createdAt; payables aged from cost createdAt. Buckets are 0-30, 30-60,

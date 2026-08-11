@@ -344,6 +344,53 @@ export default function LeadDetailPage() {
                   </Select>
                 </div>
               )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="followup">Next follow-up</Label>
+                <div className="flex gap-2">
+                  <input
+                    id="followup"
+                    type="date"
+                    disabled={saving}
+                    value={lead.nextFollowUp ? lead.nextFollowUp.slice(0, 10) : ''}
+                    onChange={(e) =>
+                      patch({ nextFollowUp: e.target.value || null })
+                    }
+                    className="h-9 flex-1 rounded-md border border-ink-700 bg-ink-950 px-3 text-[13px] text-ink-100 focus:border-signal-500 focus:outline-none focus:ring-2 focus:ring-signal-500/25"
+                  />
+                  {lead.nextFollowUp && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={saving}
+                      onClick={() => patch({ nextFollowUp: null })}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-1 pt-1">
+                  {[
+                    { label: 'Tomorrow', days: 1 },
+                    { label: '+3d', days: 3 },
+                    { label: '+7d', days: 7 },
+                  ].map(({ label, days }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + days);
+                        patch({ nextFollowUp: d.toISOString().slice(0, 10) });
+                      }}
+                      className="rounded-md border border-ink-700 bg-transparent px-2 py-0.5 text-[10.5px] text-ink-400 hover:border-ink-600 hover:text-ink-200"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </PanelBody>
           </Panel>
 

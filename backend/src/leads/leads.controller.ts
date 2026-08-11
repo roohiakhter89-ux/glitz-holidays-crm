@@ -79,6 +79,21 @@ export class LeadsController {
     return this.leads.opsStats(actor);
   }
 
+  /** Overdue + due-today + upcoming-this-week worklist for /follow-ups. */
+  @Roles(...LEAD_MODULE_ROLES)
+  @Get('follow-ups')
+  followUps(@CurrentUser() actor: Actor) {
+    return this.leads.followUps(actor);
+  }
+
+  /** Global search from the ⌘K palette. Free-text over name/phone/email. */
+  @Roles(...LEAD_MODULE_ROLES)
+  @Get('search')
+  search(@Query('q') q: string, @CurrentUser() actor: Actor) {
+    if (!q || q.trim().length < 2) return [];
+    return this.leads.searchLeads(actor, q.trim());
+  }
+
   @Roles(...LEAD_MODULE_ROLES)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
