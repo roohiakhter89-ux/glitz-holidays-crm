@@ -428,4 +428,103 @@ export class LeadsService {
       })),
     };
   }
+
+  /**
+   * Operational dashboard metrics — what the ops floor should see when they
+   * log in. Deliberately distinct from `stats`, which is the pipeline shape
+   * used on the finance page and lead-list header.
+   *
+   * Cost-per-lead uses today's AdSpend across all channels divided by today's
+   * lead count. Zero-denominator returns null (not zero) so the UI can render
+   * "—" instead of a misleading ₹0.
+   */
+  async opsStats(actor: Actor) {
+    const scope: Prisma.LeadWhereInput = canSeeAllLeads(actor.role)
+      ? {}
+      : { assignedToId: actor.id };
+
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    // Week starts Monday (Indian workweek convention).
+    const startOfWeek = new Date(startOfDay);
+    const day = startOfWeek.getDay(); // 0=Sun, 1=Mon, ...
+    const daysSinceMonday = (day + 6) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday);
+
+    const [
+      leadsToday,
+      leadsThisWeek,
+      unassigned,
+      overdueFollowUps,
+      dueTodayFollowUps,
+      todaySpendRows,
+      newLeadsToday,
+      itinerariesAwaitingPricing,
+    ] = await Promise.all([
+      this.prisma.lead.count({
+        where: { ...scope, createdAt: { gte: startOfDay, lt: endOfDay } },
+      }),
+      this.prisma.lead.count({
+        where: { ...scope, createdAt: { gte: startOfWeek } },
+      }),
+      this.prisma.lead.count({ where: { ...scope, assignedToId: null } }),
+      this.prisma.lead.count({
+        where: {
+          ...scope,
+          nextFollowUp: { lt: startOfDay },
+          status: {
+            notIn: [
+              LeadStatus.CONFIRMED,
+              LeadStatus.LOST,
+              LeadStatus.CANCELLED,
+            ],
+          },
+        },
+      }),
+      this.prisma.lead.count({
+        where: {
+          ...scope,
+          nextFollowUp: { gte: startOfDay, lt: endOfDay },
+        },
+      }),
+      // AdSpend not scoped by actor — spend is agency-wide.
+      this.prisma.adSpend.aggregate({
+        where: { spendDate: { gte: startOfDay, lt: endOfDay } },
+        _sum: { amount: true },
+      }),
+      this.prisma.lead.count({
+        where: { createdAt: { gte: startOfDay, lt: endOfDay } },
+      }),
+      this.prisma.itinerary.count({
+        where: {
+          days: {
+            some: {
+              items: {
+                some: { pricing: { none: {} } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    // AdSpend.amount is paise; divide by 100 to compare with lead-count in ₹.
+    const spendToday = (todaySpendRows._sum.amount ?? 0) / 100;
+    const costPerLead = newLeadsToday > 0 ? Math.round(spendToday / newLeadsToday) : null;
+
+    return {
+      leadsToday,
+      leadsThisWeek,
+      unassigned,
+      overdueFollowUps,
+      dueTodayFollowUps,
+      itinerariesAwaitingPricing,
+      spendToday: Math.round(spendToday),
+      costPerLead,
+    };
+  }
 }

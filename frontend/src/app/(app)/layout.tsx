@@ -16,6 +16,7 @@ import {
   Map,
   BarChart3,
   ShieldCheck,
+  Wallet,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ const NAV = [
   { href: '/itineraries', label: 'Itineraries', icon: Map },
   { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
   { href: '/attribution', label: 'Attribution', icon: TrendingUp },
+  { href: '/finance', label: 'Finance', icon: Wallet },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/seo', label: 'SEO', icon: Globe },
   { href: '/vendors', label: 'Suppliers', icon: Building2 },

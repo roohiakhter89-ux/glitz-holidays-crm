@@ -5,17 +5,19 @@ import Link from 'next/link';
 import {
   ArrowUpRight,
   TriangleAlert,
-  Wallet,
+  Inbox,
   Users,
-  Receipt,
-  TrendingUp,
+  AlarmClock,
+  Sparkles,
+  ClipboardList,
+  Coins,
 } from 'lucide-react';
 import type { EChartsOption } from 'echarts';
 import {
   api,
   ApiError,
-  type BookingStats,
   type LeadStats,
+  type OpsStats,
   type LeadRow,
   type Paged,
 } from '@/lib/api';
@@ -25,7 +27,7 @@ import { Stage } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { WeatherStrip } from '@/components/weather-widget';
 import { CountUp } from '@/components/count-up';
-import { money, moneyShort, percent, relativeDate } from '@/lib/format';
+import { money, relativeDate } from '@/lib/format';
 import { tokenStore } from '@/lib/api';
 
 /**
@@ -43,7 +45,7 @@ import { tokenStore } from '@/lib/api';
  * numbers stay the loudest thing on the screen.
  */
 export default function DashboardPage() {
-  const [bookings, setBookings] = useState<BookingStats | null>(null);
+  const [ops, setOps] = useState<OpsStats | null>(null);
   const [leads, setLeads] = useState<LeadStats | null>(null);
   const [recent, setRecent] = useState<LeadRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +57,8 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [b, l, r] = await Promise.all([
-          api.get<BookingStats>('/bookings/stats').catch(() => null),
+        const [o, l, r] = await Promise.all([
+          api.get<OpsStats>('/leads/stats/ops').catch(() => null),
           api.get<LeadStats>('/leads/stats').catch(() => null),
           api
             .get<Paged<LeadRow>>('/leads?limit=6')
@@ -69,7 +71,7 @@ export default function DashboardPage() {
             })),
         ]);
         if (cancelled) return;
-        setBookings(b);
+        setOps(o);
         setLeads(l);
         setRecent(r.data ?? []);
       } catch (e) {
@@ -141,9 +143,6 @@ export default function DashboardPage() {
     };
   }, [leads]);
 
-  const eroding =
-    bookings != null && bookings.profitVariance < 0 ? bookings.profitVariance : 0;
-
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 12) return 'Good morning';
@@ -193,7 +192,11 @@ export default function DashboardPage() {
               <span className="text-brand-600">{name}</span>.
             </h1>
             <p className="mt-1 text-[13.5px] text-ink-400">
-              Here&rsquo;s where the money is right now.
+              Here&rsquo;s where the work is right now. Money lives on{' '}
+              <Link href="/finance" className="text-signal-600 hover:text-signal-500">
+                Finance
+              </Link>
+              .
             </p>
           </div>
 
@@ -218,68 +221,93 @@ export default function DashboardPage() {
           </Panel>
         )}
 
-        {/* Row 1 — the four numbers you'd shout across the office */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Row 1 — operational tiles. What arrived, what's stuck, what to do next. */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <KpiTile
-            label="Booked value"
-            value={bookings?.totalSell ?? 0}
+            label="Leads today"
+            value={ops?.leadsToday ?? 0}
             loading={loading}
-            hint={
-              bookings && bookings.bookings > 0
-                ? `${bookings.bookings} file${bookings.bookings === 1 ? '' : 's'}`
-                : 'no files yet'
-            }
-            icon={Wallet}
+            hint={`${ops?.leadsThisWeek ?? 0} this week`}
+            icon={Inbox}
             accent="signal"
-            format={money}
+            format={(n) => String(n)}
           />
           <KpiTile
-            label="Owed to you"
-            value={bookings?.totalOutstanding ?? 0}
+            label="Cost per lead"
+            value={ops?.costPerLead ?? 0}
             loading={loading}
-            hint={`${money(bookings?.totalReceived ?? 0)} received`}
-            icon={ArrowUpRight}
+            hint={
+              ops?.costPerLead == null
+                ? ops && ops.spendToday > 0
+                  ? `${money(ops.spendToday)} spent, no leads yet`
+                  : 'no spend today'
+                : `${money(ops.spendToday)} spent`
+            }
+            hintTone="muted"
+            icon={Coins}
             accent="brand"
-            format={money}
-            delay={80}
+            format={(n) => (ops?.costPerLead == null ? '—' : money(n))}
+            delay={70}
           />
           <KpiTile
-            label="You owe suppliers"
-            value={bookings?.vendorOutstanding ?? 0}
+            label="Unassigned"
+            value={ops?.unassigned ?? 0}
             loading={loading}
             hint={
-              eroding < 0
-                ? `${money(eroding)} margin variance`
-                : 'balances current'
+              (ops?.unassigned ?? 0) > 0
+                ? 'assign to a sales exec'
+                : 'all leads owned'
             }
-            hintTone={eroding < 0 ? 'warn' : 'muted'}
-            icon={Receipt}
-            accent="warn"
-            format={money}
-            delay={160}
+            hintTone={(ops?.unassigned ?? 0) > 0 ? 'warn' : 'muted'}
+            icon={Users}
+            accent={(ops?.unassigned ?? 0) > 0 ? 'warn' : 'muted'}
+            format={(n) => String(n)}
+            delay={140}
           />
           <KpiTile
-            label="Average margin"
-            value={Math.round(bookings?.averageMarginPercent ?? 0)}
+            label="Follow-ups due"
+            value={ops?.dueTodayFollowUps ?? 0}
             loading={loading}
             hint={
-              (bookings?.averageMarginPercent ?? 0) >= 15
-                ? 'healthy'
-                : bookings && bookings.bookings > 0
-                  ? 'thin — review pricing'
-                  : 'no data yet'
+              (ops?.overdueFollowUps ?? 0) > 0
+                ? `${ops!.overdueFollowUps} overdue`
+                : 'nothing overdue'
             }
-            hintTone={
-              (bookings?.averageMarginPercent ?? 0) >= 15
-                ? 'healthy'
-                : bookings && bookings.bookings > 0
-                  ? 'warn'
-                  : 'muted'
-            }
-            icon={TrendingUp}
+            hintTone={(ops?.overdueFollowUps ?? 0) > 0 ? 'warn' : 'muted'}
+            icon={AlarmClock}
             accent="healthy"
-            format={(n) => `${n}%`}
-            delay={240}
+            format={(n) => String(n)}
+            delay={210}
+          />
+          <KpiTile
+            label="Overdue follow-ups"
+            value={ops?.overdueFollowUps ?? 0}
+            loading={loading}
+            hint={
+              (ops?.overdueFollowUps ?? 0) > 0
+                ? 'call them today'
+                : 'clean queue'
+            }
+            hintTone={(ops?.overdueFollowUps ?? 0) > 0 ? 'warn' : 'healthy'}
+            icon={ClipboardList}
+            accent={(ops?.overdueFollowUps ?? 0) > 0 ? 'warn' : 'healthy'}
+            format={(n) => String(n)}
+            delay={280}
+          />
+          <KpiTile
+            label="Itineraries to price"
+            value={ops?.itinerariesAwaitingPricing ?? 0}
+            loading={loading}
+            hint={
+              (ops?.itinerariesAwaitingPricing ?? 0) > 0
+                ? 'items missing a rate'
+                : 'all itineraries priced'
+            }
+            hintTone={(ops?.itinerariesAwaitingPricing ?? 0) > 0 ? 'warn' : 'muted'}
+            icon={Sparkles}
+            accent="brand"
+            format={(n) => String(n)}
+            delay={350}
           />
         </div>
 
@@ -555,6 +583,3 @@ function Empty({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-// moneyShort/percent stay imported for future rows; suppress unused warnings.
-void moneyShort;
-void percent;

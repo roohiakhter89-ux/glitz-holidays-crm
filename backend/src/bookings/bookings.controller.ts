@@ -63,6 +63,13 @@ export class BookingsController {
     return this.bookings.stats(from, to);
   }
 
+  /** Receivables and payables aged 0-30 / 30-60 / 60+. Finance-only. */
+  @Roles(...FINANCE_ROLES)
+  @Get('stats/aging')
+  aging() {
+    return this.bookings.aging();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
     return this.bookings.findOne(id, actor);

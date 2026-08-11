@@ -609,4 +609,116 @@ export class BookingsService {
       })),
     };
   }
+
+  /**
+   * Aging report for the finance page. Receivables aged from booking
+   * createdAt; payables aged from cost createdAt. Buckets are 0-30, 30-60,
+   * 60+ — the ones actually used in DMC collections calls.
+   *
+   * Cancelled bookings are excluded from receivables but their vendor costs
+   * (if any were seeded then not zeroed) still count as payables.
+   */
+  async aging() {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+
+    const bucketize = (ageDays: number) => {
+      if (ageDays < 30) return 'd0_30';
+      if (ageDays < 60) return 'd30_60';
+      return 'd60_plus';
+    };
+
+    const [bookings, costs] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: { status: { not: BookingStatus.CANCELLED } },
+        select: {
+          id: true,
+          bookingNumber: true,
+          totalSell: true,
+          createdAt: true,
+          travelStartDate: true,
+          lead: { select: { name: true } },
+          payments: { select: { amount: true } },
+        },
+      }),
+      this.prisma.bookingCost.findMany({
+        where: {},
+        select: {
+          id: true,
+          vendorId: true,
+          amountDue: true,
+          amountPaid: true,
+          description: true,
+          createdAt: true,
+          booking: { select: { bookingNumber: true } },
+        },
+      }),
+    ]);
+
+    // Look up vendor names in one shot — BookingCost has no @relation to
+    // Vendor (nullable FK, kept flexible for ad-hoc costs), so we resolve
+    // names ourselves.
+    const vendorIds = Array.from(
+      new Set(costs.map((c) => c.vendorId).filter((v): v is string => !!v)),
+    );
+    const vendors = vendorIds.length
+      ? await this.prisma.vendor.findMany({
+          where: { id: { in: vendorIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const vendorMap = new Map(vendors.map((v) => [v.id, v.name]));
+
+    const receivables = { d0_30: 0, d30_60: 0, d60_plus: 0 };
+    const receivableRows: any[] = [];
+    for (const b of bookings) {
+      const paid = (b.payments as any[]).reduce((s, p) => s + p.amount, 0);
+      const balance = b.totalSell - paid;
+      if (balance <= 0) continue;
+      const ageDays = Math.floor((now - b.createdAt.getTime()) / day);
+      receivables[bucketize(ageDays)] += balance;
+      receivableRows.push({
+        id: b.id,
+        bookingNumber: b.bookingNumber,
+        clientName: b.lead.name,
+        balance,
+        ageDays,
+        travelStartDate: b.travelStartDate,
+      });
+    }
+
+    const payables = { d0_30: 0, d30_60: 0, d60_plus: 0 };
+    const payableRows: any[] = [];
+    for (const c of costs as any[]) {
+      const balance = c.amountDue - c.amountPaid;
+      if (balance <= 0) continue;
+      const ageDays = Math.floor((now - c.createdAt.getTime()) / day);
+      payables[bucketize(ageDays)] += balance;
+      payableRows.push({
+        id: c.id,
+        description: c.description,
+        vendorName: c.vendorId ? (vendorMap.get(c.vendorId) ?? '—') : '—',
+        vendorId: c.vendorId,
+        bookingNumber: c.booking?.bookingNumber ?? '—',
+        balance,
+        ageDays,
+      });
+    }
+
+    receivableRows.sort((a, b) => b.ageDays - a.ageDays);
+    payableRows.sort((a, b) => b.ageDays - a.ageDays);
+
+    return {
+      receivables: {
+        ...receivables,
+        total: receivables.d0_30 + receivables.d30_60 + receivables.d60_plus,
+        rows: receivableRows.slice(0, 25),
+      },
+      payables: {
+        ...payables,
+        total: payables.d0_30 + payables.d30_60 + payables.d60_plus,
+        rows: payableRows.slice(0, 25),
+      },
+    };
+  }
 }

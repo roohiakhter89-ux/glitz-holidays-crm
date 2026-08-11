@@ -165,6 +165,48 @@ export interface BookingStats {
   byStatus: { status: string; count: number }[];
 }
 
+export interface OpsStats {
+  leadsToday: number;
+  leadsThisWeek: number;
+  unassigned: number;
+  overdueFollowUps: number;
+  dueTodayFollowUps: number;
+  itinerariesAwaitingPricing: number;
+  spendToday: number;
+  costPerLead: number | null;
+}
+
+export interface AgingBuckets {
+  d0_30: number;
+  d30_60: number;
+  d60_plus: number;
+  total: number;
+}
+
+export interface ReceivableRow {
+  id: string;
+  bookingNumber: string;
+  clientName: string;
+  balance: number;
+  ageDays: number;
+  travelStartDate: string | null;
+}
+
+export interface PayableRow {
+  id: string;
+  description: string;
+  vendorName: string;
+  vendorId: string | null;
+  bookingNumber: string;
+  balance: number;
+  ageDays: number;
+}
+
+export interface AgingReport {
+  receivables: AgingBuckets & { rows: ReceivableRow[] };
+  payables: AgingBuckets & { rows: PayableRow[] };
+}
+
 export interface LeadRow {
   id: string;
   name: string;

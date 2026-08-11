@@ -72,6 +72,13 @@ export class LeadsController {
     return this.leads.stats(actor);
   }
 
+  /** Operational tiles for the desk. Scoped per role like `stats`. */
+  @Roles(...LEAD_MODULE_ROLES)
+  @Get('stats/ops')
+  opsStats(@CurrentUser() actor: Actor) {
+    return this.leads.opsStats(actor);
+  }
+
   @Roles(...LEAD_MODULE_ROLES)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
