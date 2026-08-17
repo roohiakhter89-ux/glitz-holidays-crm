@@ -531,6 +531,10 @@ export class LeadsService {
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
 
+    const startOfYesterday = new Date(startOfDay);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    const endOfYesterday = new Date(startOfDay);
+
     // Week starts Monday (Indian workweek convention).
     const startOfWeek = new Date(startOfDay);
     const day = startOfWeek.getDay(); // 0=Sun, 1=Mon, ...
@@ -543,8 +547,8 @@ export class LeadsService {
       unassigned,
       overdueFollowUps,
       dueTodayFollowUps,
-      todaySpendRows,
-      newLeadsToday,
+      yesterdaySpendRows,
+      newLeadsYesterday,
       itinerariesAwaitingPricing,
     ] = await Promise.all([
       this.prisma.lead.count({
@@ -575,11 +579,11 @@ export class LeadsService {
       }),
       // AdSpend not scoped by actor — spend is agency-wide.
       this.prisma.adSpend.aggregate({
-        where: { spendDate: { gte: startOfDay, lt: endOfDay } },
+        where: { spendDate: { gte: startOfYesterday, lt: endOfYesterday } },
         _sum: { amount: true },
       }),
       this.prisma.lead.count({
-        where: { createdAt: { gte: startOfDay, lt: endOfDay } },
+        where: { createdAt: { gte: startOfYesterday, lt: endOfYesterday } },
       }),
       this.prisma.itinerary.count({
         where: {
@@ -595,8 +599,8 @@ export class LeadsService {
     ]);
 
     // AdSpend.amount is paise; divide by 100 to compare with lead-count in ₹.
-    const spendToday = (todaySpendRows._sum.amount ?? 0) / 100;
-    const costPerLead = newLeadsToday > 0 ? Math.round(spendToday / newLeadsToday) : null;
+    const spendYesterday = (yesterdaySpendRows._sum.amount ?? 0) / 100;
+    const costPerLeadYesterday = newLeadsYesterday > 0 ? Math.round(spendYesterday / newLeadsYesterday) : null;
 
     return {
       leadsToday,
@@ -605,8 +609,8 @@ export class LeadsService {
       overdueFollowUps,
       dueTodayFollowUps,
       itinerariesAwaitingPricing,
-      spendToday: Math.round(spendToday),
-      costPerLead,
+      spendYesterday: Math.round(spendYesterday),
+      costPerLeadYesterday,
     };
   }
 }

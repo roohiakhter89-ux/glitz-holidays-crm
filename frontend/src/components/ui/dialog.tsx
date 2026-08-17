@@ -30,15 +30,13 @@ export function DialogContent({
       <DialogPrimitive.Content
         className={cn(
           // Full-screen on mobile so form fields don't get cramped; centered
-          // sheet on tablet+ desktop. Individual side properties (top/left/
-          // right/bottom) instead of `inset-0` shorthand so the sm: overrides
-          // win — with the shorthand Tailwind emitted `inset: auto` AFTER the
-          // individual sm:top-1/2, resetting it and stranding the dialog at
-          // bottom-left. Same-specificity overrides only.
+          // sheet on tablet+ desktop. We use w-full h-full on mobile instead
+          // of right-0 bottom-0 to cleanly avoid any need for 'auto' resets
+          // that can strand the dialog off-screen in Tailwind v4.
           'fixed z-50 overflow-hidden bg-ink-900',
-          'top-0 right-0 bottom-0 left-0 w-full',
-          'sm:top-1/2 sm:left-1/2 sm:right-auto sm:bottom-auto',
-          'sm:w-[min(92vw,720px)] sm:-translate-x-1/2 sm:-translate-y-1/2',
+          'top-0 left-0 w-full h-full',
+          'sm:top-[50%] sm:left-[50%] sm:h-auto sm:w-[min(92vw,720px)]',
+          'sm:-translate-x-[50%] sm:-translate-y-[50%]',
           'sm:max-h-[85vh] sm:rounded-[10px] sm:border sm:border-ink-700',
           'shadow-[0_24px_64px_-16px_rgba(0,0,0,0.9)]',
           'data-[state=open]:animate-[popIn_180ms_cubic-bezier(0.16,1,0.3,1)]',

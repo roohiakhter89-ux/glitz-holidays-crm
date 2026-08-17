@@ -236,19 +236,19 @@ export default function DashboardPage() {
           />
           <KpiTile
             label="Cost per lead"
-            value={ops?.costPerLead ?? 0}
+            value={ops?.costPerLeadYesterday ?? 0}
             loading={loading}
             hint={
-              ops?.costPerLead == null
-                ? ops && ops.spendToday > 0
-                  ? `${money(ops.spendToday)} spent, no leads yet`
-                  : 'no spend today'
-                : `${money(ops.spendToday)} spent`
+              ops?.costPerLeadYesterday == null
+                ? ops && ops.spendYesterday > 0
+                  ? `${money(ops.spendYesterday)} spent, no leads yesterday`
+                  : 'no spend yesterday'
+                : `${money(ops.spendYesterday)} spent yesterday`
             }
             hintTone="muted"
             icon={Coins}
             accent="brand"
-            format={(n) => (ops?.costPerLead == null ? '—' : money(n))}
+            format={(n) => (ops?.costPerLeadYesterday == null ? '—' : money(n))}
             delay={70}
           />
           <KpiTile

@@ -172,8 +172,8 @@ export interface OpsStats {
   overdueFollowUps: number;
   dueTodayFollowUps: number;
   itinerariesAwaitingPricing: number;
-  spendToday: number;
-  costPerLead: number | null;
+  spendYesterday: number;
+  costPerLeadYesterday: number | null;
 }
 
 export interface AgingBuckets {
