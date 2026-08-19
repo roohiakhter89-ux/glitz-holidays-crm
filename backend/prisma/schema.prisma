@@ -597,8 +597,9 @@ model Lead {
   ipAddress String?
 
   enquiryCount Int       @default(1)
-  lastContact  DateTime?
-  nextFollowUp DateTime?
+  lastContact    DateTime?
+  firstContactAt DateTime?
+  nextFollowUp   DateTime?
 
   /// Optional link to the Visit that produced this lead. Set only when the
   /// landing page beacon has fired and the form carried the returned visitId.
@@ -1075,4 +1076,58 @@ model BookingCost {
 
   @@index([bookingId])
   @@index([vendorId])
+}
+
+// ============================================================================
+// PHASE 27 — Integrations
+// ============================================================================
+
+enum IntegrationCategory {
+  PAYMENT_DOMESTIC
+  PAYMENT_INTERNATIONAL
+  AI
+  ADS
+  SOCIAL
+}
+
+enum IntegrationTestStatus {
+  UNTESTED
+  OK
+  FAILED
+}
+
+/**
+ * Third-party service credential. One row per configured provider — you can
+ * have multiple rows of the same provider (e.g. two Razorpay accounts) which
+ * is why `provider` is not @unique.
+ *
+ * `credentials` is an AES-256-GCM blob of a JSON `{key: value}` map whose
+ * shape is defined by the provider registry. `priority` is used by the AI
+ * failover helper: higher = tried first.
+ */
+model Integration {
+  id String @id @default(cuid())
+
+  category IntegrationCategory
+  provider String  // e.g. "razorpay", "openai" — from providers.ts registry
+  label    String? // user-friendly name, e.g. "Razorpay (main)"
+
+  /// AES-256-GCM ciphertext of the JSON credentials. Never returned to the
+  /// frontend in plaintext; only test/probe endpoints decrypt inside the
+  /// service.
+  credentials String
+
+  isActive  Boolean @default(true)
+  /// Higher = tried first when the failover helper picks an integration.
+  priority  Int     @default(0)
+
+  lastTestedAt    DateTime?
+  lastTestStatus  IntegrationTestStatus @default(UNTESTED)
+  lastTestMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, isActive, priority])
+  @@index([provider])
 }

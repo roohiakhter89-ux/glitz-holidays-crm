@@ -207,6 +207,53 @@ export interface AgingReport {
   payables: AgingBuckets & { rows: PayableRow[] };
 }
 
+export type IntegrationCategory =
+  | 'PAYMENT_DOMESTIC'
+  | 'PAYMENT_INTERNATIONAL'
+  | 'AI'
+  | 'ADS'
+  | 'SOCIAL';
+
+export type IntegrationTestStatus = 'UNTESTED' | 'OK' | 'FAILED';
+
+export interface ProviderField {
+  key: string;
+  label: string;
+  type: 'text' | 'password' | 'url' | 'select';
+  required?: boolean;
+  placeholder?: string;
+  help?: string;
+  options?: string[];
+}
+
+export interface ProviderCatalogEntry {
+  id: string;
+  label: string;
+  category: IntegrationCategory;
+  docsUrl?: string;
+  fields: ProviderField[];
+  hasTest: boolean;
+}
+
+export interface IntegrationRow {
+  id: string;
+  category: IntegrationCategory;
+  provider: string;
+  label: string | null;
+  isActive: boolean;
+  priority: number;
+  keysOnFile: string[];
+  lastTestedAt: string | null;
+  lastTestStatus: IntegrationTestStatus;
+  lastTestMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IntegrationTestResponse extends IntegrationRow {
+  testResult: { ok: boolean; message: string };
+}
+
 export interface LeadRow {
   id: string;
   name: string;
@@ -217,6 +264,7 @@ export interface LeadRow {
   source: string;
   score: number;
   createdAt: string;
+  firstContactAt: string | null;
   assignedTo?: { id: string; name: string } | null;
 }
 

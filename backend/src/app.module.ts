@@ -16,6 +16,7 @@ import { HrModule } from './hr/hr.module';
 import { SeoModule } from './seo/seo.module';
 import { ItinerariesModule } from './itineraries/itineraries.module';
 import { ReportsModule } from './reports/reports.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -39,6 +40,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     SeoModule,
     ItinerariesModule,
     ReportsModule,
+    IntegrationsModule,
   ],
   providers: [
     // Order: rate limit -> authenticate -> authorize.

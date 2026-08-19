@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   Search,
+  Plug,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ const NAV = [
   { href: '/vendors', label: 'Suppliers', icon: Building2 },
   { href: '/people', label: 'People', icon: UserCog },
   { href: '/users', label: 'Access', icon: ShieldCheck },
+  { href: '/integrations', label: 'Integrations', icon: Plug },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
