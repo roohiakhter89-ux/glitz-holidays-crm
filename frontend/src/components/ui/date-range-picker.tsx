@@ -23,7 +23,8 @@ export type PresetId =
   | 'last90'
   | 'thisMonth'
   | 'lastMonth'
-  | 'all';
+  | 'all'
+  | 'custom';
 
 export interface DateRange {
   from: string | null; // ISO date (YYYY-MM-DD) or null
@@ -76,6 +77,7 @@ function buildRange(preset: PresetId): DateRange {
       return { from: iso(s), to: iso(e), label: 'Last month', preset };
     }
     case 'all':        return { from: null, to: null, label: 'All time', preset };
+    case 'custom':     return { from: iso(t), to: iso(t), label: `${fmtDate(t)}`, preset };
   }
 }
 
@@ -120,6 +122,7 @@ const PRESETS: { id: PresetId; label: string }[] = [
   { id: 'thisMonth',  label: 'This month' },
   { id: 'lastMonth',  label: 'Last month' },
   { id: 'all',        label: 'All time' },
+  { id: 'custom',     label: 'Custom range…' },
 ];
 
 export function DateRangePicker({
@@ -130,6 +133,9 @@ export function DateRangePicker({
   onChange: (r: DateRange) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customFrom, setCustomFrom] = useState(value.from ?? '');
+  const [customTo, setCustomTo] = useState(value.to ?? '');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -174,21 +180,84 @@ export function DateRangePicker({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-40 mt-1 min-w-[180px] overflow-hidden rounded-md border border-ink-700 bg-ink-900 shadow-xl">
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => { onChange(buildRange(p.id)); setOpen(false); }}
-              className={
-                (value.preset === p.id
-                  ? 'bg-signal-500/10 text-signal-400 '
-                  : 'text-ink-300 hover:bg-ink-850 hover:text-ink-100 ') +
-                'flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px]'
-              }
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="absolute top-full right-0 z-40 mt-1 min-w-[220px] overflow-hidden rounded-md border border-ink-700 bg-ink-900 shadow-xl">
+          {!showCustom ? (
+            <>
+              {PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    if (p.id === 'custom') {
+                      setCustomFrom(value.from ?? iso(startOfToday()));
+                      setCustomTo(value.to ?? iso(startOfToday()));
+                      setShowCustom(true);
+                      return;
+                    }
+                    onChange(buildRange(p.id));
+                    setOpen(false);
+                  }}
+                  className={
+                    (value.preset === p.id
+                      ? 'bg-signal-500/10 text-signal-400 '
+                      : 'text-ink-300 hover:bg-ink-850 hover:text-ink-100 ') +
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px]'
+                  }
+                >
+                  {p.label}
+                </button>
+              ))}
+            </>
+          ) : (
+            <div className="space-y-2 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-ink-500">
+                Custom range
+              </p>
+              <label className="block">
+                <span className="text-[11px] text-ink-400">From</span>
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={customTo || undefined}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="mt-0.5 w-full rounded border border-ink-700 bg-ink-950 px-2 py-1 text-[12.5px] text-ink-100 focus:border-signal-500 focus:outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-ink-400">To</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom || undefined}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="mt-0.5 w-full rounded border border-ink-700 bg-ink-950 px-2 py-1 text-[12.5px] text-ink-100 focus:border-signal-500 focus:outline-none"
+                />
+              </label>
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => setShowCustom(false)}
+                  className="text-[11.5px] text-ink-400 hover:text-ink-200"
+                >
+                  ← Back
+                </button>
+                <button
+                  disabled={!customFrom || !customTo}
+                  onClick={() => {
+                    const f = new Date(customFrom);
+                    const t = new Date(customTo);
+                    const label = f.toDateString() === t.toDateString()
+                      ? fmtDate(f)
+                      : `${fmtDate(f)} - ${fmtDate(t)}`;
+                    onChange({ from: customFrom, to: customTo, label, preset: 'custom' });
+                    setShowCustom(false);
+                    setOpen(false);
+                  }}
+                  className="rounded bg-signal-600 px-3 py-1 text-[12px] font-medium text-ink-950 hover:bg-signal-500 disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
