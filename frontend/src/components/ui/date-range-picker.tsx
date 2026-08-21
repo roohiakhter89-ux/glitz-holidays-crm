@@ -144,7 +144,7 @@ export function DateRangePicker({
   const canShift = value.preset !== 'all' && value.from && value.to;
 
   return (
-    <div ref={rootRef} className="relative inline-flex items-stretch overflow-hidden rounded-md border border-ink-700 bg-ink-950 text-[13px]">
+    <div ref={rootRef} className="relative inline-flex items-stretch rounded-md border border-ink-700 bg-ink-950 text-[13px]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

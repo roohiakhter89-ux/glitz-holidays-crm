@@ -104,7 +104,8 @@ export default function LeadsPage() {
     return () => clearTimeout(t);
   }, [load, search]);
 
-  const filtered = Boolean(search || status || source);
+  // Any active narrowing — filters OR a date range that isn't "all time".
+  const filtered = Boolean(search || status || source || range.preset !== 'all');
 
   function clearFilters() {
     setSearch('');
@@ -239,11 +240,13 @@ export default function LeadsPage() {
               className="mx-auto size-6 text-ink-600"
             />
             <p className="mt-3 text-[13px] text-ink-300">
-              {filtered ? 'No leads match those filters' : 'No leads yet'}
+              {filtered
+                ? `No leads for this view (${range.label})`
+                : 'No leads yet'}
             </p>
             <p className="mt-1 text-[12px] text-ink-500">
               {filtered
-                ? 'Widen the search or clear the filters.'
+                ? 'Try a wider date range or clear the filters.'
                 : 'Point a landing page form at /api/leads/capture and they arrive here.'}
             </p>
             {filtered && (
