@@ -607,6 +607,22 @@ model Lead {
   visitId String?
   visit   Visit?  @relation(fields: [visitId], references: [id], onDelete: SetNull)
 
+  // --- import / external system linkage ---
+  /// Free-form tags. Used first for 'unassigned' (owner lookup failed on
+  /// import), 'imported' (came from a bulk source), plus future segmentation.
+  tags String[] @default([])
+  /// e.g. 'brevo_import_2026_08_21'. Null for organic captures. Groups leads
+  /// by which import batch brought them in.
+  externalSource String?
+  /// Original ID in the source system (Brevo contact_id, etc). Unique per
+  /// externalSource so re-runs are idempotent — same row won't insert twice.
+  externalId String?
+  /// Whole original CSV row as JSON. Preserves 200+ Brevo fields we don't
+  /// model individually. Never queried in the hot path — cold-storage safety
+  /// net so nothing is lost.
+  externalRaw Json?
+  importedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -614,12 +630,14 @@ model Lead {
   bookings   Booking[]
   itineraries Itinerary[]
 
+  @@unique([externalSource, externalId], map: "Lead_external_natural_key")
   @@index([status])
   @@index([source])
   @@index([phone])
   @@index([assignedToId])
   @@index([createdAt])
   @@index([visitId])
+  @@index([externalSource])
 }
 
 // ============================================================================

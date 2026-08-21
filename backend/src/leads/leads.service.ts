@@ -343,7 +343,7 @@ export class LeadsService {
    * the row: it may have bookings, activities and attribution attached that
    * accountants and marketing still need.
    */
-  async deactivate(id: string, actor: Actor) {
+  async deactivate(id: string, actor: Actor, reason: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead not found');
     this.assertCanTouch(lead, actor);
@@ -354,7 +354,7 @@ export class LeadsService {
       where: { id },
       data: {
         status: LeadStatus.LOST,
-        lostReason: lead.lostReason ?? 'Removed by operator',
+        lostReason: reason,
       },
     });
     await this.prisma.activity.create({
@@ -362,7 +362,7 @@ export class LeadsService {
         leadId: id,
         userId: actor.id ?? null,
         type: ActivityType.STATUS_CHANGE,
-        content: `Status ${lead.status} -> LOST (removed by operator)`,
+        content: `Status ${lead.status} -> LOST (Reason: ${reason})`,
       },
     });
     return { id, closed: true };
@@ -385,7 +385,10 @@ export class LeadsService {
     if (contactTypes.includes(type)) {
       await this.prisma.lead.update({
         where: { id: leadId },
-        data: { lastContact: new Date() },
+        data: {
+          lastContact: new Date(),
+          ...(lead.firstContactAt ? {} : { firstContactAt: new Date() }),
+        },
       });
     }
 
@@ -427,6 +430,59 @@ export class LeadsService {
         count: r._count._all,
       })),
     };
+  }
+
+  /**
+   * Bulk reassign N leads to one user (or unassign with null). Writes one
+   * ASSIGNMENT activity per lead so the audit trail matches single-lead edits.
+   * Idempotent — leads already on the target user are counted as skipped.
+   */
+  async bulkAssign(
+    leadIds: string[],
+    assignedToId: string | null,
+    actor: Actor,
+  ) {
+    // Validate target exists (avoid setting to a stale user id)
+    if (assignedToId) {
+      const target = await this.prisma.user.findUnique({
+        where: { id: assignedToId },
+        select: { id: true, isActive: true, name: true },
+      });
+      if (!target || !target.isActive) {
+        throw new NotFoundException('Target user not found or inactive');
+      }
+    }
+
+    const before = await this.prisma.lead.findMany({
+      where: { id: { in: leadIds } },
+      select: { id: true, assignedToId: true },
+    });
+    const changed = before.filter((l) => l.assignedToId !== assignedToId);
+    const skippedSameOwner = before.length - changed.length;
+    const missing = leadIds.length - before.length;
+
+    if (changed.length === 0) {
+      return { updated: 0, skippedSameOwner, missing };
+    }
+
+    await this.prisma.lead.updateMany({
+      where: { id: { in: changed.map((l) => l.id) } },
+      data: { assignedToId },
+    });
+
+    // One activity per lead so the timeline reflects the reassignment.
+    await this.prisma.activity.createMany({
+      data: changed.map((l) => ({
+        leadId: l.id,
+        userId: actor.id ?? null,
+        type: ActivityType.ASSIGNMENT,
+        content: assignedToId
+          ? `Bulk-assigned to user ${assignedToId}`
+          : 'Bulk-unassigned',
+      })),
+    });
+
+    return { updated: changed.length, skippedSameOwner, missing };
   }
 
   /**

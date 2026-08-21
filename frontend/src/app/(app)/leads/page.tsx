@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, X, Inbox } from 'lucide-react';
-import { api, ApiError, type LeadRow, type Paged } from '@/lib/api';
+import { Search, X, Inbox, Flame, Clock, Trash2, Users } from 'lucide-react';
+import { api, ApiError, tokenStore, type LeadRow, type Paged, type UserRow } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -13,8 +13,11 @@ import { Stage, Chip } from '@/components/ui/badge';
 import { RowActions } from '@/components/ui/row-actions';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { AddLeadDialog } from '@/components/add-lead-dialog';
+import { CloseLeadDialog } from '@/components/close-lead-dialog';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
 import { relativeDate } from '@/lib/format';
+
+const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'SALES_MANAGER']);
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -26,6 +29,47 @@ export default function LeadsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Bulk assignment state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [staff, setStaff] = useState<UserRow[]>([]);
+  const [bulkTarget, setBulkTarget] = useState<string>('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const canAssign = useMemo(() => CAN_ASSIGN_ROLES.has(tokenStore.user()?.role ?? ''), []);
+
+  useEffect(() => {
+    if (!canAssign) return;
+    api.get<UserRow[]>('/users').then((u) => setStaff(u.filter((x) => x.isActive))).catch(() => setStaff([]));
+  }, [canAssign]);
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.id))));
+  }
+  function clearSelection() { setSelected(new Set()); }
+
+  async function applyBulk() {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const body = { leadIds: Array.from(selected), assignedToId: bulkTarget || null };
+      const res = await api.post<{ updated: number; skippedSameOwner: number; missing: number }>('/leads/bulk-assign', body);
+      alert(`Reassigned ${res.updated} lead${res.updated === 1 ? '' : 's'}${res.skippedSameOwner ? ` · ${res.skippedSameOwner} already on that owner` : ''}`);
+      clearSelection();
+      setBulkTarget('');
+      load();
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : 'Bulk assign failed.');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,6 +185,32 @@ export default function LeadsPage() {
         )}
       </div>
 
+      {canAssign && selected.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-signal-500/40 bg-signal-500/8 px-3 py-2 text-[13px]">
+          <Users className="size-3.5 text-signal-500" strokeWidth={1.75} />
+          <span className="tabular font-medium text-ink-100">
+            {selected.size} selected
+          </span>
+          <span className="text-ink-500">·</span>
+          <span className="text-ink-400">Assign to</span>
+          <select
+            aria-label="Bulk assign target"
+            value={bulkTarget}
+            onChange={(e) => setBulkTarget(e.target.value)}
+            className="rounded border border-ink-700 bg-ink-950 px-2 py-1 text-[12.5px] text-ink-100 focus:border-signal-500 focus:outline-none"
+          >
+            <option value="">— Unassign —</option>
+            {staff.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+          <Button size="sm" disabled={bulkBusy} onClick={applyBulk}>
+            {bulkBusy ? 'Applying…' : 'Apply'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>Cancel</Button>
+        </div>
+      )}
+
       <Panel className="overflow-x-auto">
         {error ? (
           <div className="px-5 py-10 text-center">
@@ -181,10 +251,22 @@ export default function LeadsPage() {
           <table className="w-full min-w-[720px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
+                {canAssign && (
+                  <th className="w-8 px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={rows.length > 0 && selected.size === rows.length}
+                      ref={(el) => { if (el) el.indeterminate = selected.size > 0 && selected.size < rows.length; }}
+                      onChange={toggleAll}
+                    />
+                  </th>
+                )}
                 <th className="px-5 py-2.5 font-medium">Name</th>
                 <th className="px-5 py-2.5 font-medium">Trip</th>
                 <th className="px-5 py-2.5 font-medium">Source</th>
                 <th className="px-5 py-2.5 font-medium">Stage</th>
+                <th className="px-5 py-2.5 font-medium">Response</th>
                 <th className="px-5 py-2.5 font-medium">Owner</th>
                 <th className="px-5 py-2.5 font-medium">Score</th>
                 <th className="px-5 py-2.5 text-right font-medium">Received</th>
@@ -195,9 +277,22 @@ export default function LeadsPage() {
               {rows.map((lead, i) => (
                 <tr
                   key={lead.id}
-                  className="group rise border-b border-ink-800/60 transition-colors duration-150 last:border-0 hover:bg-ink-850"
+                  className={
+                    (selected.has(lead.id) ? 'bg-signal-500/6 ' : '') +
+                    'group rise border-b border-ink-800/60 transition-colors duration-150 last:border-0 hover:bg-ink-850'
+                  }
                   style={{ animationDelay: `${Math.min(i, 12) * 18}ms` }}
                 >
+                  {canAssign && (
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${lead.name}`}
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleRow(lead.id)}
+                      />
+                    </td>
+                  )}
                   <td className="px-5 py-3">
                     <Link
                       href={`/leads/${lead.id}`}
@@ -218,9 +313,34 @@ export default function LeadsPage() {
                   <td className="px-5 py-3">
                     <Stage value={lead.status} />
                   </td>
+                  <td className="px-5 py-3">
+                    <ResponseBadge lead={lead} />
+                  </td>
                   <td className="px-5 py-3 text-ink-400">
-                    {lead.assignedTo?.name ?? (
-                      <span className="text-warn-400">Unassigned</span>
+                    {canAssign ? (
+                      <select
+                        aria-label={`Owner of ${lead.name}`}
+                        value={lead.assignedTo?.id ?? ''}
+                        disabled={bulkBusy}
+                        onChange={async (e) => {
+                          const next = e.target.value || null;
+                          if (next === (lead.assignedTo?.id ?? null)) return;
+                          try {
+                            await api.patch(`/leads/${lead.id}`, { assignedToId: next });
+                            load();
+                          } catch (err) {
+                            alert(err instanceof ApiError ? err.message : 'Could not reassign.');
+                          }
+                        }}
+                        className="w-full max-w-[140px] rounded border border-transparent bg-transparent px-1 py-0.5 text-[12px] text-ink-300 hover:border-ink-700 focus:border-signal-500 focus:outline-none"
+                      >
+                        <option value="">Unassigned</option>
+                        {staff.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      lead.assignedTo?.name ?? <span className="text-warn-400">Unassigned</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -230,18 +350,16 @@ export default function LeadsPage() {
                     {relativeDate(lead.createdAt)}
                   </td>
                   <td className="px-2 py-3">
-                    <RowActions
-                      label={`Close ${lead.name}`}
-                      confirmMessage={`Close this lead? It will be marked LOST. History, bookings and activities stay on record.`}
-                      onDelete={async () => {
-                        try {
-                          await api.del(`/leads/${lead.id}`);
-                          load();
-                        } catch (err) {
-                          alert(err instanceof ApiError ? err.message : 'Could not close that lead.');
-                        }
-                      }}
-                    />
+                    <CloseLeadDialog leadId={lead.id} leadName={lead.name} onClosed={load}>
+                      <button
+                        type="button"
+                        aria-label={`Close ${lead.name}`}
+                        title={`Close ${lead.name}`}
+                        className="inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-loss-500/12 hover:text-loss-500 disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        <Trash2 className="size-3.5" strokeWidth={1.75} />
+                      </button>
+                    </CloseLeadDialog>
                   </td>
                 </tr>
               ))}
@@ -289,6 +407,40 @@ function TableSkeleton() {
           <div className="ml-auto h-3 w-16 animate-pulse rounded bg-ink-850" />
         </div>
       ))}
+    </div>
+  );
+}
+
+function ResponseBadge({ lead }: { lead: LeadRow }) {
+  if (lead.firstContactAt) {
+    const ms = new Date(lead.firstContactAt).getTime() - new Date(lead.createdAt).getTime();
+    const mins = Math.max(0, Math.floor(ms / 60000));
+    const hrs = Math.floor(mins / 60);
+    const text = hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
+    return (
+      <div className="flex items-center gap-1.5 text-[11.5px] text-signal-400" title="Time to first response">
+        <Clock className="size-3.5" />
+        {text}
+      </div>
+    );
+  }
+
+  // Not contacted yet
+  const msWait = Date.now() - new Date(lead.createdAt).getTime();
+  const minsWait = Math.floor(msWait / 60000);
+
+  if (minsWait > 180 && lead.status === 'NEW') {
+    return (
+      <div className="flex w-max items-center gap-1 rounded bg-loss-500/10 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-[0.05em] text-loss-400">
+        <Flame className="size-3" strokeWidth={2} />
+        Cold Risk
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-[11.5px] text-ink-500">
+      Pending
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import {
+  BadRequestException,
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { Role } from '@prisma/client';
 import { LeadsService } from './leads.service';
 import { CaptureLeadDto } from './dto/capture-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -18,7 +19,7 @@ import { QueryLeadsDto } from './dto/query-leads.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Actor, LEAD_MODULE_ROLES } from '../common/access';
+import { Actor, LEAD_DELETE_ACCESS, LEAD_MODULE_ROLES } from '../common/access';
 
 function detectDevice(ua: string): string {
   const s = ua.toLowerCase();
@@ -94,6 +95,26 @@ export class LeadsController {
     return this.leads.searchLeads(actor, q.trim());
   }
 
+  /**
+   * Bulk assign — reassign N leads to one user (or unassign by passing null).
+   * Gated on roles that already see every lead, so a SALES_EXEC cannot bulk-
+   * move things away from themselves.
+   */
+  @Roles(Role.SUPER_ADMIN, Role.OWNER, Role.SALES_MANAGER)
+  @Post('bulk-assign')
+  bulkAssign(
+    @Body() body: { leadIds: string[]; assignedToId: string | null },
+    @CurrentUser() actor: Actor,
+  ) {
+    if (!Array.isArray(body?.leadIds) || body.leadIds.length === 0) {
+      throw new BadRequestException('leadIds required');
+    }
+    if (body.leadIds.length > 500) {
+      throw new BadRequestException('Max 500 leads per bulk assignment');
+    }
+    return this.leads.bulkAssign(body.leadIds, body.assignedToId ?? null, actor);
+  }
+
   @Roles(...LEAD_MODULE_ROLES)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
@@ -114,10 +135,17 @@ export class LeadsController {
    * Soft-delete: parks the lead in LOST with a system reason. History,
    * bookings and activities are preserved — we never destroy a client record.
    */
-  @Roles(...LEAD_MODULE_ROLES)
-  @Delete(':id')
-  deactivate(@Param('id') id: string, @CurrentUser() actor: Actor) {
-    return this.leads.deactivate(id, actor);
+  @Roles(...LEAD_DELETE_ACCESS)
+  @Post(':id/close')
+  closeLead(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @CurrentUser() actor: Actor,
+  ) {
+    if (!reason || reason.trim().length < 10) {
+      throw new BadRequestException('A valid reason (min 10 characters) is required to close a lead.');
+    }
+    return this.leads.deactivate(id, actor, reason.trim());
   }
 
   @Roles(...LEAD_MODULE_ROLES)

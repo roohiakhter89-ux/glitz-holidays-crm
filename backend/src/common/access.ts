@@ -22,6 +22,24 @@ export const LEAD_MODULE_ROLES: Role[] = [
 ];
 
 /**
+ * Roles allowed to DIRECTLY close a lead — no approval needed.
+ * OWNER + SUPER_ADMIN only. SALES_MANAGER can request a close via the
+ * approval workflow but cannot execute one themselves; SALES_EXEC cannot
+ * even request.
+ */
+export const LEAD_DELETE_ACCESS: Role[] = [
+  Role.SUPER_ADMIN,
+  Role.OWNER,
+];
+
+/** Roles allowed to REQUEST a close (creates a pending ApprovalRequest). */
+export const LEAD_CLOSE_REQUEST_ACCESS: Role[] = [
+  Role.SUPER_ADMIN,
+  Role.OWNER,
+  Role.SALES_MANAGER,
+];
+
+/**
  * Every role in the system is internal staff — external parties (hotels,
  * transport, B2B agents, prospective clients) do not have logins, they are
  * data (Vendor, Partner, Lead).
