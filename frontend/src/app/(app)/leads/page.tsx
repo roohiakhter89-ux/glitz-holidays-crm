@@ -17,7 +17,7 @@ import { CloseLeadDialog } from '@/components/close-lead-dialog';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
 import { relativeDate } from '@/lib/format';
 
-const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'SALES_MANAGER']);
+const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN']);
 
 export default function LeadsPage() {
   const router = useRouter();

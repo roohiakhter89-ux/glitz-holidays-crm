@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageCircle, Phone as PhoneIcon, Mail } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Phone as PhoneIcon, Mail, Trash2 } from 'lucide-react';
 import {
   api,
   ApiError,
@@ -13,12 +13,13 @@ import {
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
-import { DeactivateButton } from '@/components/ui/deactivate-button';
+import { CloseLeadDialog } from '@/components/close-lead-dialog';
 import { Select, Textarea } from '@/components/ui/select';
 import { Label } from '@/components/ui/input';
 import { Chip } from '@/components/ui/badge';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { Timeline } from '@/components/timeline';
+import { Clock, Flame } from 'lucide-react';
 import {
   ACTIVITY_TYPES,
   LEAD_STATUSES,
@@ -40,7 +41,7 @@ export default function LeadDetailPage() {
   const [noteType, setNoteType] = useState<string>('CALL');
   const [note, setNote] = useState('');
 
-  const canAssign = ['OWNER', 'SUPER_ADMIN', 'SALES_MANAGER'].includes(
+  const canAssign = ['OWNER', 'SUPER_ADMIN'].includes(
     tokenStore.user()?.role ?? '',
   );
 
@@ -170,6 +171,9 @@ export default function LeadDetailPage() {
             {lead.email ? ` · ${lead.email}` : ''}
             {lead.city ? ` · ${lead.city}` : ''}
           </p>
+          <div className="mt-2">
+            <ResponseBadge lead={lead} />
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -227,19 +231,23 @@ export default function LeadDetailPage() {
           >
             Build itinerary
           </Button>
-          <DeactivateButton
-            disabled={saving || lead.status === 'LOST'}
-            label="Close lead"
-            confirmMessage={`Close ${lead.name}? Marks the lead LOST. History, bookings and activities stay on record.`}
-            onConfirm={async () => {
-              try {
-                await api.del(`/leads/${lead.id}`);
-                router.push('/leads');
-              } catch (e) {
-                setError(e instanceof ApiError ? e.message : 'Could not close this lead.');
-              }
+          <CloseLeadDialog
+            leadId={lead.id}
+            leadName={lead.name}
+            onClosed={() => {
+              router.push('/leads');
             }}
-          />
+          >
+            <button
+              type="button"
+              disabled={saving || lead.status === 'LOST'}
+              title="Close lead"
+              className="inline-flex h-8 items-center gap-2 rounded-md border border-ink-700 bg-transparent px-3 text-xs font-medium text-ink-400 transition-colors hover:border-loss-500/60 hover:bg-loss-500/8 hover:text-loss-500 disabled:pointer-events-none disabled:opacity-45"
+            >
+              <Trash2 className="size-3.5" strokeWidth={1.75} />
+              Close lead
+            </button>
+          </CloseLeadDialog>
         </div>
       </header>
 
@@ -250,6 +258,15 @@ export default function LeadDetailPage() {
         >
           {error}
         </p>
+      )}
+
+      {lead.status === 'LOST' && (
+        <div className="mb-4 rounded-md border border-loss-500/40 bg-loss-500/10 px-4 py-3">
+          <h2 className="text-[13px] font-semibold text-loss-400">Lead Closed</h2>
+          <p className="mt-1 text-[13px] text-ink-300">
+            <span className="font-medium text-ink-400">Reason:</span> {lead.lostReason ?? 'No reason provided.'}
+          </p>
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -497,4 +514,34 @@ function Row({
       </dd>
     </div>
   );
+}
+
+function ResponseBadge({ lead }: { lead: LeadDetail }) {
+  if (lead.firstContactAt) {
+    const ms = new Date(lead.firstContactAt).getTime() - new Date(lead.createdAt).getTime();
+    const mins = Math.max(0, Math.floor(ms / 60000));
+    const hrs = Math.floor(mins / 60);
+    const text = hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
+    return (
+      <div className="flex w-max items-center gap-1.5 rounded bg-signal-500/10 px-2 py-1 text-[11.5px] font-medium text-signal-400" title="Time to first response">
+        <Clock className="size-3.5" />
+        First replied in {text}
+      </div>
+    );
+  }
+
+  // Not contacted yet
+  const msWait = Date.now() - new Date(lead.createdAt).getTime();
+  const minsWait = Math.floor(msWait / 60000);
+
+  if (minsWait > 180 && lead.status === 'NEW') {
+    return (
+      <div className="flex w-max items-center gap-1.5 rounded bg-loss-500/10 px-2 py-1 text-[11.5px] font-medium text-loss-400" title="Uncontacted for >3 hours">
+        <Flame className="size-3.5" />
+        High Cold Risk — Not contacted
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -19,7 +19,7 @@ import { QueryLeadsDto } from './dto/query-leads.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Actor, LEAD_DELETE_ACCESS, LEAD_MODULE_ROLES } from '../common/access';
+import { Actor, LEAD_ASSIGN_ACCESS, LEAD_DELETE_ACCESS, LEAD_MODULE_ROLES } from '../common/access';
 
 function detectDevice(ua: string): string {
   const s = ua.toLowerCase();
@@ -100,7 +100,7 @@ export class LeadsController {
    * Gated on roles that already see every lead, so a SALES_EXEC cannot bulk-
    * move things away from themselves.
    */
-  @Roles(Role.SUPER_ADMIN, Role.OWNER, Role.SALES_MANAGER)
+  @Roles(...LEAD_ASSIGN_ACCESS)
   @Post('bulk-assign')
   bulkAssign(
     @Body() body: { leadIds: string[]; assignedToId: string | null },

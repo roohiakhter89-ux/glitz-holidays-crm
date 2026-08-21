@@ -40,6 +40,20 @@ export const LEAD_CLOSE_REQUEST_ACCESS: Role[] = [
 ];
 
 /**
+ * Roles allowed to ASSIGN leads (single, bulk, or via the Add Lead dialog's
+ * "Assign to" picker). OWNER + SUPER_ADMIN only, per business rule. A sales
+ * manager can see every lead and progress its stage, but assignment is a
+ * headcount / capacity call reserved for the owner.
+ */
+export const LEAD_ASSIGN_ACCESS: Role[] = [
+  Role.SUPER_ADMIN,
+  Role.OWNER,
+];
+
+export const canAssignLeads = (role: Role): boolean =>
+  LEAD_ASSIGN_ACCESS.includes(role);
+
+/**
  * Every role in the system is internal staff — external parties (hotels,
  * transport, B2B agents, prospective clients) do not have logins, they are
  * data (Vendor, Partner, Lead).

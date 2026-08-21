@@ -15,7 +15,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { QueryLeadsDto } from './dto/query-leads.dto';
 import { scoreLead } from './lead-scoring';
-import { Actor, canSeeAllLeads } from '../common/access';
+import { Actor, canAssignLeads, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
 import { AttributionService } from '../attribution/attribution.service';
 
@@ -197,7 +197,7 @@ export class LeadsService {
       // auto-assigns to themselves. Silently coerce so a sales-exec cannot
       // spawn leads owned by other people.
       let target = actor.id;
-      if (dto.assignedToId !== undefined && canSeeAllLeads(actor.role)) {
+      if (dto.assignedToId !== undefined && canAssignLeads(actor.role)) {
         target = dto.assignedToId ?? actor.id;
       }
       await this.prisma.lead.update({
@@ -288,9 +288,10 @@ export class LeadsService {
     if (!lead) throw new NotFoundException('Lead not found');
     this.assertCanTouch(lead, actor);
 
-    // Execs must not reassign leads away from themselves.
-    if (!canSeeAllLeads(actor.role) && dto.assignedToId !== undefined) {
-      throw new ForbiddenException('You cannot reassign leads');
+    // Only owner/super-admin can reassign a lead. Sales manager sees every
+    // lead and edits its stage/notes, but cannot change ownership.
+    if (dto.assignedToId !== undefined && !canAssignLeads(actor.role)) {
+      throw new ForbiddenException('Only the owner can reassign leads');
     }
 
     const data: Prisma.LeadUpdateInput = {};

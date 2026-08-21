@@ -22,7 +22,7 @@ import { LEAD_SOURCES, humanise } from '@/lib/constants';
  * The dedupe rule (same phone within 30 days = re-enquiry, not new lead)
  * lives on the server and applies here too.
  */
-const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'SALES_MANAGER']);
+const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN']);
 
 export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => void }) {
   const [open, setOpen] = useState(false);
