@@ -28,21 +28,45 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CommandPalette } from '@/components/command-palette';
 
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: Users },
-  { href: '/follow-ups', label: 'Follow-ups', icon: AlarmClock },
-  { href: '/itineraries', label: 'Itineraries', icon: Map },
-  { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
-  { href: '/attribution', label: 'Attribution', icon: TrendingUp },
-  { href: '/finance', label: 'Finance', icon: Wallet },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/seo', label: 'SEO', icon: Globe },
-  { href: '/vendors', label: 'Suppliers', icon: Building2 },
-  { href: '/people', label: 'People', icon: UserCog },
-  { href: '/users', label: 'Access', icon: ShieldCheck },
-  { href: '/integrations', label: 'Integrations', icon: Plug },
-  { href: '/settings', label: 'Settings', icon: Settings },
+/**
+ * Per-role visibility for sidebar + route guard. Single source of truth.
+ * Anything not listed defaults to owner-only for safety.
+ *
+ * Row-level scoping (e.g. sales exec only sees own leads) is enforced by the
+ * backend — this map controls only whether the PAGE itself is reachable.
+ */
+const OWNER_ONLY: string[] = ['OWNER', 'SUPER_ADMIN'];
+const NAV: {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles: string[];
+}[] = [
+  { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
+  { href: '/leads',       label: 'Leads',       icon: Users,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
+  { href: '/follow-ups',  label: 'Follow-ups',  icon: AlarmClock,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','OPERATIONS'] },
+  { href: '/itineraries', label: 'Itineraries', icon: Map,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+  { href: '/bookings',    label: 'Bookings',    icon: CalendarCheck,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+  { href: '/attribution', label: 'Attribution', icon: TrendingUp,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','MARKETING'] },
+  { href: '/finance',     label: 'Finance',     icon: Wallet,
+    roles: ['OWNER','SUPER_ADMIN','ACCOUNTS'] },
+  { href: '/reports',     label: 'Reports',     icon: BarChart3,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','ACCOUNTS','MARKETING','OPERATIONS'] },
+  { href: '/seo',         label: 'SEO',         icon: Globe,
+    roles: ['OWNER','SUPER_ADMIN','MARKETING'] },
+  { href: '/vendors',     label: 'Suppliers',   icon: Building2,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+  { href: '/people',      label: 'People',      icon: UserCog,
+    roles: ['OWNER','SUPER_ADMIN','ACCOUNTS'] },
+  { href: '/users',       label: 'Access',      icon: ShieldCheck, roles: OWNER_ONLY },
+  { href: '/integrations',label: 'Integrations',icon: Plug,        roles: OWNER_ONLY },
+  { href: '/settings',    label: 'Settings',    icon: Settings,    roles: OWNER_ONLY },
 ];
 
 export default function AppLayout({
@@ -63,6 +87,17 @@ export default function AppLayout({
     setUser(u);
     setReady(true);
   }, [router]);
+
+  // Route guard — if the user typed a URL their role can't access, bounce
+  // them to /dashboard (everyone can see the dashboard). The sidebar hides
+  // these entries too, but URL bar + old bookmarks would otherwise sneak in.
+  useEffect(() => {
+    if (!user) return;
+    const entry = NAV.find((n) => pathname.startsWith(n.href));
+    if (entry && !entry.roles.includes(user.role) && pathname !== '/dashboard') {
+      router.replace('/dashboard');
+    }
+  }, [user, pathname, router]);
 
   // Close the drawer whenever the route changes — otherwise it'd stay open
   // after tapping a nav link on mobile.
@@ -106,7 +141,7 @@ export default function AppLayout({
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.filter((n) => !user || n.roles.includes(user.role)).map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link
