@@ -193,16 +193,26 @@ export class LeadsService {
     const result = await this.capture({ ...dto, source }, {});
 
     if (!result.duplicate) {
+      // Owner/admin/sales-manager may assign to anyone; everyone else's lead
+      // auto-assigns to themselves. Silently coerce so a sales-exec cannot
+      // spawn leads owned by other people.
+      let target = actor.id;
+      if (dto.assignedToId !== undefined && canSeeAllLeads(actor.role)) {
+        target = dto.assignedToId ?? actor.id;
+      }
       await this.prisma.lead.update({
         where: { id: result.leadId },
-        data: { assignedToId: actor.id },
+        data: { assignedToId: target },
       });
       await this.prisma.activity.create({
         data: {
           leadId: result.leadId,
           userId: actor.id,
           type: 'SYSTEM' as any,
-          content: `Added manually by ${actor.id}, auto-assigned`,
+          content:
+            target === actor.id
+              ? 'Added manually, auto-assigned to creator'
+              : `Added manually by ${actor.id}, assigned to ${target}`,
         },
       });
     }

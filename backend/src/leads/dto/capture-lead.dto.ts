@@ -74,4 +74,12 @@ export class CaptureLeadDto {
    * spoofed by copy-paste.
    */
   @IsOptional() @IsString() @MaxLength(64) visitId?: string;
+
+  /**
+   * Only honoured on the authenticated manual-create path AND only when the
+   * caller has full lead access (owner / super-admin / sales manager).
+   * Public capture ignores it. Sales-exec attempts are silently coerced back
+   * to themselves in leads.service.
+   */
+  @IsOptional() @IsString() @MaxLength(64) assignedToId?: string;
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, tokenStore, type UserRow } from '@/lib/api';
 import {
   Dialog,
   DialogClose,
@@ -22,10 +22,19 @@ import { LEAD_SOURCES, humanise } from '@/lib/constants';
  * The dedupe rule (same phone within 30 days = re-enquiry, not new lead)
  * lives on the server and applies here too.
  */
+const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'SALES_MANAGER']);
+
 export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => void }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staff, setStaff] = useState<UserRow[]>([]);
+  const canAssign = useMemo(() => CAN_ASSIGN_ROLES.has(tokenStore.user()?.role ?? ''), []);
+
+  useEffect(() => {
+    if (!canAssign || !open) return;
+    api.get<UserRow[]>('/users').then((u) => setStaff(u.filter((x) => x.isActive))).catch(() => setStaff([]));
+  }, [canAssign, open]);
 
   // Split fields per common data-entry order (contact -> trip -> notes) rather
   // than schema order — an operator on a call reads their form top-to-bottom.
@@ -40,6 +49,7 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
   const [children, setChildren] = useState('');
   const [budget, setBudget] = useState('');
   const [message, setMessage] = useState('');
+  const [assignedToId, setAssignedToId] = useState('');
 
   function reset() {
     setName('');
@@ -53,6 +63,7 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
     setChildren('');
     setBudget('');
     setMessage('');
+    setAssignedToId('');
     setError(null);
   }
 
@@ -77,6 +88,7 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
       if (children) body.children = Number(children);
       if (budget) body.budget = Number(budget);
       if (message.trim()) body.message = message.trim();
+      if (canAssign && assignedToId) body.assignedToId = assignedToId;
 
       const res = await api.post<{ leadId: string; duplicate: boolean }>(
         '/leads',
@@ -109,7 +121,7 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
 
       <DialogContent
         title="Add lead"
-        description="For phone-ins, walk-ins, or a WhatsApp that came directly to you. Auto-assigns to you."
+        description="For phone-ins, walk-ins, or a WhatsApp that came directly to you. Defaults to you; owner/manager can assign to any sales exec."
       >
         <form onSubmit={submit} className="max-h-[70vh] overflow-y-auto p-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -242,6 +254,22 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
                 rows={3}
               />
             </div>
+
+            {canAssign && (
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="al-assign">Assign to</Label>
+                <Select
+                  id="al-assign"
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(e.target.value)}
+                >
+                  <option value="">Me (default)</option>
+                  {staff.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
           </div>
 
           {error && (
