@@ -15,6 +15,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { QueryLeadsDto } from './dto/query-leads.dto';
 import { scoreLead } from './lead-scoring';
+import { computeNextFollowUp, isBreached } from './follow-up-cadence';
 import { Actor, canAssignLeads, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
 import { AttributionService } from '../attribution/attribution.service';
@@ -149,6 +150,8 @@ export class LeadsService {
         status: LeadStatus.NEW,
         score,
         scoreNotes: notes,
+        // First-contact SLA starts ticking immediately (5 min).
+        nextFollowUp: computeNextFollowUp(LeadStatus.NEW, new Date()),
         utmSource: pick('utmSource') ?? null,
         utmMedium: pick('utmMedium') ?? null,
         utmCampaign: pick('utmCampaign') ?? null,
@@ -306,9 +309,26 @@ export class LeadsService {
     if (dto.lostReason !== undefined) data.lostReason = dto.lostReason;
     if (dto.travelDate !== undefined)
       data.travelDate = toDateOrNull(dto.travelDate);
-    if (dto.nextFollowUp !== undefined)
-      data.nextFollowUp = toDateOrNull(dto.nextFollowUp);
-    if (dto.status !== undefined) data.status = dto.status;
+    // Human picked a date -> mark manual so the cadence scheduler leaves it
+    // alone. Clearing the date reverts to auto-cadence.
+    if (dto.nextFollowUp !== undefined) {
+      const picked = toDateOrNull(dto.nextFollowUp);
+      data.nextFollowUp = picked;
+      data.followUpManual = picked !== null;
+      if (picked !== null) data.slaBreachAt = null;
+    }
+    // Status advance -> resume auto-cadence for the new stage (manual date
+    // was tied to the old stage's context).
+    if (dto.status !== undefined && dto.status !== lead.status) {
+      data.status = dto.status;
+      if (dto.nextFollowUp === undefined) {
+        data.nextFollowUp = computeNextFollowUp(dto.status, new Date());
+        data.followUpManual = false;
+      }
+      data.slaBreachAt = null;
+    } else if (dto.status !== undefined) {
+      data.status = dto.status;
+    }
     if (dto.assignedToId !== undefined) {
       data.assignedTo = dto.assignedToId
         ? { connect: { id: dto.assignedToId } }
@@ -394,11 +414,17 @@ export class LeadsService {
     const type = dto.type ?? ActivityType.NOTE;
 
     if (contactTypes.includes(type)) {
+      // Contact happened -> refresh the SLA clock (unless human picked date).
+      const next = lead.followUpManual
+        ? undefined
+        : computeNextFollowUp(lead.status, new Date());
       await this.prisma.lead.update({
         where: { id: leadId },
         data: {
           lastContact: new Date(),
           ...(lead.firstContactAt ? {} : { firstContactAt: new Date() }),
+          ...(next !== undefined ? { nextFollowUp: next } : {}),
+          slaBreachAt: null,
         },
       });
     }

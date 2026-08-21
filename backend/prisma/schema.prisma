@@ -600,6 +600,15 @@ model Lead {
   lastContact    DateTime?
   firstContactAt DateTime?
   nextFollowUp   DateTime?
+  /// True when a human explicitly picked the nextFollowUp date. The
+  /// auto-cadence scheduler will NOT overwrite manual dates — the exec's
+  /// judgement wins. Cleared when the lead advances to a new stage that
+  /// has its own SLA (a resumed cadence is intentional).
+  followUpManual Boolean @default(false)
+  /// Stamped when the auto-cadence check finds a lead past its
+  /// nextFollowUp. Cleared the moment a contact activity is logged.
+  /// Used to surface "SLA breached" in the UI + dashboard tile.
+  slaBreachAt    DateTime?
 
   /// Optional link to the Visit that produced this lead. Set only when the
   /// landing page beacon has fired and the form carried the returned visitId.
