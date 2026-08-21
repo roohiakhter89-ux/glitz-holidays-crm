@@ -95,6 +95,13 @@ export class LeadsController {
     return this.leads.searchLeads(actor, q.trim());
   }
 
+  /** Owner-only team scorecard for the dashboard. */
+  @Roles(Role.SUPER_ADMIN, Role.OWNER)
+  @Get('stats/team-scorecard')
+  teamScorecard() {
+    return this.leads.teamScorecard();
+  }
+
   /**
    * Bulk assign — reassign N leads to one user (or unassign by passing null).
    * Gated on roles that already see every lead, so a SALES_EXEC cannot bulk-

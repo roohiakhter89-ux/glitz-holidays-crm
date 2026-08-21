@@ -20,6 +20,8 @@ import {
   type OpsStats,
   type LeadRow,
   type Paged,
+  type TeamScorecardRow,
+  type WeeklyPulse,
 } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { EChart, chartBase, axisStyle } from '@/components/echart';
@@ -44,36 +46,41 @@ import { tokenStore } from '@/lib/api';
  * teal accent tied to the brand. Everything else stays warm neutral so
  * numbers stay the loudest thing on the screen.
  */
+const OWNER_ROLES = new Set(['OWNER', 'SUPER_ADMIN']);
+
 export default function DashboardPage() {
   const [ops, setOps] = useState<OpsStats | null>(null);
   const [leads, setLeads] = useState<LeadStats | null>(null);
   const [recent, setRecent] = useState<LeadRow[]>([]);
+  const [team, setTeam] = useState<TeamScorecardRow[] | null>(null);
+  const [pulse, setPulse] = useState<WeeklyPulse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState<string>('there');
+  const isOwner = useMemo(() => OWNER_ROLES.has(tokenStore.user()?.role ?? ''), []);
 
   useEffect(() => {
     setName(tokenStore.user()?.name.split(' ')[0] ?? 'there');
     let cancelled = false;
     (async () => {
       try {
-        const [o, l, r] = await Promise.all([
+        const [o, l, r, tm, wp] = await Promise.all([
           api.get<OpsStats>('/leads/stats/ops').catch(() => null),
           api.get<LeadStats>('/leads/stats').catch(() => null),
           api
             .get<Paged<LeadRow>>('/leads?limit=6')
             .catch((): Paged<LeadRow> => ({
-              total: 0,
-              page: 1,
-              limit: 6,
-              pages: 0,
-              data: [],
+              total: 0, page: 1, limit: 6, pages: 0, data: [],
             })),
+          isOwner ? api.get<TeamScorecardRow[]>('/leads/stats/team-scorecard').catch(() => null) : Promise.resolve(null),
+          isOwner ? api.get<WeeklyPulse>('/bookings/stats/weekly-pulse').catch(() => null) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setOps(o);
         setLeads(l);
         setRecent(r.data ?? []);
+        setTeam(tm);
+        setPulse(wp);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : 'Could not load the desk.');
@@ -85,7 +92,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isOwner]);
 
   // Where leads are stuck — laid out as a segmented bar rather than a chart,
   // because the shape of the bar IS the pipeline diagnosis.
@@ -352,7 +359,87 @@ export default function DashboardPage() {
           </Panel>
         </div>
 
-        {/* Row 3 — the actual work queue */}
+        {/* Row 3 — team scorecard (owner-only) */}
+        {isOwner && team && team.length > 0 && (
+          <Panel className="rise mt-5" style={{ animationDelay: '360ms' }}>
+            <PanelHeader>
+              <PanelTitle>Team scorecard</PanelTitle>
+              <span className="text-[11px] text-ink-500">this week</span>
+            </PanelHeader>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-ink-800 text-[10px] uppercase tracking-[0.09em] text-ink-500">
+                    <th className="px-5 py-2.5 font-medium">Person</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Assigned</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Contacted today</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Quotes this week</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Confirmed this month</th>
+                    <th className="px-5 py-2.5 text-right font-medium">SLA breaches</th>
+                    <th className="px-5 py-2.5 text-right font-medium">First-response avg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.map((row) => (
+                    <tr key={row.userId} className="border-b border-ink-800/60 last:border-0 hover:bg-ink-850">
+                      <td className="px-5 py-3">
+                        <div className="font-medium text-ink-100">{row.name}</div>
+                        <div className="text-[11px] text-ink-500">{row.role.replace('_', ' ').toLowerCase()}</div>
+                      </td>
+                      <td className="tabular px-5 py-3 text-right text-ink-200">{row.assigned}</td>
+                      <td className="tabular px-5 py-3 text-right text-ink-200">{row.contactedToday}</td>
+                      <td className="tabular px-5 py-3 text-right text-ink-200">{row.quotesThisWeek}</td>
+                      <td className="tabular px-5 py-3 text-right text-healthy-500">{row.bookingsThisMonth}</td>
+                      <td className={`tabular px-5 py-3 text-right ${row.slaBreaches > 0 ? 'text-loss-500' : 'text-ink-500'}`}>
+                        {row.slaBreaches || '—'}
+                      </td>
+                      <td className="tabular px-5 py-3 text-right text-ink-300">
+                        {row.avgFirstResponseMinutes == null
+                          ? '—'
+                          : row.avgFirstResponseMinutes < 60
+                            ? `${row.avgFirstResponseMinutes} min`
+                            : `${(row.avgFirstResponseMinutes / 60).toFixed(1)} h`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        )}
+
+        {/* Row 4 — this week's cash (owner-only) */}
+        {isOwner && pulse && (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MoneyTile
+              label="Booked this week"
+              value={pulse.bookedThisWeek}
+              deltaValue={pulse.bookedThisWeek - pulse.bookedLastWeek}
+              hint={`${pulse.bookingsThisWeek} file${pulse.bookingsThisWeek === 1 ? '' : 's'} · vs last week`}
+            />
+            <MoneyTile
+              label="Travelling this week"
+              value={pulse.travellingThisWeek}
+              hint="bookings whose trip starts in 7 days"
+              plain
+            />
+            <MoneyTile
+              label="Payments due next 7d"
+              value={pulse.paymentsDueNext7Days}
+              hint="balance on trips starting soon"
+              tone={pulse.paymentsDueNext7Days > 0 ? 'warn' : 'muted'}
+            />
+            <MoneyTile
+              label="Suppliers overdue >30d"
+              value={pulse.suppliersOverdue30d}
+              hint="unpaid cost rows past 30d"
+              plain
+              tone={pulse.suppliersOverdue30d > 0 ? 'warn' : 'muted'}
+            />
+          </div>
+        )}
+
+        {/* Row 5 — the actual work queue */}
         <Panel className="rise mt-5" style={{ animationDelay: '380ms' }}>
           <PanelHeader>
             <PanelTitle>Latest enquiries</PanelTitle>
@@ -585,3 +672,31 @@ function Empty({ title, hint }: { title: string; hint: string }) {
   );
 }
 
+
+function MoneyTile({
+  label, value, hint, deltaValue, plain, tone = 'muted',
+}: {
+  label: string; value: number; hint?: string; deltaValue?: number;
+  plain?: boolean; tone?: Tone;
+}) {
+  const hintClass = HINT_TONE[tone];
+  const delta = deltaValue == null ? null : deltaValue;
+  return (
+    <Panel interactive className="rise">
+      <PanelBody className="py-5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.11em] text-ink-500">
+          {label}
+        </p>
+        <p className="display tabular mt-3 text-[24px] leading-none font-semibold text-ink-100">
+          <CountUp value={value} format={plain ? (n) => String(n) : money} />
+        </p>
+        {delta !== null && (
+          <p className={`mt-1 text-[11.5px] ${delta >= 0 ? 'text-healthy-500' : 'text-loss-500'}`}>
+            {delta >= 0 ? '▲' : '▼'} {money(Math.abs(delta))}
+          </p>
+        )}
+        {hint && <p className={`mt-1 text-[11.5px] ${hintClass}`}>{hint}</p>}
+      </PanelBody>
+    </Panel>
+  );
+}

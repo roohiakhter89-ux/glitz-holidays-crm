@@ -165,6 +165,28 @@ export interface BookingStats {
   byStatus: { status: string; count: number }[];
 }
 
+export interface TeamScorecardRow {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  assigned: number;
+  contactedToday: number;
+  quotesThisWeek: number;
+  bookingsThisMonth: number;
+  slaBreaches: number;
+  avgFirstResponseMinutes: number | null;
+}
+
+export interface WeeklyPulse {
+  bookedThisWeek: number;
+  bookedLastWeek: number;
+  bookingsThisWeek: number;
+  travellingThisWeek: number;
+  paymentsDueNext7Days: number;
+  suppliersOverdue30d: number;
+}
+
 export interface OpsStats {
   leadsToday: number;
   leadsThisWeek: number;

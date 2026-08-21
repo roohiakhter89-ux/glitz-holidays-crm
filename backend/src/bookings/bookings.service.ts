@@ -610,6 +610,76 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Owner-dashboard "this week" tiles. Real ops-critical numbers vs
+   * finance-page ledger view (which is aged AR/AP).
+   *
+   *  - bookedThisWeek        rupees booked in the current calendar week
+   *  - bookedLastWeek        same range one week ago (for the delta arrow)
+   *  - travellingThisWeek    bookings whose travelStartDate falls in [today, today+7)
+   *  - paymentsDueNext7Days  sum of balance-due on bookings starting travel in the next week
+   *  - suppliersOverdue30d   count of vendor cost rows with balance > 0 and > 30d old
+   */
+  async weeklyPulse() {
+    const now = new Date();
+    const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7));
+    const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(endOfWeek.getDate() + 7);
+    const startOfPrevWeek = new Date(startOfWeek); startOfPrevWeek.setDate(startOfPrevWeek.getDate() - 7);
+    const in7Days = new Date(startOfDay); in7Days.setDate(in7Days.getDate() + 7);
+    const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [bookedThis, bookedPrev, upcomingBookings, overdueVendorCosts] = await Promise.all([
+      this.prisma.booking.aggregate({
+        where: {
+          status: { not: BookingStatus.CANCELLED },
+          createdAt: { gte: startOfWeek, lt: endOfWeek },
+        },
+        _sum: { totalSell: true },
+        _count: { _all: true },
+      }),
+      this.prisma.booking.aggregate({
+        where: {
+          status: { not: BookingStatus.CANCELLED },
+          createdAt: { gte: startOfPrevWeek, lt: startOfWeek },
+        },
+        _sum: { totalSell: true },
+      }),
+      this.prisma.booking.findMany({
+        where: {
+          status: { not: BookingStatus.CANCELLED },
+          travelStartDate: { gte: startOfDay, lt: in7Days },
+        },
+        select: { totalSell: true, payments: { select: { amount: true } } },
+      }),
+      this.prisma.bookingCost.findMany({
+        where: { createdAt: { lt: thirtyDaysAgo } },
+        select: { amountDue: true, amountPaid: true },
+      }),
+    ]);
+
+    let paymentsDueNext7Days = 0;
+    for (const b of upcomingBookings) {
+      const paid = (b.payments as { amount: number }[]).reduce((s, p) => s + p.amount, 0);
+      paymentsDueNext7Days += Math.max(0, b.totalSell - paid);
+    }
+
+    let suppliersOverdue = 0;
+    for (const c of overdueVendorCosts) {
+      if (c.amountDue - c.amountPaid > 0) suppliersOverdue += 1;
+    }
+
+    return {
+      bookedThisWeek: bookedThis._sum.totalSell ?? 0,
+      bookedLastWeek: bookedPrev._sum.totalSell ?? 0,
+      bookingsThisWeek: bookedThis._count._all,
+      travellingThisWeek: upcomingBookings.length,
+      paymentsDueNext7Days,
+      suppliersOverdue30d: suppliersOverdue,
+    };
+  }
+
   /** Free-text search over booking number, package name, and client name. */
   async search(q: string) {
     return this.prisma.booking.findMany({

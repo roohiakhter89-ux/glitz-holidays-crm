@@ -70,6 +70,17 @@ export class BookingsController {
     return this.bookings.aging();
   }
 
+  /**
+   * Owner-dashboard "this week" pulse — booked delta vs last week,
+   * bookings travelling this week, payments due next 7 days, suppliers
+   * overdue >30d. Owner + super-admin only.
+   */
+  @Roles(Role.SUPER_ADMIN, Role.OWNER)
+  @Get('stats/weekly-pulse')
+  weeklyPulse() {
+    return this.bookings.weeklyPulse();
+  }
+
   /** Global search — ⌘K palette. */
   @Get('search')
   search(@Query('q') q: string) {

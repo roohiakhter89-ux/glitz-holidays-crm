@@ -470,6 +470,101 @@ export class LeadsService {
   }
 
   /**
+   * Team scorecard for the owner dashboard. Per-user pipeline snapshot:
+   * assigned count, contacted today, quotes sent this week, bookings
+   * confirmed this month, current SLA breaches, avg first-response
+   * minutes over the last 30 days. Owner uses this weekly for 1:1s.
+   *
+   * Returns rows only for users with an active login AND at least one
+   * lead attached — silent staff who don't handle inbound don't pad
+   * the table.
+   */
+  async teamScorecard() {
+    const now = new Date();
+    const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(startOfDay);
+    const dow = startOfWeek.getDay();
+    startOfWeek.setDate(startOfWeek.getDate() - ((dow + 6) % 7));
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const users = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const rows = await Promise.all(
+      users.map(async (u) => {
+        const [assigned, contactedToday, quotesThisWeek, bookingsThisMonth, breaches, respondedLeads] = await Promise.all([
+          this.prisma.lead.count({ where: { assignedToId: u.id } }),
+          this.prisma.lead.count({
+            where: { assignedToId: u.id, lastContact: { gte: startOfDay } },
+          }),
+          this.prisma.itinerary.count({
+            where: { createdById: u.id, createdAt: { gte: startOfWeek } },
+          }),
+          this.prisma.booking.count({
+            where: {
+              lead: { assignedToId: u.id },
+              status: 'CONFIRMED',
+              createdAt: { gte: startOfMonth },
+            },
+          }),
+          this.prisma.lead.count({
+            where: {
+              assignedToId: u.id,
+              nextFollowUp: { lt: now },
+              status: { notIn: ['CONFIRMED','LOST','CANCELLED','FUTURE_FOLLOWUP'] },
+            },
+          }),
+          this.prisma.lead.findMany({
+            where: {
+              assignedToId: u.id,
+              firstContactAt: { not: null, gte: thirtyDaysAgo },
+            },
+            select: { createdAt: true, firstContactAt: true },
+            take: 500,
+          }),
+        ]);
+
+        const responseMinutes = respondedLeads.length
+          ? Math.round(
+              respondedLeads.reduce(
+                (sum, l) =>
+                  sum + Math.max(0, (l.firstContactAt!.getTime() - l.createdAt.getTime()) / 60000),
+                0,
+              ) / respondedLeads.length,
+            )
+          : null;
+
+        return {
+          userId: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          assigned,
+          contactedToday,
+          quotesThisWeek,
+          bookingsThisMonth,
+          slaBreaches: breaches,
+          avgFirstResponseMinutes: responseMinutes,
+        };
+      }),
+    );
+
+    // Only rows that have any activity worth showing.
+    return rows.filter(
+      (r) =>
+        r.assigned > 0 ||
+        r.contactedToday > 0 ||
+        r.quotesThisWeek > 0 ||
+        r.bookingsThisMonth > 0 ||
+        r.slaBreaches > 0,
+    );
+  }
+
+  /**
    * Bulk reassign N leads to one user (or unassign with null). Writes one
    * ASSIGNMENT activity per lead so the audit trail matches single-lead edits.
    * Idempotent — leads already on the target user are counted as skipped.
