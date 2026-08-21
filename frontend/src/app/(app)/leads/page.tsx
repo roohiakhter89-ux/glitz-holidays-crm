@@ -14,6 +14,7 @@ import { RowActions } from '@/components/ui/row-actions';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { AddLeadDialog } from '@/components/add-lead-dialog';
 import { CloseLeadDialog } from '@/components/close-lead-dialog';
+import { DateRangePicker, defaultRange, type DateRange } from '@/components/ui/date-range-picker';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
 import { relativeDate } from '@/lib/format';
 
@@ -26,6 +27,7 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [source, setSource] = useState('');
+  const [range, setRange] = useState<DateRange>(() => defaultRange('today'));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,11 @@ export default function LeadsPage() {
     if (search.trim()) params.set('search', search.trim());
     if (status) params.set('status', status);
     if (source) params.set('source', source);
+    if (range.from) params.set('from', range.from);
+    if (range.to) {
+      // Backend uses lte on createdAt; include the entire end day.
+      params.set('to', range.to + 'T23:59:59.999Z');
+    }
 
     try {
       const res = await api.get<Paged<LeadRow>>(`/leads?${params}`);
@@ -89,7 +96,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status, source]);
+  }, [page, search, status, source, range]);
 
   // debounce so typing in search doesn't hammer the API
   useEffect(() => {
@@ -108,17 +115,20 @@ export default function LeadsPage() {
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <header className="mb-6 flex items-end justify-between gap-4">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="display text-[26px] font-semibold tracking-tight text-ink-100">
             Leads
           </h1>
           <p className="mt-0.5 text-[13px] text-ink-400">
             {meta.total} enquir{meta.total === 1 ? 'y' : 'ies'}
-            {filtered ? ' matching your filters' : ' in the pipeline'}
+            <span className="text-ink-500"> · {range.label}</span>
           </p>
         </div>
-        <AddLeadDialog onCreated={(id) => router.push(`/leads/${id}`)} />
+        <div className="flex items-center gap-2">
+          <DateRangePicker value={range} onChange={(r) => { setRange(r); setPage(1); }} />
+          <AddLeadDialog onCreated={(id) => router.push(`/leads/${id}`)} />
+        </div>
       </header>
 
       {/* Filters — a toolbar, not a panel. It is chrome, not content. */}
