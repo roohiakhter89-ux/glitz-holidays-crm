@@ -37,7 +37,7 @@ export const GUIDES: GuideArticle[] = [
     publishedAt: '2026-08-15',
     updatedAt: '2026-08-30',
     tags: ['Gulmarg', 'Gondola', 'Snow Activities', 'Travel Tips'],
-    relatedPackages: ['gulmarg-ski-snow-adventure-4n5d', 'glimpse-of-kashmir-4n5d', 'kashmir-honeymoon-special-5n6d'],
+    relatedPackages: ['kashmir-snow-winter-5-nights', 'classic-kashmir-4-nights', 'kashmir-honeymoon-5-nights'],
     toc: [
       { id: 'phases-explained', title: 'Phase 1 vs Phase 2: What is the Difference?' },
       { id: 'booking-process', title: 'How to Book Tickets Online in Advance' },
@@ -91,7 +91,7 @@ Tickets are issued exclusively via the official online booking portal of J&K Tou
     publishedAt: '2026-08-20',
     updatedAt: '2026-08-30',
     tags: ['Kashmir Seasons', 'Weather Guide', 'Best Time To Visit', 'Planning'],
-    relatedPackages: ['classic-kashmir-family-6n7d', 'kashmir-honeymoon-special-5n6d', 'complete-kashmir-circuit-7n8d'],
+    relatedPackages: ['complete-kashmir-6-nights', 'kashmir-honeymoon-5-nights'],
     toc: [
       { id: 'spring', title: 'Spring (March to April): Blooms & Tulip Festival' },
       { id: 'summer', title: 'Summer (May to August): Lush Valleys & Escapes' },
@@ -144,7 +144,7 @@ The famous *Chillai Kalan* brings heavy snowfall to Gulmarg and Pahalgam. Gulmar
     publishedAt: '2026-08-10',
     updatedAt: '2026-08-30',
     tags: ['Ladakh', 'Acclimatization', 'AMS', 'Health Tips', 'Khardung La'],
-    relatedPackages: ['ladakh-explorer-6n7d', 'grand-ladakh-circuit-7n8d', 'zanskar-valley-expedition-8n9d'],
+    relatedPackages: ['ladakh-leh-nubra-pangong-6-nights', 'ladakh-complete-8-nights'],
     toc: [
       { id: 'why-acclimatization', title: 'Why Acclimatization Matters at 11,500 ft' },
       { id: '48-hour-rule', title: 'The Golden 48-Hour Rule in Leh' },
@@ -188,7 +188,7 @@ Leh sits at 11,500 feet (3,500 meters) above sea level, where atmospheric pressu
     publishedAt: '2026-08-25',
     updatedAt: '2026-08-30',
     tags: ['Houseboat', 'Dal Lake', 'Nigeen Lake', 'Srinagar Hotels', 'Accommodation'],
-    relatedPackages: ['kashmir-honeymoon-special-5n6d', 'glimpse-of-kashmir-4n5d'],
+    relatedPackages: ['kashmir-honeymoon-5-nights', 'classic-kashmir-4-nights'],
     toc: [
       { id: 'houseboat-experience', title: 'The Traditional Kashmiri Houseboat Experience' },
       { id: 'dal-vs-nigeen', title: 'Dal Lake vs Nigeen Lake Houseboats' },
