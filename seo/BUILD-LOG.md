@@ -8,7 +8,7 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 18 of 270**
+**Progress: 19 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
@@ -16,7 +16,7 @@ Queue: `seo/page-manifest.json`.
 | 1 · Origin city | 5 | 47 |
 | 2 · Honeymoon & family | 4 | 22 |
 | 3 · Transport routes | 1 | 88 |
-| 4 · Place × intent | 0 | 86 |
+| 4 · Place × intent | 1 | 86 |
 | 5 · Month hubs | 1 | 10 |
 | 6 · Hindi | 0 | 10 |
 
@@ -25,6 +25,55 @@ consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 020 — /guides/places-to-visit-in-kashmir
+**31 Aug 2026 · Tier 4 · reference implementation for 85 more place-intent guides**
+
+Targets the largest informational cluster in the manifest: **19,978 impressions, 500 clicks, 17.3 conversions across 593 queries**.
+
+**SERP checked.** Top 10 is dominated by generic aggregator listicles (MakeMyTrip, Thomas Cook, TourMyIndia, Holidify) describing every spot as "paradise on earth" without driving distances, geographic reality, or cost constraints. Two key structural flaws in competitor pages:
+1. They treat Kashmir as a linear circular loop, encouraging visitors to attempt impossible cross-valley hops.
+2. They omit local taxi union restrictions at Gulmarg, Pahalgam, and Sonmarg.
+
+**Why one deep guide.** The page acts as the authoritative geographic and logistical blueprint for the entire valley. Passage ranking allows individual sections (e.g. Doodhpathri, Gulmarg Gondola costs, or Union Taxi rules) to rank for specific long-tail queries, while the main guide accumulates equity from destination hubs, month hubs, and packages.
+
+**Information gain (6):**
+1. **The Hub-and-Spoke Distance Blueprint:** Real driving times and radial directions from Srinagar (51 km W to Gulmarg, 90 km SE to Pahalgam, 80 km NE to Sonmarg, 42 km SW to Doodhpathri), explicitly debunking the myth that you can drive directly between Gulmarg and Pahalgam without passing Srinagar.
+2. **Local Union Stand & Restricted Vehicle Rules:** Sourced, practical explanation of why outside Srinagar vehicles are halted at Pahalgam and Sonmarg union stands, where tourists hire local union cabs (e.g. ₹2,200 for Aru/Betaab circuit), removing the #1 tourist surprise cost.
+3. **Comprehensive Quick-Reference Comparison Table:** Structured HTML table with distance, real drive time, key highlights, official fees, best season, and ideal stay per destination.
+4. **Direct 100-Word Answer:** Prioritised breakdown above all prose, categorised by trip length (4N vs 6N vs 8N).
+5. **Dated 2026 Official Entry Fees & Activity Costs:** Gondola Phase 1 (₹810), Phase 2 (₹1,010), Betaab Valley (₹100), Mughal Gardens (₹24 J&K Floriculture fee), Shikara government rates (₹800–₹1,200/hr).
+6. **Explicit Negative Advice:**
+   - Why trying to do 4 valleys in 4 nights results in 22+ hours trapped in a car.
+   - Why March is a muddy thaw month to avoid for snow sports or blossoms.
+   - Why pony rides at Baisaran are overhyped in wet weather compared to walking.
+   - Warning against counterfeit highway saffron stalls in Pampore.
+
+**Moat assets used:** Operating from Srinagar since 2013; 5,000+ guests hosted / 604 Google reviews; published real union prices & exclusions; direct negative recommendations.
+
+**Checklist:**
+```
+[x] SERP checked; format matches what ranks
+[x] Primary query answered in first 100 words
+[x] 3+ information-gain items (6 delivered)
+[x] 2+ moat assets (4 used)
+[x] Explicit negative recommendation box
+[x] Named author + role (Tariq Ahmad, Head of Operations)
+[x] All hard facts carry verifiedOn (dateModified: 2026-08-31)
+[x] No invented facts; real 2026 official fees
+[x] Exclusions & union taxi rules visible
+[x] Title 55 chars (<60), keyword first
+[x] Meta description 150 chars (<160), written for click
+[x] Canonical set explicitly
+[x] Structured data: Article + FAQPage(6) + BreadcrumbList validates
+[x] Internal links: /destinations/kashmir, /guides, /guides/by-month/kashmir-by-month, /packages/*
+[x] FAQ targets real PAA questions
+[x] Renders 200, H1 correct
+[x] Added to sitemap via GUIDES
+[x] Linkgraph verified: depth 2, not orphaned, zero non-utility orphan pages sitewide
+```
 
 ---
 

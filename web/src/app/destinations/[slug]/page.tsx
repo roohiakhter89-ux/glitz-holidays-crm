@@ -175,6 +175,21 @@ export default async function DestinationHub({ params }: { params: Params }) {
               </div>
             ))}
           </div>
+
+          {d.slug === 'kashmir' && (
+            <div className="mt-10 rounded-2xl border border-paper-300 bg-paper-50 p-6 md:p-8 flex flex-wrap items-center justify-between gap-4">
+              <div className="max-w-xl">
+                <p className="kicker">Detailed Sightseeing Guide</p>
+                <h4 className="display text-xl font-bold text-ink-950 mt-1">Places to Visit in Kashmir: 2026 Practical Guide</h4>
+                <p className="text-sm text-ink-600 mt-2">
+                  Driving times, union cab rules, entry fees, and what to skip — from our Srinagar operations team.
+                </p>
+              </div>
+              <Link href="/guides/places-to-visit-in-kashmir" className="btn btn-secondary text-xs font-semibold">
+                Read Places Guide →
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

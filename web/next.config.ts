@@ -72,6 +72,22 @@ const config: NextConfig = {
         destination: '/routes/delhi-to-srinagar#delhi-to-srinagar-flight',
         permanent: true,
       },
+      // Best time to visit Kashmir queries fold into the authoritative 12-month hub
+      {
+        source: '/guides/best-time-to-visit-kashmir',
+        destination: '/guides/by-month/kashmir-by-month',
+        permanent: true,
+      },
+      {
+        source: '/guides/best-time-to-visit-kashmir-month-by-month',
+        destination: '/guides/by-month/kashmir-by-month',
+        permanent: true,
+      },
+      {
+        source: '/best-time-to-visit-kashmir',
+        destination: '/guides/by-month/kashmir-by-month',
+        permanent: true,
+      },
       {
         source: '/routes/delhi-to-srinagar-road',
         destination: '/routes/delhi-to-srinagar#delhi-to-srinagar-road',

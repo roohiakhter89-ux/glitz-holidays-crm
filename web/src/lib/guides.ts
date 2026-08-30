@@ -5,6 +5,7 @@
 export type GuideArticle = {
   slug: string;
   title: string;
+  seoTitle?: string;
   subtitle: string;
   summary: string;
   destination: string;
@@ -14,15 +15,312 @@ export type GuideArticle = {
   authorRole: string;
   publishedAt: string;
   updatedAt: string;
+  verifiedOnISO?: string;
   tags: string[];
   faqs: { q: string; a: string }[];
   toc: { id: string; title: string }[];
   content: string;
   image: string;
   relatedPackages: string[];
+  directAnswer?: {
+    heading: string;
+    body: string;
+    highlights: string[];
+  };
+  placesTable?: {
+    caption?: string;
+    headers: string[];
+    rows: {
+      place: string;
+      distance: string;
+      drivingTime: string;
+      highlights: string;
+      cost: string;
+      bestSeason: string;
+      stay: string;
+    }[];
+  };
+  negativeAdvice?: {
+    title: string;
+    body: string;
+    items: string[];
+  };
+  localInsights?: {
+    title: string;
+    body: string;
+  };
 };
 
 export const GUIDES: GuideArticle[] = [
+  {
+    slug: 'places-to-visit-in-kashmir',
+    image: 'https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1200&auto=format&fit=crop',
+    title: 'Places to Visit in Kashmir: The Realistic 2026 Valley Guide',
+    seoTitle: 'Places to Visit in Kashmir: 2026 Guide',
+    subtitle:
+      'Driving times, entry costs, union cab rules, and the day-trip clusters that actually work — from a Srinagar team operating since 2013.',
+    summary:
+      'Kashmir places to visit ranked by a Srinagar DMC: driving times, union cab rules, entry fees, half vs full day plans & what to skip. Updated 2026.',
+    destination: 'kashmir',
+    destinationName: 'Kashmir',
+    readingTime: '9 min read',
+    author: 'Tariq Ahmad',
+    authorRole: 'Head of Operations, Srinagar',
+    publishedAt: '2026-08-31',
+    updatedAt: '2026-08-31',
+    verifiedOnISO: '2026-08-31',
+    tags: [
+      'Kashmir Sightseeing',
+      'Places To Visit',
+      'Srinagar',
+      'Gulmarg',
+      'Pahalgam',
+      'Sonmarg',
+      'Doodhpathri',
+      'Travel Planning',
+    ],
+    relatedPackages: [
+      'complete-kashmir-6-nights',
+      'classic-kashmir-4-nights',
+      'kashmir-honeymoon-5-nights',
+      'kashmir-snow-winter-5-nights',
+    ],
+    directAnswer: {
+      heading: 'The Short Answer: How to Prioritise Kashmir’s Places',
+      body:
+        'Kashmir has seven primary destinations, but you cannot visit them in a continuous circular road trip. Srinagar sits at the centre; Gulmarg (51 km west), Pahalgam (90 km south-east), Sonmarg (80 km north-east), and Doodhpathri (42 km south-west) are separate spokes radiating from the capital. For a 5-to-6-night trip, prioritise the Big Four: Srinagar (2 days for Dal Lake, houseboats, and Mughal Gardens), Gulmarg (1 day / 1 night for Gondola and snow slopes), Pahalgam (2 nights for Betaab, Aru, and Lidder river), and Sonmarg (1 day for Thajiwas Glacier). If you have 7+ nights, add Doodhpathri or Gurez Valley.',
+      highlights: [
+        'Base hub: Srinagar (all valleys radiate from here; no direct mountain passes connect Gulmarg to Pahalgam)',
+        'Minimum time needed: 5 nights / 6 days for the core 4 destinations without exhausting daily driving',
+        'Offbeat additions: Doodhpathri (untouched river meadows) and Gurez Valley (remote borderland via Razdan Pass)',
+      ],
+    },
+    placesTable: {
+      caption: 'Kashmir Top Destinations: Verified Distances, Driving Times & 2026 Official Costs',
+      headers: [
+        'Destination',
+        'Distance from Srinagar',
+        'Real Drive Time',
+        'Key Highlights',
+        'Official Costs / Union Rules',
+        'Best Season',
+        'Recommended Stay',
+      ],
+      rows: [
+        {
+          place: 'Srinagar (The Base & Heritage City)',
+          distance: '0 km (Base hub)',
+          drivingTime: '30–45 min from airport',
+          highlights: 'Dal Lake Shikara, Nigeen Lake Houseboats, Shalimar & Nishat Gardens, Pari Mahal, Jamia Masjid Old City',
+          cost: 'Mughal Gardens ₹24/person; Shikara ₹800–₹1,200/hr (Govt fixed rate)',
+          bestSeason: 'All year (Tulips: Apr; Chinars: Oct–Nov)',
+          stay: '2 Nights (1N Houseboat + 1N Hotel)',
+        },
+        {
+          place: 'Gulmarg (Meadow of Flowers & Ski Resort)',
+          distance: '51 km West',
+          drivingTime: '1 hr 45 min (via Tangmarg)',
+          highlights: 'Gondola Phase 1 & Phase 2 (13,780 ft), Apharwat Peak, Drung Waterfall (winter frozen), Golf Course',
+          cost: 'Gondola Phase 1: ₹810; Phase 2: ₹1,010 (Online only via jktpc.in)',
+          bestSeason: 'Dec–Feb (Snow/Ski), May–Jun (Meadows)',
+          stay: '1 Night (guarantees 9 AM Gondola slot)',
+        },
+        {
+          place: 'Pahalgam (Valley of Shepherds)',
+          distance: '90 km South-East',
+          drivingTime: '2 hr 30 min (via NH-44)',
+          highlights: 'Betaab Valley (Hajan), Aru Valley, Chandanwari (Amarnath base), Baisaran Valley, Lidder River',
+          cost: 'Betaab entry ₹100; Local Union Taxi circuit ~₹2,200–₹2,600 (mandatory)',
+          bestSeason: 'Apr–Jun (Lush green), Sep–Oct (Crisp)',
+          stay: '2 Nights (explore without rushing)',
+        },
+        {
+          place: 'Sonmarg (Meadow of Gold & Glaciers)',
+          distance: '80 km North-East',
+          drivingTime: '2 hr 15 min (via Sindh Valley)',
+          highlights: 'Thajiwas Glacier, Zero Point / Zoji La Pass gateway, Sindh River trout streams, Baltal valley',
+          cost: 'Local Union Taxi / Pony to Thajiwas Glacier (~₹1,500–₹2,500 negotiable)',
+          bestSeason: 'May–Oct (Road shuts in deep winter past Gagangeer)',
+          stay: '1 Full Day Trip from Srinagar',
+        },
+        {
+          place: 'Doodhpathri (Valley of Milk)',
+          distance: '42 km South-West',
+          drivingTime: '1 hr 30 min (via Budgam)',
+          highlights: 'Shaliganga riverbed, rolling shepherd meadows, uncrowded pine forest trails',
+          cost: 'Free entry (parking ~₹50); Outside taxis allowed throughout',
+          bestSeason: 'May–Oct (Lush green carpet, serene)',
+          stay: 'Day trip (5–6 hours from Srinagar)',
+        },
+        {
+          place: 'Yusmarg (Meadow of Jesus)',
+          distance: '47 km South-West',
+          drivingTime: '1 hr 45 min (via Charar-i-Sharief)',
+          highlights: 'Doodh Ganga stream, Nilnag alpine lake, quiet hiking trails, Charar-i-Sharief shrine',
+          cost: 'Free entry; Outside taxis permitted',
+          bestSeason: 'May–Oct (Untouched picnic grounds)',
+          stay: 'Day trip from Srinagar',
+        },
+        {
+          place: 'Gurez Valley (Dawar & Borderland)',
+          distance: '123 km North',
+          drivingTime: '5 to 6 hr (via Razdan Pass 11,672 ft)',
+          highlights: 'Habba Khatoon pyramid peak, Dawar border town, turquoise Kishanganga River, log huts',
+          cost: 'Free entry (Indian nationals carry valid Aadhaar for checkposts)',
+          bestSeason: 'Jun–Sep (Razdan Pass snowbound Nov–May)',
+          stay: '2 Nights in Dawar',
+        },
+      ],
+    },
+    negativeAdvice: {
+      title: 'What to Skip & Common Itinerary Mistakes',
+      body:
+        'Most disappointing Kashmir holidays happen when itineraries try to copy aggregator templates that pack five destinations into four days. Here is what we actively advise our private guests to avoid:',
+      items: [
+        'Never attempt Gulmarg to Pahalgam as a single-day commute. There is no direct highway across the Pir Panjal mountains; you must drive down to Srinagar bypass and back up through South Kashmir (4.5 to 5 hours driving alone). Stay in Srinagar or split them into dedicated overnight legs.',
+        'Skip the overhyped Baisaran pony touts during monsoon or early spring thaw. In wet weather, the trail becomes a steep mud ditch where horse handlers charge ₹2,000–₹3,000 for an uncomfortable ride. If you go, hire certified gumboots and check conditions first.',
+        'Do not book Sonmarg between December and mid-March expecting green meadows or easy glacier access. The highway past Gagangeer regularly closes due to heavy snow and avalanche hazards on the Zoji La corridor.',
+        'Avoid purchasing "bargain saffron" from roadside souvenir stalls near Pampore highway stops without verifying purity. Genuine Kashmiri Mongra saffron has a GI tag and costs ₹250–₹350 per gram; anything sold at ₹50/gram is adulterated safflower.',
+      ],
+    },
+    localInsights: {
+      title: 'Operating from Srinagar Since 2013: Our Ground Routing Philosophy',
+      body:
+        'Over 5,000+ hosted journeys, the single biggest difference between a frantic holiday and a memorable one is night allocation. Spending 2 consecutive nights in Pahalgam lets you explore Aru Valley in the morning dew without competing against day-trip tempo travellers arriving from Srinagar. Similarly, booking an overnight stay in Gulmarg guarantees you can board the Gondola Phase 1 at 09:30 AM before the tour buses arriving from Srinagar clog the base terminal line.',
+    },
+    toc: [
+      { id: 'hub-and-spoke-map', title: 'The Hub-and-Spoke Reality: How Kashmir Is Actually Laid Out' },
+      { id: 'the-big-four', title: 'The Big Four: Srinagar, Gulmarg, Pahalgam & Sonmarg' },
+      { id: 'offbeat-meadows', title: 'Offbeat Gems: Doodhpathri, Yusmarg & Gurez Valley' },
+      { id: 'itinerary-clustering', title: 'How to Cluster Places into Real Day Trips' },
+      { id: 'local-taxi-unions', title: 'The Local Union Taxi Rule: What Competitors Omit' },
+      { id: 'what-to-skip', title: 'What to Skip: Honest Negative Advice from Local Operators' },
+      { id: 'practical-costs', title: '2026 Verified Entry Fees, Passes & Permits' },
+    ],
+    faqs: [
+      {
+        q: 'Which are the must-visit places in Kashmir for a first-time trip?',
+        a: 'For a first visit, focus on the core four: Srinagar (Dal Lake, Shankaracharya Temple, and Mughal Gardens), Gulmarg (for the world-famous Gondola and Apharwat Peak), Pahalgam (Betaab Valley, Aru Valley, and the Lidder River), and Sonmarg (Thajiwas Glacier). This combination balances lakes, alpine meadows, pine valleys, and snow glaciers in a 5 to 6-night itinerary.',
+      },
+      {
+        q: 'How many days are needed to see all the main places in Kashmir?',
+        a: 'A minimum of 5 nights / 6 days is required to cover Srinagar, Gulmarg, and Pahalgam comfortably. If you want to include Sonmarg or Doodhpathri without rushing, 6 nights / 7 days is ideal. Remote destinations like Gurez Valley require an extra 2 dedicated nights due to the 6-hour drive over Razdan Pass.',
+      },
+      {
+        q: 'Can we travel directly from Gulmarg to Pahalgam without passing Srinagar?',
+        a: 'No. The Pir Panjal mountain range separates Gulmarg in the west from Pahalgam in the south-east with no direct road. All vehicular routes run through the Srinagar outskirts or Narbal/Bijbehara bypass. The total drive is approximately 140 km and takes 4 to 4.5 hours.',
+      },
+      {
+        q: 'What is the difference between Doodhpathri and Gulmarg?',
+        a: 'Gulmarg is a world-class resort town focused on high-altitude cable cars (reaching 13,780 ft at Apharwat Peak), luxury ski hotels, and winter snow sports. Doodhpathri is an untouched, peaceful river meadow with vast grasslands, pine forests, and roaming sheep, featuring zero commercial cable cars and far fewer tourists. Gulmarg is about high peaks; Doodhpathri is about tranquil picnic meadows.',
+      },
+      {
+        q: 'Why do we need to hire separate local union taxis in Pahalgam and Sonmarg?',
+        a: 'Local transport unions in Pahalgam and Sonmarg restrict outside Srinagar cabs from driving internal sightseeing routes (such as Aru Valley and Betaab Valley in Pahalgam, or Thajiwas Glacier in Sonmarg). Your primary vehicle brings you to the destination, where you hire a union cab with regulated fares (~₹2,200 for Pahalgam circuit). At Glitz Holidays, we declare these union rules clearly up front.',
+      },
+      {
+        q: 'What is the best month to visit the places in Kashmir?',
+        a: 'It depends on your goal: April to June offers blooming gardens and lush green meadows (15°C to 28°C); July and August are perfect for high-altitude trekking; September to November brings crisp weather and golden Chinar leaves; and December to February is the peak winter snow season for skiing in Gulmarg.',
+      },
+    ],
+    content: `
+### The Hub-and-Spoke Reality: How Kashmir Is Actually Laid Out
+Most online travel portals present Kashmir as a linear route where you can hop between valleys in an afternoon. That geography is completely inaccurate.
+
+Srinagar is situated in the central valley floor. Every major destination radiates outward like spokes on a wheel:
+- **Gulmarg (51 km West):** Takes 1 hr 45 min via Narbal and Tangmarg.
+- **Pahalgam (90 km South-East):** Takes 2 hr 30 min via the South Kashmir highway through Awantipora and Anantnag.
+- **Sonmarg (80 km North-East):** Takes 2 hr 15 min along the Sindh River valley toward Ladakh.
+- **Doodhpathri (42 km South-West):** Takes 1 hr 30 min through Budgam district.
+- **Gurez Valley (123 km North):** Takes 5 to 6 hours crossing the Razdan Pass (11,672 ft).
+
+Because high mountain ridges separate these radial valleys, **there are no direct roads connecting Gulmarg to Pahalgam or Pahalgam to Sonmarg**. You must always descend back toward the Srinagar valley basin before ascending into the next valley. Understanding this simple geographic fact will save you from booking an exhausting itinerary.
+
+### The Big Four: Srinagar, Gulmarg, Pahalgam & Sonmarg
+These four destinations form the backbone of 90% of all Kashmir holidays. Each offers a completely distinct landscape and character:
+
+#### 1. Srinagar: Heritage, Houseboats & Mughal Terraces
+Srinagar is not merely a transit airport; it is a historic Himalayan capital with over 2,000 years of culture.
+- **Dal Lake & Nigeen Lake:** Take a dawn shikara ride at 06:00 AM to see the floating vegetable market. Staying one night on a traditional carved cedarwood houseboat on Nigeen Lake gives you peaceful glassy water reflections without the motorboat noise of Dal Gate.
+- **Mughal Gardens:** Built during the 16th and 17th centuries by Emperors Jahangir and Shah Jahan. *Nishat Bagh* (Garden of Bliss) features 12 terraces cascading toward the lake, while *Shalimar Bagh* is famous for its chinar groves and Mughal water fountains. Entry is ₹24 per adult.
+- **Pari Mahal & Shankaracharya Temple:** Pari Mahal (Palace of Fairies) sits atop the Zabarwan ridge and offers the finest sunset vantage point over Dal Lake. Shankaracharya Temple (dedicated to Lord Shiva) requires climbing 240 stone steps for a 360-degree panorama of the entire city.
+- **Old City (Downtown Srinagar):** Walk through the 14th-century wooden Jamia Masjid with its 378 monumental Deodar pillars and explore the copper-engraving bazaars around Zaina Kadal.
+
+#### 2. Gulmarg: Cable Cars & Snow Peaks
+Located at an altitude of 8,694 ft, Gulmarg is Asia’s premier winter ski destination and a cool summer meadow.
+- **The Gulmarg Gondola:** The world’s second-highest operating cable car. *Phase 1 (Kongdoori Valley, 10,050 ft)* offers gentle pine slopes, sledging, and beginner skiing. *Phase 2 (Mount Apharwat shoulder, 13,780 ft)* takes you directly into alpine glacial territory with snow patches lasting well into July. Round-trip combo tickets cost ₹1,820 (Phase 1: ₹810, Phase 2: ₹1,010) and must be booked online weeks in advance at [jktpc.in](https://jktpc.in).
+- **Drung Frozen Waterfall:** Located 16 km before Gulmarg near Tangmarg, this cascading waterfall completely freezes into giant icicles between December and mid-February.
+
+#### 3. Pahalgam: The Pine Valley Along the Lidder River
+Nestled at 7,200 ft where the Sheshnag and Lidder rivers converge, Pahalgam is the greenest, most relaxing valley in Kashmir.
+- **Betaab Valley (Hajan):** Named after the Bollywood movie *Betaab*, this broad valley features manicured lawns surrounded by towering pine cliffs and crystalline glacial riverbeds. Entry fee is ₹100.
+- **Aru Valley:** Situated 12 km further upstream from Pahalgam at 7,900 ft, Aru is a peaceful eco-village that serves as the base camp for the Kolahoi Glacier and Tarsar Marsar alpine lake treks.
+- **Chandanwari:** 16 km from Pahalgam, this is the official roadhead and starting point for the annual Amarnath Yatra pilgrimage.
+- **Baisaran Valley:** Known locally as "Mini Switzerland", this high meadow is reached via a 4 km uphill pony track or hike through dense pine forest.
+
+#### 4. Sonmarg: Alpine Glaciers on the Gateway to Ladakh
+Sitting at 8,960 ft on the banks of the roaring Sindh River, Sonmarg is dramatic, rugged, and glacial.
+- **Thajiwas Glacier:** A massive hanging glacier located 3 km from the main Sonmarg market. You can hike or hire a local pony/union vehicle to the snow line.
+- **Zero Point & Zoji La Pass:** Located 25 km beyond Sonmarg at 11,575 ft, Zero Point offers year-round snow play even in peak June and July. *Note: The pass is subject to weather conditions and traffic timing.*
+
+### Offbeat Gems: Doodhpathri, Yusmarg & Gurez Valley
+If you have more than 6 nights or want to escape tour bus crowds, these three destinations deliver raw Himalayan beauty:
+
+#### 1. Doodhpathri (The Valley of Milk)
+Located just 42 km (1.5 hours) south-west of Srinagar in Budgam district, Doodhpathri is an expansive bowl of lush rolling meadows dissected by the frothing *Shaliganga River*. Unlike Gulmarg, there are no commercial hotels or touts here — just open grasslands, pine forests, and nomadic Gujjar log huts. Outside private taxis are allowed everywhere, making it the most stress-free day trip from Srinagar.
+
+#### 2. Yusmarg (The Meadow of Jesus)
+Sitting at 7,860 ft in the Pir Panjal range, Yusmarg is 47 km from Srinagar. It features quiet walking trails leading to the *Doodh Ganga* roaring river gorge and *Nilnag Lake* (a turquoise lake hidden in deep forest). It is ideal for couples and families seeking quiet nature picnics.
+
+#### 3. Gurez Valley (Dawar & The Kishanganga)
+Located 123 km north of Srinagar along the Line of Control, Gurez is one of Kashmir’s most pristine border valleys. The journey crosses the dramatic *Razdan Pass (11,672 ft)* with sweeping views of Mount Harmukh. In Dawar, the iconic pyramid-shaped *Habba Khatoon peak* towers over the turquoise Kishanganga River. Gurez requires a dedicated 2-night stay and is accessible only between late May and October.
+
+### How to Cluster Places into Real Day Trips
+To avoid spending your holiday trapped inside a car, cluster your sightseeing by geographic corridor:
+
+- **Cluster 1: Central Srinagar (2 Days)**
+  - Day 1: Morning 06:00 AM Shikara on Dal Lake $\\rightarrow$ Nishat & Shalimar Mughal Gardens $\\rightarrow$ Pari Mahal sunset $\\rightarrow$ Dinner at a traditional Wazwan restaurant.
+  - Day 2: Shankaracharya Temple $\\rightarrow$ Jamia Masjid & Old City heritage walk $\\rightarrow$ Check into Nigeen Lake Houseboat $\\rightarrow$ Evening relaxing on the cedar deck.
+- **Cluster 2: Gulmarg Corridor (1 Full Day or 1 Overnight)**
+  - Day trip from Srinagar (Leave by 08:00 AM to board 09:30 AM Gondola Phase 1) or stay overnight at a resort in Gulmarg to enjoy empty evening meadows.
+- **Cluster 3: South Kashmir / Pahalgam (2 Days & 2 Nights)**
+  - Day 1: Drive Srinagar $\\rightarrow$ Pampore saffron fields $\\rightarrow$ Awantipora 9th-century ruins $\\rightarrow$ Pahalgam hotel check-in $\\rightarrow$ Evening walk by the Lidder River.
+  - Day 2: Hire local Union Cab for Aru Valley, Betaab Valley, and Chandanwari $\\rightarrow$ Afternoon hike or relaxation.
+- **Cluster 4: North-East / Sonmarg (1 Full Day)**
+  - Early morning drive along Sindh River $\\rightarrow$ Thajiwas Glacier excursion $\\rightarrow$ Trout lunch by the riverbanks $\\rightarrow$ Return to Srinagar hotel by 06:00 PM.
+- **Cluster 5: The South-West Meadows (1 Full Day)**
+  - Day trip to Doodhpathri or Yusmarg $\\rightarrow$ Leisurely meadow walk and river picnic $\\rightarrow$ Return to Srinagar.
+
+### The Local Union Taxi Rule: What Competitors Omit
+One of the most frequent tourist complaints in Kashmir is arriving in Pahalgam, Sonmarg, or Gulmarg and being told by local drivers that your Srinagar taxi cannot take you for internal sightseeing.
+
+**Here is the exact rule:**
+- **Your Primary Tour Vehicle (from Srinagar):** Can take you from Srinagar to your hotel in Gulmarg, Pahalgam, or Sonmarg, and bring you back.
+- **Local Internal Sightseeing:** Inside Pahalgam (Aru, Betaab, Chandanwari), inside Sonmarg (Zero Point, Thajiwas), and inside Gulmarg (Tangmarg snow chain transfers in winter), internal routes are reserved exclusively for local taxi union drivers with government-regulated fixed rates.
+
+For example, a dedicated union taxi in Pahalgam covering Aru Valley, Betaab Valley, and Chandanwari costs approximately **₹2,200 to ₹2,600 per vehicle** (regulated rate). At Glitz Holidays, our tour managers explain this in advance so you can budget accurately without surprise cash expenses on the ground.
+
+### What to Skip: Honest Negative Advice from Local Operators
+Unlike national travel portals that describe every spot as unmissable, here is our honest guidance on what to skip:
+
+1. **Skip the 4-Night "All-Kashmir" Itinerary:** Trying to do Srinagar + Gulmarg + Pahalgam + Sonmarg in 4 nights means spending 22 out of 48 waking hours on mountain highways. You will remember the asphalt more than the valley. Drop Sonmarg and do Srinagar + Gulmarg + Pahalgam properly.
+2. **Skip Roadside Highway Saffron Touts:** Do not purchase saffron from vendors waving plastic boxes on the highway outside Pampore. Much of it is dyed corn silk or low-grade imported saffron. Buy only from the government-authorized *India International Kashmir Saffron Trading Centre (IIKSTC)* in Pampore or certified Srinagar emporiums with GI-tag authentication.
+3. **Skip Pony Rides at Baisaran if You Enjoy Walking:** The 4 km trail from Pahalgam to Baisaran is a pleasant 45-minute uphill walk through pine forests. Pony operators frequently claim the hike is "impossible on foot" to charge ₹2,000 per horse. If you are reasonably fit, walking is cleaner and far more enjoyable.
+4. **Skip March for Snow Sports or Flower Blooms:** March is Kashmir’s transitional thaw month. The snow at low elevations turns to slush and mud, while the famous Tulip Garden does not open until early April. If you want pristine powder snow, come in January or February; if you want spring flowers, come in April or May.
+
+### 2026 Verified Entry Fees, Passes & Permits
+To help you budget your sightseeing costs with exact figures, here are the official 2026 rates verified by our operations desk:
+
+- **Gulmarg Gondola Phase 1 (Gulmarg to Kongdoori):** ₹810 per person (Round-trip)
+- **Gulmarg Gondola Phase 2 (Kongdoori to Apharwat Peak):** ₹1,010 per person (Round-trip)
+- **Betaab Valley Entry (Pahalgam):** ₹100 per adult, ₹50 per child (J&K Tourism Development Authority)
+- **Mughal Gardens Entry (Nishat, Shalimar, Chashme Shahi, Pari Mahal):** ₹24 per adult, ₹12 per child per garden (J&K Floriculture Dept)
+- **Indira Gandhi Memorial Tulip Garden (Open April only):** ₹60 per adult, ₹25 per child
+- **Dal Lake Shikara Ride (Govt Fixed Rate):** ₹800 (1 hour standard) to ₹1,200 (2 hours including floating market)
+- **Pahalgam Union Sightseeing Cab (Aru + Betaab + Chandanwari):** ₹2,200 to ₹2,600 (Per vehicle, Maruti Omni / Tavera / Sumo)
+- **Permits for Indian Nationals:** None required for Srinagar, Gulmarg, Pahalgam, Sonmarg, or Doodhpathri. For Gurez Valley, keep original government photo ID (Aadhaar/Passport) handy for army transit checkpoints at Razdan Pass.
+    `,
+  },
   {
     slug: 'gulmarg-gondola-booking-guide-2026',
     image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1200&auto=format&fit=crop',
@@ -75,59 +373,6 @@ Tickets are issued exclusively via the official online booking portal of J&K Tou
 1. **Target the 09:30 AM to 10:30 AM Slot:** Weather is clearest in the morning, and queues at the boarding terminal are shortest.
 2. **Dress in Layers:** Temperatures at Phase 2 are typically 10°C to 15°C colder than Gulmarg bowl. Carry windproof jackets, sunglasses, and waterproof gloves.
 3. **Boarding Gate Strategy:** Reach the base station 30 minutes before your slot time with digital QR codes ready on your phone.
-    `,
-  },
-  {
-    slug: 'best-time-to-visit-kashmir-month-by-month',
-    image: 'https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1200&auto=format&fit=crop',
-    title: 'Best Time to Visit Kashmir: Month-by-Month Weather, Snow & Seasonal Guide',
-    subtitle: 'From the spring Tulip blooms in April to summer Dal Lake houseboats, autumn golden Chinars, and winter Gulmarg ski slopes.',
-    summary: 'A seasonal planning guide breaking down Kashmir temperatures, tourist crowds, clothing recommendations, and ideal itineraries across all four distinct seasons.',
-    destination: 'kashmir',
-    destinationName: 'Kashmir',
-    readingTime: '7 min read',
-    author: 'Roohi Akhter',
-    authorRole: 'Chief Travel Curator',
-    publishedAt: '2026-08-20',
-    updatedAt: '2026-08-30',
-    tags: ['Kashmir Seasons', 'Weather Guide', 'Best Time To Visit', 'Planning'],
-    relatedPackages: ['complete-kashmir-6-nights', 'kashmir-honeymoon-5-nights'],
-    toc: [
-      { id: 'spring', title: 'Spring (March to April): Blooms & Tulip Festival' },
-      { id: 'summer', title: 'Summer (May to August): Lush Valleys & Escapes' },
-      { id: 'autumn', title: 'Autumn (September to November): Chinar Foliage' },
-      { id: 'winter', title: 'Winter (December to February): Powder Snow Paradise' },
-    ],
-    faqs: [
-      {
-        q: 'When can I see snow in Kashmir?',
-        a: 'For fresh snowfall in Gulmarg, Pahalgam, and Srinagar, plan between late December and mid-February. For year-round snow glaciers, visit Sonmarg Zero Point (May to October) or Gulmarg Phase 2 Apharwat Peak.',
-      },
-      {
-        q: 'Which month is best for a honeymoon in Kashmir?',
-        a: 'April–May offers pleasant blooming gardens and shikara weather, while January–February is ideal for couples wanting a snow-covered wonderland with cozy fireplace stays.',
-      },
-    ],
-    content: `
-### Spring (March to April): Blooms & Tulip Festival
-Spring is Kashmir awakening from winter slumber. Almond blossoms bloom across Srinagar in late March, followed by the opening of Asia’s largest Tulip Garden at the foothills of Zabarwan range in April.
-- **Temperatures:** 8°C to 18°C.
-- **What to Pack:** Light woollens, a windbreaker jacket, and comfortable walking shoes.
-
-### Summer (May to August): Lush Valleys & Escapes
-When the Indian plains swelter, Kashmir is green and cool. Aru Valley, Betaab Valley, and Doodhpathri meadow streams are in full flow.
-- **Temperatures:** 15°C to 28°C.
-- **What to Pack:** Cotton daywear with light evening jackets or cardigans.
-
-### Autumn (September to November): Chinar Foliage
-Kashmir turns fiery gold and crimson as iconic Chinar leaves change color. The weather is crisp, skies are azure, and crisp saffron harvest begins in Pampore.
-- **Temperatures:** 5°C to 20°C.
-- **What to Pack:** Medium woollens, shawls, and thermals for late October/November.
-
-### Winter (December to February): Powder Snow Paradise
-The famous *Chillai Kalan* brings heavy snowfall to Gulmarg and Pahalgam. Gulmarg becomes a world-class skiing hub, and Dal Lake freezes along its edges.
-- **Temperatures:** -6°C to 7°C.
-- **What to Pack:** Heavy down jackets, thermal innerwear, snow boots, and woollen beanies.
     `,
   },
   {

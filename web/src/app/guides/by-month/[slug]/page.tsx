@@ -257,6 +257,17 @@ export default async function MonthHubPage({ params }: { params: Params }) {
               </div>
 
               <Link
+                href="/guides/places-to-visit-in-kashmir"
+                className="lift group flex items-center justify-between gap-3 rounded-2xl border border-paper-300 bg-paper-50 p-5 transition-colors hover:border-gold-400 hover:bg-white"
+              >
+                <div>
+                  <p className="kicker">Sightseeing guide</p>
+                  <p className="display mt-1.5 text-[17px] text-ink-900">Places to Visit in Kashmir</p>
+                </div>
+                <ArrowUpRight className="arrow-slide size-5 shrink-0 text-gold-600" strokeWidth={2} />
+              </Link>
+
+              <Link
                 href="/destinations/kashmir"
                 className="lift group flex items-center justify-between gap-3 rounded-2xl border border-paper-300 bg-paper-50 p-5 transition-colors hover:border-gold-400 hover:bg-white"
               >
