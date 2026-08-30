@@ -1,13 +1,21 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Check, ArrowUpRight } from 'lucide-react';
+import { Check, ArrowUpRight, AlertTriangle, Equal, Sparkles } from 'lucide-react';
 import { TRAVEL_STYLES, getTravelStyle } from '@/lib/travel-styles';
 import { packagesForStyle } from '@/lib/packages';
 import { PackageCard, SectionHead, Faq, JsonLd } from '@/components/cards';
 import { PageHero } from '@/components/page-hero';
 import { EnquiryForm } from '@/components/enquiry-form';
 import { SITE } from '@/lib/site';
+
+/** Month verdicts get a colour and a word, so the table scans without reading. */
+const VERDICT = {
+  best: { label: 'Best', cls: 'bg-pine-100 text-pine-700 border-pine-200' },
+  good: { label: 'Good', cls: 'bg-gold-50 text-gold-700 border-gold-200' },
+  mixed: { label: 'Mixed', cls: 'bg-paper-100 text-ink-600 border-paper-300' },
+  avoid: { label: 'Avoid', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+} as const;
 
 type Params = Promise<{ slug: string }>;
 
@@ -19,13 +27,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { slug } = await params;
   const s = getTravelStyle(slug);
   if (!s) return {};
+  const description = s.metaDescription ?? s.intro.slice(0, 158);
   return {
     title: s.seoTitle,
-    description: `${s.intro.slice(0, 158)}`,
+    description,
     alternates: { canonical: `/travel-styles/${s.slug}` },
     openGraph: {
       title: s.seoTitle,
-      description: s.intro,
+      description,
       url: `${SITE.domain}/travel-styles/${s.slug}`,
       type: 'website',
     },
@@ -41,6 +50,21 @@ export default async function TravelStylePage({ params }: { params: Params }) {
   const url = `${SITE.domain}/travel-styles/${s.slug}`;
 
   const jsonLd = [
+    ...(s.author
+      ? [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            '@id': `${url}#article`,
+            headline: s.seoTitle,
+            description: s.metaDescription ?? s.intro,
+            url,
+            author: { '@type': 'Person', name: s.author.name, jobTitle: s.author.role },
+            publisher: { '@id': `${SITE.domain}/#org` },
+            ...(s.updatedAt ? { dateModified: s.updatedAt } : {}),
+          },
+        ]
+      : []),
     {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
@@ -78,6 +102,89 @@ export default async function TravelStylePage({ params }: { params: Params }) {
         background={s.hero}
       />
 
+      {/* ── direct answer: the primary query, answered before anything else */}
+      {s.answer && (
+        <section className="section-sm mesh-warm">
+          <div className="wrap-narrow" data-reveal>
+            <div className="rounded-2xl border border-paper-300 bg-white p-7 shadow-lg md:p-9">
+              <h2 className="display d3 text-ink-900">{s.answer.heading}</h2>
+              <div className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-y border-paper-200 py-5">
+                <span className="display text-[44px] leading-none text-gold-700 tabular-nums">
+                  {s.answer.figure}
+                </span>
+                <span className="text-[13px] text-ink-500">{s.answer.figureNote}</span>
+              </div>
+              <p className="mt-6 text-[16px] leading-[1.75] text-ink-700">{s.answer.body}</p>
+              {s.author && (
+                <p className="mt-6 border-t border-paper-200 pt-4 text-[12.5px] text-ink-500">
+                  Written by <span className="font-medium text-ink-800">{s.author.name}</span>,{' '}
+                  {s.author.role}
+                  {s.updatedAt && (
+                    <>
+                      {' '}&middot; last verified{' '}
+                      <time dateTime={s.updatedAt}>
+                        {new Date(s.updatedAt).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </time>
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── price decoder: the information gain competitors will not publish */}
+      {s.priceDecoder && (
+        <section className="section-sm border-y border-paper-200 bg-paper-100">
+          <div className="wrap-narrow" data-reveal>
+            <p className="kicker">Read the small print</p>
+            <h2 className="display d2 mt-3 text-ink-900">{s.priceDecoder.heading}</h2>
+            <p className="mt-5 text-[15.5px] leading-[1.8] text-ink-600">
+              {s.priceDecoder.intro}
+            </p>
+
+            <div className="scroll-x mt-9 overflow-x-auto rounded-2xl border border-paper-300 bg-white">
+              <table className="w-full min-w-[540px] text-left text-[14px]">
+                <thead>
+                  <tr className="border-b border-paper-300 bg-paper-100">
+                    <th scope="col" className="w-[34%] px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      What you see
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      What it usually means
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {s.priceDecoder.rows.map((r, i) => (
+                    <tr
+                      key={r.claim}
+                      className={i < s.priceDecoder!.rows.length - 1 ? 'border-b border-paper-200' : ''}
+                    >
+                      <th scope="row" className="px-5 py-4 align-top font-medium text-ink-900">
+                        {r.claim}
+                      </th>
+                      <td className="px-5 py-4 align-top leading-relaxed text-ink-600">
+                        {r.reality}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="mt-7 rounded-2xl border-l-[3px] border-gold-400 bg-gold-50 p-5 text-[14.5px] leading-relaxed text-ink-700">
+              {s.priceDecoder.conclusion}
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* long-form */}
       <section className="section-sm mesh-warm">
         <div className="wrap-narrow" data-reveal>
@@ -98,6 +205,121 @@ export default async function TravelStylePage({ params }: { params: Params }) {
           </div>
         </div>
       </section>
+
+      {/* ── commodity vs real differentiators */}
+      {s.commodity && (
+        <section className="section-sm">
+          <div className="wrap-narrow">
+            <div data-reveal>
+              <p className="kicker">Comparing operators</p>
+              <h2 className="display d2 mt-3 text-ink-900">{s.commodity.heading}</h2>
+              <p className="mt-5 text-[15.5px] leading-[1.8] text-ink-600">
+                {s.commodity.intro}
+              </p>
+            </div>
+
+            <div data-reveal className="mt-9 rounded-2xl border border-paper-300 bg-paper-100 p-6">
+              <h3 className="flex items-center gap-2.5 text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                <Equal className="size-4" strokeWidth={2.4} />
+                Identical everywhere — ignore when comparing
+              </h3>
+              <ul className="mt-4 flex flex-wrap gap-2">
+                {s.commodity.same.map((item) => (
+                  <li
+                    key={item}
+                    className="rounded-full border border-paper-300 bg-white px-3.5 py-1.5 text-[13px] text-ink-600"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div data-reveal-group className="mt-5 grid gap-4 md:grid-cols-2">
+              {s.commodity.different.map((d) => (
+                <div
+                  key={d.label}
+                  className="rounded-2xl border border-paper-300 bg-white p-6"
+                >
+                  <h3 className="flex items-start gap-2.5 text-[15px] font-semibold text-ink-900">
+                    <Sparkles className="mt-0.5 size-4 shrink-0 text-gold-600" strokeWidth={2.2} />
+                    {d.label}
+                  </h3>
+                  <p className="mt-2.5 text-[14px] leading-relaxed text-ink-600">{d.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── month table */}
+      {s.months && (
+        <section className="section-sm border-y border-paper-200 bg-paper-100">
+          <div className="wrap-narrow" data-reveal>
+            <p className="kicker">Month by month</p>
+            <h2 className="display d2 mt-3 text-ink-900">
+              When to go, and the month to skip.
+            </h2>
+            <div className="scroll-x mt-8 overflow-x-auto rounded-2xl border border-paper-300 bg-white">
+              <table className="w-full min-w-[520px] text-left text-[14px]">
+                <thead>
+                  <tr className="border-b border-paper-300 bg-paper-100">
+                    <th scope="col" className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      Month
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      Verdict
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      What to expect
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {s.months.map((m, i) => (
+                    <tr
+                      key={m.month}
+                      className={i < s.months!.length - 1 ? 'border-b border-paper-200' : ''}
+                    >
+                      <th scope="row" className="whitespace-nowrap px-5 py-3.5 font-medium text-ink-900">
+                        {m.month}
+                      </th>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${VERDICT[m.verdict].cls}`}
+                        >
+                          {VERDICT[m.verdict].label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 leading-relaxed text-ink-600">{m.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── the honest negative */}
+      {s.negative && (
+        <section className="section-sm">
+          <div className="wrap-narrow" data-reveal>
+            <div className="flex gap-5 rounded-2xl border border-paper-300 bg-white p-7 md:p-9">
+              <AlertTriangle className="mt-1 size-6 shrink-0 text-gold-600" strokeWidth={1.9} />
+              <div>
+                <h2 className="display text-[26px] leading-snug text-ink-900">
+                  {s.negative.heading}
+                </h2>
+                <p className="mt-4 text-[15.5px] leading-[1.8] text-ink-600">
+                  {s.negative.body}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* promises */}
       <section className="mesh-pine grain section relative isolate overflow-hidden">
