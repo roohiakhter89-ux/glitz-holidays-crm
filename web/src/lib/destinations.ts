@@ -42,7 +42,7 @@ export const DESTINATIONS: Destination[] = [
       "Dal Lake at first light. Gulmarg's gondola climbing into cloud. Sonmarg's glacier meadows, Pahalgam's pine valleys. Kashmir is India's most complete mountain destination — and we've lived here our whole lives.",
     body: [
       "Most Kashmir itineraries you'll find online were written by someone who has never spent a winter here. They send you to Gulmarg on the one day the gondola is shut, book you into a houseboat on the wrong side of the lake, and route Pahalgam and Sonmarg back-to-back so you spend two full days in a car.",
-      "We build it differently because we live here. Our office is in Rajbagh, a fifteen-minute drive from Dal Gate. Our drivers are Kashmiri. When we tell you late April is better than early April, it's because we drove that road last week.",
+      "We build it differently because we live here. Our office is in Hawal, a fifteen-minute drive from Dal Gate. Our drivers are Kashmiri. When we tell you late April is better than early April, it's because we drove that road last week.",
       "A Kashmir trip works best across five to seven nights: three in Srinagar as your base, one or two in Gulmarg or Pahalgam, and a full unhurried day for Sonmarg. Anything shorter and the valley becomes a checklist. Anything longer and you'll want to start adding Doodhpathri and Yusmarg — which, honestly, you should.",
     ],
     bestTime: 'March to October, plus December to February for snow',

@@ -31,7 +31,7 @@ export const metadata = {
 
 const TRUST = [
   'Srinagar-based, not a reseller',
-  '4,000+ guests hosted',
+  `${SITE.stats.guests} guests hosted`,
   'Own fleet, own drivers',
   'Hotels we have slept in',
   '24×7 on-trip WhatsApp',
@@ -186,7 +186,7 @@ export default function HomePage() {
           </div>
         </div>
         <p className="sr-only">
-          Srinagar-based DMC. Over 4,000 guests hosted. Own fleet and drivers.
+          Srinagar-based DMC since 2013. Over 5,000 guests hosted. Own fleet and drivers.
           24×7 on-trip WhatsApp support. GST-inclusive pricing.
         </p>
       </section>

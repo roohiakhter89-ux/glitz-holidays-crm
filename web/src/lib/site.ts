@@ -9,38 +9,55 @@ export const SITE = {
   tagline: 'Srinagar-based DMC · Handcrafted Himalayan journeys',
   domain: 'https://glitz-holidays.in',
   landerDomain: 'https://go.glitz-holidays.in',
-  founded: '2019',
+
+  /**
+   * NAP (name / address / phone) below is taken from the live Google
+   * Business Profile, NOT invented. Local SEO depends on these matching
+   * the GBP listing character-for-character across every citation — if
+   * the GBP is ever edited, edit here in the same sitting.
+   */
+  founded: '2013',
 
   phone: {
-    display: '+91 70068 41384',
-    tel: '+917006841384',
-    wa: '917006841384',
+    display: '+91 78895 30413',
+    tel: '+917889530413',
+    wa: '917889530413',
   },
-  email: 'glitzholidaysofficial@gmail.com',
+  email: 'contact@glitzholidays.in',
 
   address: {
-    street: 'Rajbagh',
+    street: 'Firdous Cinema Bus Stop, NH-1D, Hawal',
     city: 'Srinagar',
     region: 'Jammu & Kashmir',
-    postalCode: '190008',
+    postalCode: '190002',
     country: 'IN',
   },
 
-  /** Approximate office coords — used for LocalBusiness JSON-LD. */
-  geo: { lat: 34.0656, lng: 74.8181 },
+  /** Approximate office coords (Hawal, Srinagar) — for LocalBusiness JSON-LD. */
+  geo: { lat: 34.1027, lng: 74.8156 },
 
   hours: 'Mon–Sun, 10:00–21:00 IST',
 
   social: {
-    instagram: 'https://instagram.com/glitzholidays',
+    instagram: 'https://instagram.com/glitzholidays9',
     facebook: 'https://facebook.com/glitzholidays',
   },
 
+  /**
+   * Verified against the Google Business Profile knowledge panel on
+   * 30 Aug 2026 (4.8 ★ / 604 reviews) and the glitzholidays.in about copy
+   * (5,000+ travellers, 120+ partner hotels, est. 2013).
+   *
+   * The rating and reviewCount feed AggregateRating JSON-LD. Publishing
+   * numbers that do not match the GBP is a structured-data violation, so
+   * re-check these whenever the GBP count moves materially.
+   */
   stats: {
-    guests: '4,000+',
-    rating: '4.9',
-    reviewCount: 212,
-    years: '6',
+    guests: '5,000+',
+    rating: '4.8',
+    reviewCount: 604,
+    years: '12',
+    hotels: '120+',
   },
 
   gtmId: 'GTM-K2QMV9NM',

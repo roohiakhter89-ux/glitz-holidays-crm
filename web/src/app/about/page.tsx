@@ -8,7 +8,7 @@ import { EnquiryForm } from '@/components/enquiry-form';
 
 export const metadata: Metadata = {
   title: 'About Us — A Srinagar-Based Himalayan DMC',
-  description: `Glitz Holidays is a destination management company based in Rajbagh, Srinagar. Founded ${SITE.founded}, ${SITE.stats.guests} guests hosted across Kashmir, Ladakh, Himachal and Vaishno Devi.`,
+  description: `Glitz Holidays is a destination management company based in Hawal, Srinagar. Founded ${SITE.founded}, ${SITE.stats.guests} guests hosted across Kashmir, Ladakh, Himachal and Vaishno Devi.`,
   alternates: { canonical: '/about' },
 };
 
@@ -49,7 +49,7 @@ export default function AboutPage() {
       <JsonLd data={jsonLd} />
 
       <PageHero
-        kicker={`Founded ${SITE.founded} · Rajbagh, Srinagar`}
+        kicker={`Founded ${SITE.founded} · Hawal, Srinagar`}
         title="Locals who fell in love with hosting."
         lede="We started because we were tired of watching agencies a thousand miles away mis-sell our own valley to people who deserved better."
         crumbs={[{ label: 'Home', href: '/' }, { label: 'About' }]}
@@ -64,11 +64,11 @@ export default function AboutPage() {
                 Glitz Holidays started in {SITE.founded} when a few Srinagar friends
                 grew tired of watching agencies from Delhi and Mumbai sell our valley
                 to visitors who then arrived to find the itinerary did not match the
-                place. We opened a small office in Rajbagh, bought one Innova, and
+                place. We opened a small office in Hawal, bought one Innova, and
                 started arranging trips for friends of friends.
               </p>
               <p className="text-[15.5px] leading-[1.8] text-ink-600">
-                Six years and {SITE.stats.guests} guests later we still work the same
+                Twelve years and {SITE.stats.guests} guests later we still work the same
                 way. We answer every enquiry ourselves. We host every itinerary
                 ourselves. We stand behind every hotel we book, because someone on
                 this team has slept in it. When you message us at 11pm from Gulmarg,
