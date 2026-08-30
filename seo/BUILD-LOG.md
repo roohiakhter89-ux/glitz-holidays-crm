@@ -8,14 +8,14 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 70 of 270**
+**Progress: 157 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
 | 0 · Proven converters | 7 | 7 |
 | 1 · Origin city | 47 | 47 |
 | 2 · Honeymoon & family | 4 | 22 |
-| 3 · Transport routes | 1 | 88 |
+| 3 · Transport routes | 88 | 88 |
 | 4 · Place × intent | 1 | 86 |
 | 5 · Month hubs | 10 | 10 |
 | 6 · Hindi | 0 | 10 |
@@ -25,6 +25,31 @@ consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 023 — /routes/* (Tier 3 completed: all 88 transport route guides)
+**31 Aug 2026 · Tier 3 · 87 new transport route pairs (88 of 88 completed)**
+
+Completes the entire Tier 3 Transport Routes cluster (replaces 157 fragmented mode queries with 88 unified, multi-mode guides carrying real flight schedules, train corridors, and mountain road distances).
+
+**Key route categories deployed:**
+1. **Intra-J&K Transit Corridors:**
+   - `/routes/katra-to-srinagar` (1,835 impr, 1.0 conv) & `/routes/jammu-to-srinagar` (1,368 impr, 1.0 conv) — 2026 Vande Bharat rail timetable across the Chenab Rail Bridge, 35-minute flights, and NH44 mountain driving conditions.
+   - `/routes/srinagar-to-gulmarg` (639 impr, 4.0 conv) — 51 km driving distance, Tangmarg snow-chain rules, and union cab requirements.
+   - `/routes/srinagar-to-pahalgam` (536 impr) — 90 km drive along Lidder river, Awantipora ruins, Pampore saffron fields, local Pahalgam union stand rules.
+   - `/routes/srinagar-to-sonmarg` (245 impr) — 80 km Sindh gorge drive, Thajiwas glacier pony routes, Gagangeer winter road closure.
+   - `/routes/srinagar-to-leh` (164 impr) — 418 km trans-Himalayan NH1 road trip guide (mandatory Kargil night halt, Zoji La & Fotu La passes, flight alternatives).
+   - Plus `/routes/jammu-to-pahalgam`, `/routes/katra-to-pahalgam`, `/routes/banihal-to-srinagar`, `/routes/jammu-to-patnitop`, `/routes/katra-to-patnitop`, `/routes/delhi-to-katra`.
+
+2. **Major Indian City to Kashmir/Srinagar Corridors (70+ origin routes):**
+   - Metro pairs: Mumbai, Bangalore, Hyderabad, Kolkata, Chennai, Pune, Ahmedabad, Chandigarh, Jaipur, Lucknow, Amritsar, Dehradun, Indore, Kochi, Patna, Guwahati, Nagpur, Bhopal, Vadodara, Kanpur, Varanasi, Raipur, Ranchi, Coimbatore, Trivandrum, Mangalore, Ludhiana, Jalandhar, Agra.
+   - Each route carries explicit flight durations, direct train connections via the Chenab Bridge corridor, and multi-day driving distances with recommended night halts.
+
+**Linkgraph verification:**
+- Total site routes increased from 108 to 195 static pages.
+- Every route sits at depth 3 with 88 main-content inlinks from `/routes` and links back to its origin city package page.
+- 0 non-utility orphans sitewide.
 
 ---
 
