@@ -37,44 +37,80 @@ import { CommandPalette } from '@/components/command-palette';
  * backend — this map controls only whether the PAGE itself is reachable.
  */
 const OWNER_ONLY: string[] = ['OWNER', 'SUPER_ADMIN'];
-const NAV: {
+const ALL_STAFF = ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'];
+
+type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
   roles: string[];
-}[] = [
-  { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
-  { href: '/leads',       label: 'Leads',       icon: Users,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
-  { href: '/b2b-partners',label: 'B2B Partners',icon: Users,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
-  { href: '/follow-ups',  label: 'Follow-ups',  icon: AlarmClock,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','OPERATIONS'] },
-  { href: '/itineraries', label: 'Itineraries', icon: Map,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
-  { href: '/bookings',    label: 'Bookings',    icon: CalendarCheck,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
-  { href: '/marketing',        label: 'Marketing',       icon: Megaphone,
-    roles: ['OWNER','SUPER_ADMIN','MARKETING'] },
-  { href: '/marketing/social', label: 'Social Studio',   icon: Globe,
-    roles: ['OWNER','SUPER_ADMIN','MARKETING','SALES_MANAGER'] },
-  { href: '/attribution', label: 'Attribution', icon: TrendingUp,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','MARKETING'] },
-  { href: '/finance',     label: 'Finance',     icon: Wallet,
-    roles: ['OWNER','SUPER_ADMIN','ACCOUNTS'] },
-  { href: '/reports',     label: 'Reports',     icon: BarChart3,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','ACCOUNTS','MARKETING','OPERATIONS'] },
-  { href: '/seo',         label: 'SEO',         icon: Globe,
-    roles: ['OWNER','SUPER_ADMIN','MARKETING'] },
-  { href: '/vendors',     label: 'Suppliers',   icon: Building2,
-    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
-  { href: '/people',      label: 'People',      icon: UserCog,
-    roles: ['OWNER','SUPER_ADMIN','ACCOUNTS'] },
-  { href: '/users',       label: 'Access',      icon: ShieldCheck, roles: OWNER_ONLY },
-  { href: '/integrations',label: 'Integrations',icon: Plug,        roles: OWNER_ONLY },
-  { href: '/settings',    label: 'Settings',    icon: Settings,    roles: OWNER_ONLY },
+};
+
+type NavGroup = { label: string | null; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: null,
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ALL_STAFF },
+    ],
+  },
+  {
+    label: 'Sales',
+    items: [
+      { href: '/leads',        label: 'Leads',        icon: Users,         roles: ALL_STAFF },
+      { href: '/b2b-partners', label: 'B2B Partners', icon: Users,         roles: ALL_STAFF },
+      { href: '/follow-ups',   label: 'Follow-ups',   icon: AlarmClock,
+        roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','OPERATIONS'] },
+      { href: '/itineraries',  label: 'Itineraries',  icon: Map,
+        roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+      { href: '/bookings',     label: 'Bookings',     icon: CalendarCheck,
+        roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+    ],
+  },
+  {
+    label: 'Growth',
+    items: [
+      { href: '/marketing',        label: 'Marketing',     icon: Megaphone,
+        roles: ['OWNER','SUPER_ADMIN','MARKETING'] },
+      { href: '/marketing/social', label: 'Social Studio', icon: Globe,
+        roles: ['OWNER','SUPER_ADMIN','MARKETING','SALES_MANAGER'] },
+      { href: '/attribution',      label: 'Attribution',   icon: TrendingUp,
+        roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','MARKETING'] },
+      { href: '/seo',              label: 'SEO',           icon: Globe,
+        roles: ['OWNER','SUPER_ADMIN','MARKETING'] },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { href: '/finance', label: 'Finance', icon: Wallet,
+        roles: ['OWNER','SUPER_ADMIN','ACCOUNTS'] },
+      { href: '/reports', label: 'Reports', icon: BarChart3,
+        roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','ACCOUNTS','MARKETING','OPERATIONS'] },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { href: '/vendors', label: 'Suppliers', icon: Building2,
+        roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+      { href: '/people',  label: 'People',    icon: UserCog,
+        roles: ['OWNER','SUPER_ADMIN','ACCOUNTS'] },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { href: '/users',        label: 'Access',       icon: ShieldCheck, roles: OWNER_ONLY },
+      { href: '/integrations', label: 'Integrations', icon: Plug,        roles: OWNER_ONLY },
+      { href: '/settings',     label: 'Settings',     icon: Settings,    roles: OWNER_ONLY },
+    ],
+  },
 ];
+
+/** Flat list still needed by the route guard below. */
+const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 export default function AppLayout({
   children,
@@ -147,30 +183,48 @@ export default function AppLayout({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {NAV.filter((n) => !user || n.roles.includes(user.role)).map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+      <nav className="flex-1 overflow-y-auto p-3">
+        {NAV_GROUPS.map((group, gi) => {
+          const visible = group.items.filter((n) => !user || n.roles.includes(user.role));
+          if (visible.length === 0) return null;
           return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]',
-                'transition-[background-color,color,transform] duration-150 ease-out',
-                active
-                  ? 'bg-signal-600/8 text-signal-600 font-medium'
-                  : 'text-ink-400 hover:bg-ink-850 hover:text-ink-200 hover:translate-x-0.5',
+            <div key={group.label ?? `_g${gi}`} className={cn(gi > 0 && 'mt-4')}>
+              {group.label && (
+                <p className="mb-1 px-3 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-500">
+                  {group.label}
+                </p>
               )}
-            >
-              {active && (
-                <span
-                  aria-hidden
-                  className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-brand-500"
-                />
-              )}
-              <Icon className="size-4" strokeWidth={1.75} />
-              {label}
-            </Link>
+              <div className="space-y-0.5">
+                {visible.map(({ href, label, icon: Icon }) => {
+                  const active =
+                    href === '/marketing'
+                      ? pathname === '/marketing'
+                      : pathname.startsWith(href);
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={cn(
+                        'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]',
+                        'transition-[background-color,color,transform] duration-150 ease-out',
+                        active
+                          ? 'bg-signal-600/8 text-signal-600 font-medium'
+                          : 'text-ink-400 hover:bg-ink-850 hover:text-ink-200 hover:translate-x-0.5',
+                      )}
+                    >
+                      {active && (
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-brand-500"
+                        />
+                      )}
+                      <Icon className="size-4" strokeWidth={1.75} />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
