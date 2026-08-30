@@ -27,8 +27,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
     .reduce((min, p) => (p.priceFrom < min ? p.priceFrom : min), Infinity);
 
-  const title = `Kashmir Tour Packages from ${c.name} — Itineraries & Prices from ${inr(cheapest)}`;
-  const description = `${c.summary} Day-by-day itineraries, GST-inclusive land prices from ${inr(cheapest)} per person, and honest advice on flights and timing from ${c.name}.`;
+  const title = `Kashmir Tour Packages from ${c.name}`;
+  const description = `Kashmir tour packages from ${c.name}. Land packages from ${inr(cheapest)} per person with hotels, private cab & shikara. Direct advice on ${c.name} flights & timing.`;
 
   return {
     title,

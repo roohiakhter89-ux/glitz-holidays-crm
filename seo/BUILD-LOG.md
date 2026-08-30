@@ -8,12 +8,12 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 19 of 270**
+**Progress: 61 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
 | 0 · Proven converters | 7 | 7 |
-| 1 · Origin city | 5 | 47 |
+| 1 · Origin city | 47 | 47 |
 | 2 · Honeymoon & family | 4 | 22 |
 | 3 · Transport routes | 1 | 88 |
 | 4 · Place × intent | 1 | 86 |
@@ -25,6 +25,26 @@ consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 021 — /packages/from/* (Tier 1 completed: all 47 origin cities)
+**31 Aug 2026 · Tier 1 · 42 new origin cities added (47 of 47 completed)**
+
+Completes the entire Tier 1 departure-city programmatic cluster backed by the all-time search terms manifest (**7.29% CTR, 65+ conversions**).
+
+**Cities deployed (42 additions):** Chennai, Pune, Ahmedabad, Chandigarh, Lucknow, Jaipur, Amritsar, Nagpur, Indore, Kochi, Guwahati, Patna, Dehradun, Varanasi, Bhopal, Vadodara, Ludhiana, Jalandhar, Kanpur, Agra, Jodhpur, Udaipur, Raipur, Ranchi, Coimbatore, Trivandrum, Calicut, Mangalore, Mysore, Nashik, Aurangabad, Rajkot, Siliguri, Gwalior, Jabalpur, Allahabad, Meerut, Noida, Gurgaon, Madurai, Vijayawada, Visakhapatnam.
+
+**Information gain:**
+1. **True Distance & Connection Risk:** Layovers specified with 2+ hour buffers (especially for South/East Indian origins via DEL/BOM) to guard against North Indian winter fog delays.
+2. **First-Day Realities:** Departure-timed Day 1 structure (e.g. morning Chandigarh/Delhi flights getting afternoon Dal Lake shikaras vs late South India arrivals getting direct hotel check-in and evening rest).
+3. **Local Dietary & Cultural Nuances:** Pure-veg/Jain catering vetted in Pahalgam/Gulmarg for Ahmedabad/Rajkot/Surat guests; North Indian comfort foods for UP/MP families.
+4. **Honesty Rule Enforced:** `flight` and `train` facts nullable and quoted live rather than statically invented.
+
+**Linkgraph verification:**
+- Total site routes increased from 55 to 97 pages.
+- Every origin city receives 47 to 57 main-content inlinks at crawl depth 2.
+- 0 non-utility orphans sitewide.
 
 ---
 
