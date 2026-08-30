@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/**
+ * Premium editorial design tokens.
+ * Reference: Aman, Six Senses, Andaz — muted, saturated, serif-forward.
+ */
+@theme {
+  /* Ink neutrals (near-black to warm off-white) */
+  --color-ink-950: #0f0d0a;
+  --color-ink-900: #1a1613;
+  --color-ink-800: #2a2420;
+  --color-ink-700: #3d342e;
+  --color-ink-600: #574a41;
+  --color-ink-500: #7a6c62;
+  --color-ink-400: #a49689;
+  --color-ink-300: #c9beb2;
+  --color-ink-200: #e4dcd0;
+  --color-ink-100: #f2ede4;
+  --color-ink-50:  #faf6ef;
+
+  /* Brand: warm gold — Glitz identity, restrained */
+  --color-brand-50:  #fbf6e9;
+  --color-brand-100: #f5e9c2;
+  --color-brand-300: #e0c17a;
+  --color-brand-500: #b8933a;
+  --color-brand-600: #97781f;
+  --color-brand-700: #755d15;
+
+  /* Signal: deep pine — for links & subtle accents */
+  --color-signal-500: #2f5d4a;
+  --color-signal-600: #234737;
+
+  /* Typography */
+  --font-display: 'Fraunces', 'Georgia', 'Times New Roman', serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Root paint — warm off-white paper stock, not white */
+html, body {
+  background: var(--color-ink-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial headline treatment */
+.display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+}
+
+/* Container max, generous but not stretched */
+.container-editorial {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) {
+  .container-editorial { padding-inline: 2rem; }
+}
+
+/* Selection: gold on ink */
+::selection {
+  background: var(--color-brand-300);
+  color: var(--color-ink-950);
+}
+
+/* Focus rings — visible but restrained */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Utility: hairline divider that reads as ink not grey */
+.divider-hair {
+  height: 1px;
+  background: color-mix(in oklab, var(--color-ink-900) 12%, transparent);
+}
