@@ -1,25 +1,13 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Check, Clock, MapPin, Snowflake } from 'lucide-react';
-import { DESTINATIONS, getDestination } from '@/lib/destinations';
+import Link from 'next/link';
+import { Check, ArrowUpRight, Info } from 'lucide-react';
+import { DESTINATIONS, getDestination, TONE_HERO } from '@/lib/destinations';
+import { packagesFor } from '@/lib/packages';
+import { PackageCard, SectionHead, Faq, JsonLd } from '@/components/cards';
+import { PageHero, FactStrip } from '@/components/page-hero';
 import { EnquiryForm } from '@/components/enquiry-form';
-import { SITE } from '@/lib/site';
-
-/**
- * Destination-hero placeholder gradients. Deleted once
- * /public/images/destinations/<slug>-hero.jpg lands.
- */
-const HERO_BG: Record<string, string> = {
-  kashmir:
-    'linear-gradient(180deg, rgba(15,13,10,0.30) 0%, rgba(15,13,10,0.80) 100%), radial-gradient(140% 100% at 30% 20%, #4a6d7c 0%, #1a2f3a 55%, #0f1a22 100%)',
-  ladakh:
-    'linear-gradient(180deg, rgba(15,13,10,0.30) 0%, rgba(15,13,10,0.80) 100%), radial-gradient(140% 100% at 60% 25%, #d4a574 0%, #7d5a3d 55%, #2a1d14 100%)',
-  himachal:
-    'linear-gradient(180deg, rgba(15,13,10,0.30) 0%, rgba(15,13,10,0.80) 100%), radial-gradient(140% 100% at 50% 20%, #4d6b4a 0%, #263b28 60%, #12191a 100%)',
-  'vaishno-devi':
-    'linear-gradient(180deg, rgba(15,13,10,0.30) 0%, rgba(15,13,10,0.80) 100%), radial-gradient(140% 100% at 40% 30%, #c8721a 0%, #7a3e0d 55%, #2a1408 100%)',
-};
-const HERO_BG_DEFAULT = HERO_BG.kashmir;
+import { SITE, inr } from '@/lib/site';
 
 type Params = Promise<{ slug: string }>;
 
@@ -27,46 +15,52 @@ export function generateStaticParams() {
   return DESTINATIONS.map((d) => ({ slug: d.slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Params;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
   const d = getDestination(slug);
   if (!d) return {};
-  const title = `${d.name} Tour Packages — ${d.duration} from ₹${d.startingFrom.toLocaleString('en-IN')}`;
-  const description = `${d.intro.slice(0, 155)}`;
-  const url = `${SITE.domain}/destinations/${d.slug}`;
+
+  const title = `${d.seoTitle} — ${d.idealDuration} from ${inr(d.startingFrom)}`;
+  const description = `${d.seoTitle} by a Srinagar-based DMC. ${d.regions
+    .slice(0, 4)
+    .map((r) => r.name)
+    .join(', ')}. Best time: ${d.bestMonths}. All-inclusive itineraries from ${inr(d.startingFrom)} per person.`;
+
   return {
     title,
     description,
-    alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
+    alternates: { canonical: `/destinations/${d.slug}` },
+    openGraph: {
+      title,
+      description,
+      url: `${SITE.domain}/destinations/${d.slug}`,
+      type: 'website',
+    },
   };
 }
 
-export default async function DestinationHubPage({ params }: { params: Params }) {
+export default async function DestinationHub({ params }: { params: Params }) {
   const { slug } = await params;
   const d = getDestination(slug);
   if (!d) notFound();
 
+  const pkgs = packagesFor(d.slug);
   const url = `${SITE.domain}/destinations/${d.slug}`;
 
-  /* JSON-LD: TouristDestination + FAQPage + Breadcrumbs */
   const jsonLd = [
     {
       '@context': 'https://schema.org',
       '@type': 'TouristDestination',
+      '@id': `${url}#destination`,
       name: d.name,
       description: d.intro,
       url,
+      touristType: ['Family', 'Couples', 'Adventure', 'Pilgrimage', 'Groups'],
       includesAttraction: d.regions.map((r) => ({
         '@type': 'TouristAttraction',
         name: r.name,
         description: r.note,
       })),
-      touristType: ['Family', 'Couples', 'Adventure', 'Pilgrimage'],
     },
     {
       '@context': 'https://schema.org',
@@ -82,7 +76,7 @@ export default async function DestinationHubPage({ params }: { params: Params })
       '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.domain },
-        { '@type': 'ListItem', position: 2, name: 'Destinations', item: `${SITE.domain}/destinations/${d.slug}` },
+        { '@type': 'ListItem', position: 2, name: 'Destinations', item: `${SITE.domain}/destinations` },
         { '@type': 'ListItem', position: 3, name: d.name, item: url },
       ],
     },
@@ -90,124 +84,198 @@ export default async function DestinationHubPage({ params }: { params: Params })
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd data={jsonLd} />
 
-      {/* Hero */}
-      <section className="relative isolate overflow-hidden">
+      <PageHero
+        tall
+        kicker={`${d.name} · Tour Packages`}
+        title={d.headline}
+        lede={d.intro}
+        crumbs={[
+          { label: 'Home', href: '/' },
+          { label: 'Destinations', href: '/destinations' },
+          { label: d.name },
+        ]}
+        background={TONE_HERO[d.tone]}
+      >
+        <FactStrip
+          facts={[
+            ['Best time', d.bestMonths],
+            ['Ideal length', d.idealDuration],
+            ['Starts from', `${inr(d.startingFrom)} per person`],
+            ['Altitude', d.altitude],
+          ]}
+        />
+      </PageHero>
+
+      {/* ───────────── long-form intro */}
+      <section className="section-sm mesh-warm">
+        <div className="wrap grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-7" data-reveal>
+            <p className="kicker">The honest version</p>
+            <div className="mt-4 space-y-5">
+              {d.body.map((p, i) => (
+                <p
+                  key={i}
+                  className={
+                    i === 0
+                      ? 'text-[17.5px] leading-[1.75] text-ink-800'
+                      : 'text-[15.5px] leading-[1.8] text-ink-600'
+                  }
+                >
+                  {p}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          <aside className="md:col-span-5" data-reveal="right">
+            <div className="rounded-2xl border border-paper-300 bg-paper-100 p-6">
+              <div className="flex items-center gap-2.5">
+                <Info className="size-4 text-gold-600" strokeWidth={2} />
+                <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ink-700">
+                  Know before you go
+                </h2>
+              </div>
+              <dl className="mt-5 space-y-4">
+                {d.knowBefore.map((k) => (
+                  <div key={k.label}>
+                    <dt className="text-[13px] font-semibold text-ink-900">{k.label}</dt>
+                    <dd className="mt-1 text-[13px] leading-relaxed text-ink-600">
+                      {k.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      {/* ───────────── regions */}
+      <section className="section border-t border-paper-200 bg-paper-100">
+        <div className="wrap">
+          <SectionHead
+            kicker="Where you'll go"
+            title={`${d.regions.length} regions worth crossing a country for.`}
+          />
+          <div data-reveal-group className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {d.regions.map((r, i) => (
+              <div
+                key={r.name}
+                className="lift group relative overflow-hidden rounded-2xl border border-paper-300 bg-paper-50 p-6"
+              >
+                <span className="display absolute right-5 top-4 text-[38px] leading-none text-paper-300 transition-colors duration-500 group-hover:text-gold-200">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <h3 className="display relative text-[22px] text-ink-900">{r.name}</h3>
+                <p className="relative mt-2 text-[13.5px] leading-relaxed text-ink-600">
+                  {r.note}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────── highlights */}
+      <section className="mesh-pine grain section relative isolate overflow-hidden">
         <div
           aria-hidden
-          className="absolute inset-0 -z-10 bg-cover bg-center"
-          style={{
-            // Placeholder — swap for /public/images/destinations/<slug>-hero.jpg.
-            backgroundImage: HERO_BG[d.slug] ?? HERO_BG_DEFAULT,
-          }}
+          className="blob right-[-6%] top-[10%] h-[400px] w-[400px]"
+          style={{ background: 'rgba(232,185,35,0.15)' }}
         />
-        <div className="container-editorial py-20 md:py-28 text-[color:var(--color-ink-50)]">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--color-brand-300)]">
-            {d.name} · Tour Packages
-          </p>
-          <h1 className="display mt-3 max-w-3xl text-[44px] leading-[1.02] md:text-[72px]">
-            {d.headline}
-          </h1>
-          <p className="mt-6 max-w-2xl text-[15.5px] leading-relaxed text-[color:var(--color-ink-100)]">
-            {d.intro}
-          </p>
-          <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-[13px] text-[color:var(--color-ink-200)]">
-            <span className="flex items-center gap-2"><Clock className="size-4" strokeWidth={1.75} /> {d.duration}</span>
-            <span className="flex items-center gap-2"><Snowflake className="size-4" strokeWidth={1.75} /> Best time: {d.bestTime}</span>
-            <span className="flex items-center gap-2"><MapPin className="size-4" strokeWidth={1.75} /> Starts ₹{d.startingFrom.toLocaleString('en-IN')} pp</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Regions */}
-      <section className="container-editorial py-20 md:py-24">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--color-brand-600)]">
-          Where you'll go
-        </p>
-        <h2 className="display mt-2 text-[36px] leading-[1.05] md:text-[46px] max-w-xl">
-          {d.regions.length} regions worth crossing a border for.
-        </h2>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {d.regions.map((r) => (
-            <div
-              key={r.name}
-              className="rounded-xl border border-[color:var(--color-ink-200)] bg-white p-6"
-            >
-              <h3 className="display text-[22px] text-[color:var(--color-ink-900)]">{r.name}</h3>
-              <p className="mt-2 text-[13.5px] leading-relaxed text-[color:var(--color-ink-600)]">
-                {r.note}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Highlights */}
-      <section className="bg-[color:var(--color-ink-100)]">
-        <div className="container-editorial grid gap-12 py-20 md:grid-cols-2 md:py-24">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--color-brand-600)]">
-              What's typically included
-            </p>
-            <h2 className="display mt-2 text-[36px] leading-[1.05] md:text-[46px]">
-              Signature experiences we build every {d.name} trip around.
-            </h2>
-          </div>
-          <ul className="space-y-4">
+        <div className="wrap relative grid gap-12 lg:grid-cols-2">
+          <SectionHead
+            light
+            kicker="Signature experiences"
+            title={`What we build every ${d.name} trip around.`}
+            lede={`Best months to travel: ${d.bestMonths}. Fly into ${d.airport}.`}
+          />
+          <ul data-reveal-group className="space-y-0">
             {d.highlights.map((h) => (
-              <li key={h} className="flex items-start gap-3 border-b border-[color:var(--color-ink-200)] pb-4">
-                <Check className="mt-0.5 size-5 shrink-0 text-[color:var(--color-brand-600)]" strokeWidth={2} />
-                <span className="text-[15px] text-[color:var(--color-ink-800)]">{h}</span>
+              <li
+                key={h}
+                className="group flex items-start gap-4 border-b border-paper-100/12 py-4 transition-colors duration-300 last:border-0 hover:bg-paper-100/5"
+              >
+                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-gold-400/15 text-gold-300 transition-all duration-300 group-hover:bg-gold-400 group-hover:text-ink-950">
+                  <Check className="size-3.5" strokeWidth={2.6} />
+                </span>
+                <span className="text-[15px] leading-relaxed text-paper-100">{h}</span>
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* FAQs */}
-      <section className="container-editorial py-20 md:py-24">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--color-brand-600)]">
-          Frequently asked
-        </p>
-        <h2 className="display mt-2 text-[36px] leading-[1.05] md:text-[46px] max-w-xl">
-          Questions we hear before every {d.name} trip.
-        </h2>
-        <div className="mt-10 divide-y divide-[color:var(--color-ink-200)] border-y border-[color:var(--color-ink-200)]">
-          {d.faqs.map((f) => (
-            <details key={f.q} className="group py-5">
-              <summary className="flex cursor-pointer items-start justify-between gap-4 text-[16.5px] font-medium text-[color:var(--color-ink-900)]">
-                {f.q}
-                <span className="mt-1 text-[color:var(--color-brand-600)] group-open:rotate-45 transition-transform">＋</span>
-              </summary>
-              <p className="mt-3 text-[14.5px] leading-relaxed text-[color:var(--color-ink-600)]">
-                {f.a}
-              </p>
-            </details>
-          ))}
+      {/* ───────────── packages */}
+      {pkgs.length > 0 && (
+        <section className="section">
+          <div className="wrap">
+            <SectionHead
+              kicker={`${d.name} packages`}
+              title="Ready-made, then reshaped around you."
+              lede="Every itinerary below is a starting point. Send us your dates and group size and we will rebuild it to fit."
+            />
+            <div data-reveal-group className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {pkgs.map((p) => (
+                <PackageCard key={p.slug} p={p} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ───────────── faqs */}
+      <section className="section border-y border-paper-200 bg-paper-100">
+        <div className="wrap grid gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <SectionHead
+              kicker="Frequently asked"
+              title={`${d.name} questions we hear every week.`}
+            />
+            <p className="mt-6 text-[14px] leading-relaxed text-ink-600">
+              Something not covered here?{' '}
+              <Link href="/contact" className="link-sweep font-medium text-gold-700">
+                Ask us directly
+              </Link>{' '}
+              &mdash; we answer within a few hours.
+            </p>
+          </div>
+          <div className="lg:col-span-8" data-reveal>
+            <Faq items={d.faqs} />
+          </div>
         </div>
       </section>
 
-      {/* Enquiry */}
-      <section className="bg-[color:var(--color-ink-900)] text-[color:var(--color-ink-100)]">
-        <div className="container-editorial grid gap-14 py-20 md:grid-cols-2 md:py-24">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--color-brand-300)]">
-              Plan your {d.name} trip
-            </p>
-            <h2 className="display mt-2 text-[36px] leading-[1.05] md:text-[46px]">
-              Same-day quote. Same team. Same phone number for the trip.
+      {/* ───────────── enquiry */}
+      <section className="mesh-pine grain section relative isolate overflow-hidden">
+        <div className="wrap relative grid items-start gap-12 lg:grid-cols-2">
+          <div data-reveal>
+            <p className="kicker kicker-light">Plan your {d.name} trip</p>
+            <h2 className="display d2 mt-3 text-paper-50">
+              Same-day quote. Same team for the whole trip.
             </h2>
-            <p className="mt-5 text-[14.5px] leading-relaxed text-[color:var(--color-ink-300)]">
-              Tell us the dates, group size, and a rough idea — we'll come back with a
-              custom itinerary and pricing in a few hours. No obligation, no spam.
+            <p className="lede mt-5 max-w-md !text-paper-200/75">
+              Tell us your dates, group size and rough idea. We come back with a
+              custom itinerary and honest pricing within a few hours &mdash; no
+              obligation, no follow-up spam.
             </p>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/packages" className="btn btn-ghost-light group">
+                Browse all packages
+                <ArrowUpRight className="arrow-slide size-4" strokeWidth={2.2} />
+              </Link>
+            </div>
           </div>
-          <div className="rounded-xl bg-white p-6 md:p-8">
-            <EnquiryForm source={`destination_${d.slug}`} packageName={d.name} />
+          <div data-reveal="right" className="glass-dark rounded-2xl p-6 md:p-8">
+            <EnquiryForm
+              source={`destination_${d.slug}`}
+              destination={d.name}
+              packageName={d.name}
+              light
+            />
           </div>
         </div>
       </section>

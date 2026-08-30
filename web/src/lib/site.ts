@@ -1,13 +1,15 @@
 /**
  * Single source of truth for public-facing brand facts.
  * Change here → propagates through header, footer, WhatsApp CTAs, JSON-LD,
- * sitemap, robots, etc. Never hardcode any of these anywhere else.
+ * sitemap, robots. Never hardcode any of these anywhere else.
  */
 export const SITE = {
   name: 'Glitz Holidays',
-  tagline: 'Kashmir DMC · Handcrafted Himalayan journeys',
+  legalName: 'Glitz Holidays',
+  tagline: 'Srinagar-based DMC · Handcrafted Himalayan journeys',
   domain: 'https://glitz-holidays.in',
   landerDomain: 'https://go.glitz-holidays.in',
+  founded: '2019',
 
   phone: {
     display: '+91 70068 41384',
@@ -24,9 +26,21 @@ export const SITE = {
     country: 'IN',
   },
 
+  /** Approximate office coords — used for LocalBusiness JSON-LD. */
+  geo: { lat: 34.0656, lng: 74.8181 },
+
+  hours: 'Mon–Sun, 10:00–21:00 IST',
+
   social: {
     instagram: 'https://instagram.com/glitzholidays',
     facebook: 'https://facebook.com/glitzholidays',
+  },
+
+  stats: {
+    guests: '4,000+',
+    rating: '4.9',
+    reviewCount: 212,
+    years: '6',
   },
 
   gtmId: 'GTM-K2QMV9NM',
@@ -38,9 +52,8 @@ export const SITE = {
 
   /**
    * Cheap health endpoint used to wake the Render free-tier backend.
-   * Every public page loads a 1×1 Image() request against this URL so
-   * that by the time a visitor clicks "Send my enquiry", the backend
-   * is already awake (Render sleeps after 15 min idle, cold-start ~30s).
+   * Every public page fires a 1×1 Image() at this so the API is warm by
+   * the time a visitor submits an enquiry (Render sleeps after 15min idle).
    */
   wakePingUrl:
     process.env.NEXT_PUBLIC_WAKE_PING_URL ??
@@ -48,11 +61,15 @@ export const SITE = {
 } as const;
 
 /**
- * Build a wa.me link with a prefilled message. Keeps every WhatsApp CTA
- * consistent and lets us track intent per surface via UTM-style tags in
- * the message body.
+ * Build a wa.me link with a prefilled message so every WhatsApp CTA is
+ * consistent and the sales team can tell which page the chat came from.
  */
 export function whatsAppLink(context: string): string {
   const msg = `Hi Glitz Holidays, I'm enquiring about ${context}.`;
   return `https://wa.me/${SITE.phone.wa}?text=${encodeURIComponent(msg)}`;
+}
+
+/** ₹ with Indian digit grouping. 18500 → "₹18,500" */
+export function inr(n: number): string {
+  return `₹${n.toLocaleString('en-IN')}`;
 }

@@ -1,84 +1,610 @@
 @import 'tailwindcss';
 
-/**
- * Premium editorial design tokens.
- * Reference: Aman, Six Senses, Andaz — muted, saturated, serif-forward.
- */
+/* ============================================================================
+   GLITZ HOLIDAYS — DESIGN SYSTEM
+   Premium editorial. Brand palette derived from the logo: chinar gold, pine
+   green, warm paper. Kashmir in three colours.
+   ========================================================================= */
+
 @theme {
-  /* Ink neutrals (near-black to warm off-white) */
-  --color-ink-950: #0f0d0a;
-  --color-ink-900: #1a1613;
-  --color-ink-800: #2a2420;
-  --color-ink-700: #3d342e;
-  --color-ink-600: #574a41;
-  --color-ink-500: #7a6c62;
-  --color-ink-400: #a49689;
-  --color-ink-300: #c9beb2;
-  --color-ink-200: #e4dcd0;
-  --color-ink-100: #f2ede4;
-  --color-ink-50:  #faf6ef;
+  /* --- Paper: warm off-white neutrals (never pure white, never pure grey) */
+  --color-paper-50:  #fdfbf7;
+  --color-paper-100: #faf6ee;
+  --color-paper-200: #f2ebdd;
+  --color-paper-300: #e5dac4;
+  --color-paper-400: #cbbb9e;
+  --color-paper-500: #a8967a;
 
-  /* Brand: warm gold — Glitz identity, restrained */
-  --color-brand-50:  #fbf6e9;
-  --color-brand-100: #f5e9c2;
-  --color-brand-300: #e0c17a;
-  --color-brand-500: #b8933a;
-  --color-brand-600: #97781f;
-  --color-brand-700: #755d15;
+  /* --- Ink: warm-black text ramp */
+  --color-ink-950: #0d0f0d;
+  --color-ink-900: #161a17;
+  --color-ink-800: #232925;
+  --color-ink-700: #333b35;
+  --color-ink-600: #4a534c;
+  --color-ink-500: #6b746d;
+  --color-ink-400: #939b95;
+  --color-ink-300: #bcc2bd;
+  --color-ink-200: #dbdfdc;
 
-  /* Signal: deep pine — for links & subtle accents */
-  --color-signal-500: #2f5d4a;
-  --color-signal-600: #234737;
+  /* --- Pine: the logo's deep green. Primary dark surface. */
+  --color-pine-50:  #eef6f1;
+  --color-pine-100: #d3e9dc;
+  --color-pine-200: #a5d1ba;
+  --color-pine-300: #6bb28f;
+  --color-pine-400: #3d8f68;
+  --color-pine-500: #1f6f4c;
+  --color-pine-600: #17573c;
+  --color-pine-700: #124430;
+  --color-pine-800: #0e3324;
+  --color-pine-900: #0a2419;
+  --color-pine-950: #061710;
 
-  /* Typography */
-  --font-display: 'Fraunces', 'Georgia', 'Times New Roman', serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  /* --- Gold: the logo's sun. Accent + CTA only, never a background wash. */
+  --color-gold-50:  #fdf8e7;
+  --color-gold-100: #faeec0;
+  --color-gold-200: #f5dd85;
+  --color-gold-300: #efc94a;
+  --color-gold-400: #e8b923;
+  --color-gold-500: #c99a12;
+  --color-gold-600: #a17708;
+  --color-gold-700: #7c5b0a;
+  --color-gold-800: #5c4310;
+
+  /* --- Saffron: warm secondary for pilgrimage / autumn contexts */
+  --color-saffron-400: #e08b32;
+  --color-saffron-500: #c26f1c;
+  --color-saffron-600: #9c5514;
+
+  /* --- Semantic */
+  --color-success: #1f6f4c;
+  --color-danger:  #b3261e;
+
+  /* --- Type */
+  --font-display: var(--font-fraunces), 'Georgia', serif;
+  --font-body: var(--font-inter), system-ui, -apple-system, sans-serif;
+
+  /* --- Motion tokens. One vocabulary so nothing feels off-tempo. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --dur-fast: 180ms;
+  --dur-base: 320ms;
+  --dur-slow: 620ms;
+
+  /* --- Elevation. Warm-tinted shadows; grey shadows look dead on paper. */
+  --shadow-sm: 0 1px 2px rgba(13, 15, 13, 0.05);
+  --shadow-md: 0 4px 16px -4px rgba(13, 15, 13, 0.10), 0 2px 6px -2px rgba(13, 15, 13, 0.06);
+  --shadow-lg: 0 18px 44px -12px rgba(13, 15, 13, 0.18), 0 6px 16px -6px rgba(13, 15, 13, 0.08);
+  --shadow-xl: 0 32px 72px -20px rgba(13, 15, 13, 0.26), 0 12px 28px -12px rgba(13, 15, 13, 0.12);
+  --shadow-gold: 0 12px 32px -10px rgba(201, 154, 18, 0.45);
 }
 
-/* Root paint — warm off-white paper stock, not white */
-html, body {
-  background: var(--color-ink-50);
+/* ============================================================================
+   BASE
+   ========================================================================= */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-paper-50);
   color: var(--color-ink-900);
   font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-/* Editorial headline treatment */
-.display {
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  font-variation-settings: 'SOFT' 30, 'WONK' 0;
-  letter-spacing: -0.015em;
-  line-height: 1.05;
-}
-
-/* Container max, generous but not stretched */
-.container-editorial {
-  width: 100%;
-  max-width: 1280px;
-  margin-inline: auto;
-  padding-inline: 1.25rem;
-}
-@media (min-width: 768px) {
-  .container-editorial { padding-inline: 2rem; }
-}
-
-/* Selection: gold on ink */
 ::selection {
-  background: var(--color-brand-300);
+  background: var(--color-gold-300);
   color: var(--color-ink-950);
 }
 
-/* Focus rings — visible but restrained */
 :focus-visible {
-  outline: 2px solid var(--color-brand-500);
+  outline: 2px solid var(--color-gold-500);
   outline-offset: 3px;
   border-radius: 4px;
 }
 
-/* Utility: hairline divider that reads as ink not grey */
-.divider-hair {
+/* Kill the ugly tap highlight on mobile but keep :active feedback */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================================
+   TYPOGRAPHY
+   ========================================================================= */
+
+.display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 28, 'WONK' 0;
+  font-weight: 500;
+  letter-spacing: -0.022em;
+  line-height: 1.04;
+}
+
+/* Fluid display scale — no media queries needed, reads well 375px → 1920px */
+.d1 { font-size: clamp(2.6rem, 7.2vw, 6.2rem); }
+.d2 { font-size: clamp(2.1rem, 5.2vw, 4.1rem); }
+.d3 { font-size: clamp(1.6rem, 3.2vw, 2.5rem); }
+.d4 { font-size: clamp(1.25rem, 2.1vw, 1.6rem); }
+
+/* Small uppercase eyebrow above every section heading */
+.kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-gold-600);
+}
+.kicker-light { color: var(--color-gold-300); }
+
+/* Gold gradient text — used sparingly, one phrase per page max */
+.text-gold-grad {
+  background: linear-gradient(100deg, var(--color-gold-400), var(--color-gold-200) 45%, var(--color-gold-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lede {
+  font-size: clamp(1rem, 1.3vw, 1.125rem);
+  line-height: 1.75;
+  color: var(--color-ink-600);
+}
+
+/* ============================================================================
+   LAYOUT
+   ========================================================================= */
+
+.wrap {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) { .wrap { padding-inline: 2rem; } }
+@media (min-width: 1280px) { .wrap { padding-inline: 2.5rem; } }
+
+.wrap-narrow {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) { .wrap-narrow { padding-inline: 2rem; } }
+
+.section { padding-block: clamp(4rem, 9vw, 8.5rem); }
+.section-sm { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
+
+.hair {
   height: 1px;
-  background: color-mix(in oklab, var(--color-ink-900) 12%, transparent);
+  background: color-mix(in oklab, var(--color-ink-900) 10%, transparent);
+}
+.hair-light {
+  height: 1px;
+  background: color-mix(in oklab, var(--color-paper-100) 16%, transparent);
+}
+
+/* ============================================================================
+   SCROLL REVEAL
+   Driven by IntersectionObserver adding [data-visible]. No-JS safe: the
+   fallback below un-hides everything so crawlers and no-JS users see content.
+   ========================================================================= */
+
+/* Everything is scoped under .js — a one-line inline script sets that class
+   before paint. If JS never runs (crawler, no-JS user, script error) the
+   hidden state is never applied and all content renders normally. */
+
+.js [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity var(--dur-slow) var(--ease-out-soft),
+    transform var(--dur-slow) var(--ease-out-soft);
+  will-change: opacity, transform;
+}
+.js [data-reveal='left']  { transform: translate3d(-24px, 0, 0); }
+.js [data-reveal='right'] { transform: translate3d(24px, 0, 0); }
+.js [data-reveal='scale'] { transform: scale(0.955); }
+
+.js [data-reveal][data-visible] {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* Stagger children of a revealed container */
+.js [data-reveal-group] > * {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition:
+    opacity var(--dur-slow) var(--ease-out-soft),
+    transform var(--dur-slow) var(--ease-out-soft);
+}
+.js [data-reveal-group][data-visible] > * {
+  opacity: 1;
+  transform: none;
+}
+.js [data-reveal-group][data-visible] > *:nth-child(1) { transition-delay: 0ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(2) { transition-delay: 70ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(3) { transition-delay: 140ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(4) { transition-delay: 210ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(5) { transition-delay: 280ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(6) { transition-delay: 350ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(7) { transition-delay: 420ms; }
+.js [data-reveal-group][data-visible] > *:nth-child(8) { transition-delay: 490ms; }
+
+/* ============================================================================
+   ENTRANCE ANIMATIONS (above the fold, fire on load not on scroll)
+   ========================================================================= */
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 26px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes mask-up {
+  from { transform: translate3d(0, 105%, 0); }
+  to   { transform: none; }
+}
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(0, -18px, 0) scale(1.03); }
+}
+@keyframes shimmer {
+  from { background-position: -220% 0; }
+  to   { background-position: 220% 0; }
+}
+@keyframes marquee-x {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(232, 185, 35, 0.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(232, 185, 35, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 185, 35, 0); }
+}
+
+.anim-rise { animation: rise-in 900ms var(--ease-out-soft) both; }
+.anim-fade { animation: fade-in 1100ms var(--ease-out-soft) both; }
+.d-1 { animation-delay: 90ms; }
+.d-2 { animation-delay: 180ms; }
+.d-3 { animation-delay: 290ms; }
+.d-4 { animation-delay: 400ms; }
+.d-5 { animation-delay: 520ms; }
+
+/* Line-by-line masked headline reveal. Wrap each line in .mask > span */
+.mask { overflow: hidden; display: block; }
+.mask > span {
+  display: block;
+  animation: mask-up 1s var(--ease-out-soft) both;
+}
+
+/* ============================================================================
+   BACKGROUNDS / TEXTURE
+   ========================================================================= */
+
+/* Warm aurora mesh — sits behind light sections */
+.mesh-warm {
+  background:
+    radial-gradient(58% 48% at 12% 8%,  rgba(232, 185, 35, 0.16), transparent 62%),
+    radial-gradient(52% 44% at 88% 22%, rgba(31, 111, 76, 0.12),  transparent 60%),
+    radial-gradient(60% 52% at 50% 100%, rgba(224, 139, 50, 0.10), transparent 64%);
+}
+
+/* Deep pine mesh — behind dark sections */
+.mesh-pine {
+  background:
+    radial-gradient(62% 52% at 18% 6%,  rgba(31, 111, 76, 0.55), transparent 64%),
+    radial-gradient(50% 46% at 84% 30%, rgba(232, 185, 35, 0.14), transparent 58%),
+    var(--color-pine-950);
+}
+
+/* Slow-drifting glow blob. Decorative only — always aria-hidden. */
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  pointer-events: none;
+  animation: drift 16s ease-in-out infinite;
+}
+
+/* Film grain. 1.5KB inline SVG, adds the editorial print feel. */
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+}
+
+/* Frosted panel over imagery */
+.glass {
+  background: rgba(253, 251, 247, 0.72);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid rgba(253, 251, 247, 0.5);
+}
+.glass-dark {
+  background: rgba(6, 23, 16, 0.55);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(245, 221, 133, 0.16);
+}
+
+/* ============================================================================
+   IMAGE / CARD INTERACTIONS
+   ========================================================================= */
+
+/* Parent hover zooms the child image. Put .zoom-wrap on the clipping box. */
+.zoom-wrap { overflow: hidden; }
+.zoom-wrap .zoom {
+  transition: transform 900ms var(--ease-out-soft), filter 600ms var(--ease-out-soft);
+  will-change: transform;
+}
+.zoom-wrap:hover .zoom,
+.zoom-wrap:focus-within .zoom {
+  transform: scale(1.07);
+}
+
+/* Lift on hover — the workhorse card interaction */
+.lift {
+  transition:
+    transform var(--dur-base) var(--ease-out-soft),
+    box-shadow var(--dur-base) var(--ease-out-soft),
+    border-color var(--dur-base) var(--ease-out-soft);
+}
+.lift:hover,
+.lift:focus-within {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Gold border that draws itself in on hover */
+.edge-gold {
+  position: relative;
+}
+.edge-gold::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--color-gold-300), transparent 42%, transparent 58%, var(--color-gold-400)) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out-soft);
+  pointer-events: none;
+}
+.edge-gold:hover::after,
+.edge-gold:focus-within::after { opacity: 1; }
+
+/* ============================================================================
+   BUTTONS & LINKS
+   ========================================================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 44px;               /* touch target floor */
+  padding: 0.8rem 1.55rem;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform var(--dur-fast) var(--ease-out-soft),
+    box-shadow var(--dur-base) var(--ease-out-soft),
+    background-color var(--dur-base) var(--ease-out-soft),
+    color var(--dur-base) var(--ease-out-soft),
+    border-color var(--dur-base) var(--ease-out-soft);
+}
+.btn:active { transform: scale(0.975); }
+
+.btn-gold {
+  background: var(--color-gold-400);
+  color: var(--color-ink-950);
+  box-shadow: var(--shadow-md);
+}
+.btn-gold:hover {
+  background: var(--color-gold-300);
+  box-shadow: var(--shadow-gold);
+  transform: translateY(-2px);
+}
+
+.btn-pine {
+  background: var(--color-pine-700);
+  color: var(--color-paper-50);
+  box-shadow: var(--shadow-md);
+}
+.btn-pine:hover {
+  background: var(--color-pine-600);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink-800);
+  border: 1px solid var(--color-ink-300);
+}
+.btn-ghost:hover {
+  border-color: var(--color-gold-500);
+  color: var(--color-gold-700);
+  background: var(--color-gold-50);
+}
+
+.btn-ghost-light {
+  background: transparent;
+  color: var(--color-paper-100);
+  border: 1px solid rgba(250, 246, 238, 0.34);
+}
+.btn-ghost-light:hover {
+  border-color: var(--color-gold-300);
+  color: var(--color-gold-200);
+  background: rgba(232, 185, 35, 0.08);
+}
+
+/* Light sweep across a button on hover */
+.btn-shine::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 780ms var(--ease-out-soft);
+}
+.btn-shine:hover::before { transform: translateX(120%); }
+
+/* Underline that sweeps in from the left */
+.link-sweep {
+  position: relative;
+  display: inline-block;
+}
+.link-sweep::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--dur-base) var(--ease-out-soft);
+}
+.link-sweep:hover::after,
+.link-sweep:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* Arrow that slides on parent hover */
+.arrow-slide {
+  transition: transform var(--dur-base) var(--ease-out-back);
+}
+.group:hover .arrow-slide { transform: translateX(5px); }
+
+/* ============================================================================
+   MARQUEE
+   ========================================================================= */
+
+.marquee {
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+  gap: 0;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee__track {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3.5rem;
+  padding-right: 3.5rem;
+  animation: marquee-x 34s linear infinite;
+}
+.marquee:hover .marquee__track { animation-play-state: paused; }
+
+/* ============================================================================
+   MISC UTILITIES
+   ========================================================================= */
+
+.shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--color-paper-200) 28%,
+    var(--color-paper-100) 42%,
+    var(--color-paper-200) 56%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+.pulse-gold { animation: pulse-ring 2.4s var(--ease-out-soft) infinite; }
+
+/* Scroll-driven top progress bar */
+.scroll-bar {
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-gold-400), var(--color-saffron-400));
+}
+
+/* Any wide element that must scroll rather than break the page */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.scroll-x::-webkit-scrollbar { height: 6px; }
+.scroll-x::-webkit-scrollbar-thumb {
+  background: var(--color-paper-300);
+  border-radius: 9999px;
+}
+
+/* Accessible visually-hidden (skip links, form labels) */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Native <details> chevron rotation */
+.acc[open] .acc-icon { transform: rotate(45deg); }
+.acc-icon { transition: transform var(--dur-base) var(--ease-out-back); }
+.acc summary::-webkit-details-marker { display: none; }
+.acc summary { list-style: none; cursor: pointer; }
+
+/* ============================================================================
+   REDUCED MOTION — honour the OS setting, keep everything readable
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-reveal],
+  [data-reveal-group] > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .blob { animation: none; }
+  .marquee__track { animation: none; }
+  .lift:hover { transform: none; }
+  .zoom-wrap:hover .zoom { transform: none; }
 }

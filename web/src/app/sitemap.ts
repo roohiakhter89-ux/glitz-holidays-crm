@@ -1,22 +1,43 @@
 import type { MetadataRoute } from 'next';
 import { SITE } from '@/lib/site';
 import { DESTINATIONS } from '@/lib/destinations';
+import { PACKAGES } from '@/lib/packages';
+import { TRAVEL_STYLES } from '@/lib/travel-styles';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
-  const staticRoutes: MetadataRoute.Sitemap = [
+  const statics: MetadataRoute.Sitemap = [
     { url: SITE.domain, lastModified: now, changeFrequency: 'weekly', priority: 1 },
-    { url: `${SITE.domain}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${SITE.domain}/contact`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE.domain}/destinations`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${SITE.domain}/packages`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${SITE.domain}/reviews`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE.domain}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE.domain}/contact`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE.domain}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
   ];
 
-  const destRoutes: MetadataRoute.Sitemap = DESTINATIONS.map((d) => ({
+  const destinations: MetadataRoute.Sitemap = DESTINATIONS.map((d) => ({
     url: `${SITE.domain}/destinations/${d.slug}`,
     lastModified: now,
     changeFrequency: 'weekly',
     priority: 0.9,
   }));
 
-  return [...staticRoutes, ...destRoutes];
+  // Highest-intent pages on the site — highest priority after the home page.
+  const packages: MetadataRoute.Sitemap = PACKAGES.map((p) => ({
+    url: `${SITE.domain}/packages/${p.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
+  const styles: MetadataRoute.Sitemap = TRAVEL_STYLES.map((s) => ({
+    url: `${SITE.domain}/travel-styles/${s.slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }));
+
+  return [...statics, ...destinations, ...packages, ...styles];
 }

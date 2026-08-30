@@ -1,23 +1,33 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { SITE } from '@/lib/site';
+import { Loader2, Check, Phone } from 'lucide-react';
+import { SITE, whatsAppLink } from '@/lib/site';
+import { DESTINATIONS } from '@/lib/destinations';
 
 type Props = {
-  /** Which page / package this form sits on — passed to CRM as `campaign`. */
+  /** Which page this form sits on — sent to the CRM as `campaign`. */
   source: string;
-  /** Optional prefill for the "package" hidden field. */
+  /** Prefills the destination select and tags the lead. */
   packageName?: string;
+  destination?: string;
+  /** Renders on a dark background. */
+  light?: boolean;
   className?: string;
 };
 
 /**
- * Server-agnostic enquiry form. POSTs to the CRM's public capture endpoint
- * (same one PHP landers use). No client-side email — everything goes into
- * the CRM so ops can assign and follow up per the standard cadence.
+ * Public enquiry form. POSTs straight to the CRM's capture endpoint — the
+ * same one the Google Ads landers use — so every lead lands in one pipeline
+ * with the standard follow-up cadence attached.
  */
-export function EnquiryForm({ source, packageName, className }: Props) {
+export function EnquiryForm({
+  source,
+  packageName,
+  destination,
+  light = false,
+  className = '',
+}: Props) {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -29,11 +39,13 @@ export function EnquiryForm({ source, packageName, className }: Props) {
     const form = e.currentTarget;
     const data = new FormData(form);
 
-    // Match the CRM's expected shape.
     const payload = {
       name: String(data.get('name') ?? '').trim(),
       phone: String(data.get('phone') ?? '').trim(),
       email: String(data.get('email') ?? '').trim() || undefined,
+      destination: String(data.get('destination') ?? '').trim() || destination || undefined,
+      adults: Number(data.get('adults')) || undefined,
+      travelDate: String(data.get('travelDate') ?? '').trim() || undefined,
       message: String(data.get('message') ?? '').trim() || undefined,
       source: 'WEBSITE',
       campaign: source,
@@ -59,87 +71,137 @@ export function EnquiryForm({ source, packageName, className }: Props) {
   if (status === 'sent') {
     return (
       <div className={className}>
-        <div className="rounded-lg border border-[color:var(--color-brand-500)] bg-[color:var(--color-brand-50)] p-5 text-[color:var(--color-ink-900)]">
-          <h3 className="display text-[22px]">Thank you.</h3>
-          <p className="mt-1 text-[14px] text-[color:var(--color-ink-700)]">
-            Our travel expert will reach out within a few hours. For anything urgent,
-            WhatsApp or call {SITE.phone.display}.
+        <div className="anim-rise rounded-2xl border border-gold-300 bg-gold-50 p-7 text-center">
+          <div className="pulse-gold mx-auto grid size-12 place-items-center rounded-full bg-gold-400 text-ink-950">
+            <Check className="size-6" strokeWidth={2.5} />
+          </div>
+          <h3 className="display d3 mt-4 text-ink-900">Enquiry received.</h3>
+          <p className="mt-2 text-[14px] leading-relaxed text-ink-600">
+            A travel specialist will reach out within a few hours with a custom
+            itinerary. For anything urgent, WhatsApp or call us directly.
           </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+            <a
+              href={whatsAppLink(packageName ?? 'my enquiry')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-pine"
+            >
+              WhatsApp us now
+            </a>
+            <a href={`tel:${SITE.phone.tel}`} className="btn btn-ghost">
+              <Phone className="size-4" strokeWidth={2} />
+              {SITE.phone.display}
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
+  const label = light
+    ? 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-paper-200/70'
+    : 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500';
+
+  const field = light
+    ? 'w-full rounded-lg border border-paper-100/20 bg-paper-50/10 px-3.5 py-3 text-[14.5px] text-paper-50 placeholder:text-paper-200/40 transition-all duration-200 focus:border-gold-400 focus:bg-paper-50/15 focus:outline-none'
+    : 'w-full rounded-lg border border-paper-300 bg-white px-3.5 py-3 text-[14.5px] text-ink-900 placeholder:text-ink-400 transition-all duration-200 focus:border-gold-400 focus:shadow-[0_0_0_3px_rgba(232,185,35,0.15)] focus:outline-none';
+
   return (
-    <form onSubmit={handleSubmit} className={className}>
-      <div className="grid gap-3">
+    <form onSubmit={handleSubmit} className={className} noValidate={false}>
+      <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className={label}>Your name *</span>
+            <input required name="name" autoComplete="name" className={field} placeholder="Full name" />
+          </label>
+          <label className="block">
+            <span className={label}>Phone / WhatsApp *</span>
+            <input
+              required
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              pattern="[0-9+() -]{8,}"
+              className={field}
+              placeholder="+91 …"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className={label}>Email</span>
+            <input name="email" type="email" autoComplete="email" className={field} placeholder="you@example.com" />
+          </label>
+          <label className="block">
+            <span className={label}>Destination</span>
+            <select
+              name="destination"
+              defaultValue={destination ?? ''}
+              className={`${field} cursor-pointer appearance-none`}
+            >
+              <option value="">Not sure yet</option>
+              {DESTINATIONS.map((d) => (
+                <option key={d.slug} value={d.name} className="text-ink-900">
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className={label}>Travelling from</span>
+            <input name="travelDate" type="date" className={`${field} cursor-pointer`} />
+          </label>
+          <label className="block">
+            <span className={label}>Travellers</span>
+            <input
+              name="adults"
+              type="number"
+              min={1}
+              max={60}
+              inputMode="numeric"
+              className={field}
+              placeholder="2"
+            />
+          </label>
+        </div>
+
         <label className="block">
-          <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-[color:var(--color-ink-500)]">
-            Your name
-          </span>
-          <input
-            required
-            name="name"
-            autoComplete="name"
-            className="w-full rounded-md border border-[color:var(--color-ink-300)] bg-white px-3.5 py-2.5 text-[14px] focus:border-[color:var(--color-brand-500)] focus:outline-none"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-[color:var(--color-ink-500)]">
-            Phone / WhatsApp
-          </span>
-          <input
-            required
-            name="phone"
-            type="tel"
-            autoComplete="tel"
-            pattern="[0-9+() -]{8,}"
-            className="w-full rounded-md border border-[color:var(--color-ink-300)] bg-white px-3.5 py-2.5 text-[14px] focus:border-[color:var(--color-brand-500)] focus:outline-none"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-[color:var(--color-ink-500)]">
-            Email (optional)
-          </span>
-          <input
-            name="email"
-            type="email"
-            autoComplete="email"
-            className="w-full rounded-md border border-[color:var(--color-ink-300)] bg-white px-3.5 py-2.5 text-[14px] focus:border-[color:var(--color-brand-500)] focus:outline-none"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-[11.5px] font-medium uppercase tracking-wider text-[color:var(--color-ink-500)]">
-            Tell us what you're planning
-          </span>
+          <span className={label}>What are you planning?</span>
           <textarea
             name="message"
             rows={3}
+            className={`${field} resize-y`}
             placeholder={
               packageName
-                ? `E.g. Interested in ${packageName} for 4 people, late June.`
-                : 'E.g. 5 nights Kashmir in June, family of 4.'
+                ? `Interested in ${packageName} — tell us group size, dates, anything specific.`
+                : 'E.g. 6 nights in Kashmir in late June, family of four, one grandparent.'
             }
-            className="w-full rounded-md border border-[color:var(--color-ink-300)] bg-white px-3.5 py-2.5 text-[14px] focus:border-[color:var(--color-brand-500)] focus:outline-none"
           />
         </label>
 
         {error && (
-          <p className="text-[12.5px] text-red-700">
-            Couldn't send: {error}. Please WhatsApp us on {SITE.phone.display}.
+          <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3.5 py-2.5 text-[12.5px] text-red-800">
+            Could not send ({error}). Please WhatsApp us on {SITE.phone.display} instead — we will get straight back to you.
           </p>
         )}
 
         <button
           type="submit"
           disabled={status === 'sending'}
-          className="mt-1 inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--color-ink-900)] px-5 py-3 text-[13.5px] font-medium text-[color:var(--color-ink-50)] hover:bg-[color:var(--color-brand-600)] transition-colors disabled:opacity-60"
+          className="btn btn-gold btn-shine w-full disabled:cursor-not-allowed disabled:opacity-60"
         >
           {status === 'sending' && <Loader2 className="size-4 animate-spin" />}
-          {status === 'sending' ? 'Sending…' : 'Send my enquiry'}
+          {status === 'sending' ? 'Sending…' : 'Get my free itinerary'}
         </button>
-        <p className="mt-1 text-[11.5px] text-[color:var(--color-ink-500)]">
-          Or WhatsApp us directly on {SITE.phone.display} for an instant response.
+
+        <p className={`text-center text-[11.5px] ${light ? 'text-paper-200/55' : 'text-ink-500'}`}>
+          No spam, no call-centre hand-offs. One specialist, start to finish.
         </p>
       </div>
     </form>

@@ -1,96 +1,163 @@
 import type { Metadata } from 'next';
-import { Phone, Mail, MapPin } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, MessageCircle } from 'lucide-react';
 import { SITE, whatsAppLink } from '@/lib/site';
+import { JsonLd } from '@/components/cards';
+import { PageHero } from '@/components/page-hero';
 import { EnquiryForm } from '@/components/enquiry-form';
 
 export const metadata: Metadata = {
-  title: 'Contact Glitz Holidays — Talk to a Kashmir Travel Specialist',
-  description: `Contact Glitz Holidays. WhatsApp or call ${SITE.phone.display}, email ${SITE.email}, or send an enquiry — our Srinagar team replies within hours.`,
-  alternates: { canonical: `${SITE.domain}/contact` },
+  title: 'Contact Us — Talk to a Kashmir Travel Specialist',
+  description: `Contact Glitz Holidays. WhatsApp or call ${SITE.phone.display}, email ${SITE.email}, or send an enquiry. Our Srinagar team replies within hours, ${SITE.hours}.`,
+  alternates: { canonical: '/contact' },
 };
 
+const CHANNELS = [
+  {
+    icon: MessageCircle,
+    label: 'WhatsApp',
+    value: SITE.phone.display,
+    note: 'Fastest. Usually a reply within minutes during working hours.',
+    href: whatsAppLink('a Himalayan holiday'),
+    external: true,
+    accent: 'bg-[#25D366] text-white',
+  },
+  {
+    icon: Phone,
+    label: 'Call us',
+    value: SITE.phone.display,
+    note: 'For anything urgent, or if you would rather just talk it through.',
+    href: `tel:${SITE.phone.tel}`,
+    external: false,
+    accent: 'bg-gold-400 text-ink-950',
+  },
+  {
+    icon: Mail,
+    label: 'Email',
+    value: SITE.email,
+    note: 'Best for detailed briefs, group bookings and corporate enquiries.',
+    href: `mailto:${SITE.email}`,
+    external: false,
+    accent: 'bg-pine-700 text-paper-50',
+  },
+];
+
 export default function ContactPage() {
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ContactPage',
+      name: `Contact ${SITE.name}`,
+      url: `${SITE.domain}/contact`,
+      mainEntity: { '@id': `${SITE.domain}/#org` },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.domain },
+        { '@type': 'ListItem', position: 2, name: 'Contact', item: `${SITE.domain}/contact` },
+      ],
+    },
+  ];
+
   return (
-    <section className="container-editorial grid gap-14 py-20 md:grid-cols-2 md:py-28">
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--color-brand-600)]">
-          Get in touch
-        </p>
-        <h1 className="display mt-2 text-[44px] leading-[1.02] md:text-[64px]">
-          Talk to a person who's actually in Kashmir.
-        </h1>
-        <p className="mt-6 text-[15.5px] leading-relaxed text-[color:var(--color-ink-700)] max-w-md">
-          The fastest path to a real answer is WhatsApp — we reply within minutes
-          during working hours (10am–9pm IST). For anything urgent on a live trip,
-          call directly.
-        </p>
+    <>
+      <JsonLd data={jsonLd} />
 
-        <div className="mt-8 space-y-5">
-          <a
-            href={`tel:${SITE.phone.tel}`}
-            className="flex items-center gap-4 rounded-xl border border-[color:var(--color-ink-200)] bg-white p-5 hover:border-[color:var(--color-brand-500)] transition-colors"
-          >
-            <div className="grid size-11 place-items-center rounded-full bg-[color:var(--color-brand-500)] text-[color:var(--color-ink-950)]">
-              <Phone className="size-5" strokeWidth={1.75} />
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-[color:var(--color-ink-500)]">Call us</p>
-              <p className="text-[16px] font-medium text-[color:var(--color-ink-900)]">{SITE.phone.display}</p>
-            </div>
-          </a>
+      <PageHero
+        kicker="Get in touch"
+        title="Talk to someone who's actually in Kashmir."
+        lede={`Our office is in Rajbagh, Srinagar. We are on WhatsApp ${SITE.hours} and the person who replies is the person who will run your trip.`}
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Contact' }]}
+        background="linear-gradient(180deg, rgba(6,12,16,0.40) 0%, rgba(6,12,16,0.92) 100%), radial-gradient(140% 120% at 26% 8%, #3b7183 0%, #17384a 46%, #060e14 100%)"
+      />
 
-          <a
-            href={whatsAppLink('a Himalayan holiday')}
-            target="_blank"
-            rel="noopener"
-            className="flex items-center gap-4 rounded-xl border border-[color:var(--color-ink-200)] bg-white p-5 hover:border-[#25D366] transition-colors"
-          >
-            <div className="grid size-11 place-items-center rounded-full bg-[#25D366] text-white">
-              <svg viewBox="0 0 24 24" className="size-5 fill-current"><path d="M17.5 14.4c-.3-.1-1.6-.8-1.8-.9-.2-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.1.1-.3.1-.5 0-.3-.1-1.2-.4-2.2-1.3-.8-.7-1.4-1.6-1.5-1.9-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.3 0-.5s-.6-1.5-.8-2c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.3.2-.9.9-.9 2.2 0 1.3.9 2.6 1.1 2.8.1.2 1.8 2.9 4.4 4 .6.3 1.1.4 1.5.5.6.2 1.2.2 1.6.1.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2-.1-.1-.3-.2-.5-.3zM12 2C6.5 2 2 6.5 2 12c0 1.7.4 3.4 1.3 4.9L2 22l5.3-1.3c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-[color:var(--color-ink-500)]">WhatsApp</p>
-              <p className="text-[16px] font-medium text-[color:var(--color-ink-900)]">{SITE.phone.display}</p>
-            </div>
-          </a>
+      <section className="mesh-warm section-sm">
+        <div className="wrap grid items-start gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <div data-reveal-group className="space-y-4">
+              {CHANNELS.map((c) => (
+                <a
+                  key={c.label}
+                  href={c.href}
+                  {...(c.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  className="lift edge-gold group flex gap-4 rounded-2xl border border-paper-300 bg-white p-5 shadow-sm"
+                >
+                  <span
+                    className={`grid size-12 shrink-0 place-items-center rounded-xl ${c.accent} transition-transform duration-500 group-hover:scale-110`}
+                  >
+                    <c.icon className="size-5" strokeWidth={1.9} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      {c.label}
+                    </p>
+                    <p className="mt-1 break-all text-[15.5px] font-medium text-ink-900">
+                      {c.value}
+                    </p>
+                    <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-500">
+                      {c.note}
+                    </p>
+                  </div>
+                </a>
+              ))}
 
-          <a
-            href={`mailto:${SITE.email}`}
-            className="flex items-center gap-4 rounded-xl border border-[color:var(--color-ink-200)] bg-white p-5 hover:border-[color:var(--color-brand-500)] transition-colors"
-          >
-            <div className="grid size-11 place-items-center rounded-full bg-[color:var(--color-ink-900)] text-[color:var(--color-ink-50)]">
-              <Mail className="size-5" strokeWidth={1.75} />
+              <div className="rounded-2xl border border-paper-300 bg-paper-100 p-5">
+                <div className="flex gap-4">
+                  <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-paper-300 text-ink-700">
+                    <MapPin className="size-5" strokeWidth={1.9} />
+                  </span>
+                  <div>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+                      Office
+                    </p>
+                    <p className="mt-1 text-[15px] leading-snug text-ink-900">
+                      {SITE.address.street}, {SITE.address.city}
+                      <br />
+                      {SITE.address.region} {SITE.address.postalCode}
+                    </p>
+                    <p className="mt-2.5 inline-flex items-center gap-2 text-[12.5px] text-ink-600">
+                      <Clock className="size-3.5 text-gold-600" strokeWidth={2} />
+                      {SITE.hours}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-[color:var(--color-ink-500)]">Email</p>
-              <p className="text-[15px] font-medium text-[color:var(--color-ink-900)]">{SITE.email}</p>
-            </div>
-          </a>
 
-          <div className="flex items-start gap-4 rounded-xl border border-[color:var(--color-ink-200)] bg-white p-5">
-            <div className="grid size-11 place-items-center rounded-full bg-[color:var(--color-ink-100)] text-[color:var(--color-ink-800)]">
-              <MapPin className="size-5" strokeWidth={1.75} />
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-[color:var(--color-ink-500)]">Office</p>
-              <p className="text-[15px] text-[color:var(--color-ink-900)]">
-                {SITE.address.street}, {SITE.address.city}<br />
-                {SITE.address.region} {SITE.address.postalCode}
+            <div
+              data-reveal
+              className="mt-6 rounded-2xl border border-gold-200 bg-gold-50 p-5"
+            >
+              <p className="text-[13px] leading-relaxed text-ink-700">
+                <strong className="font-semibold text-ink-900">
+                  Planning for peak season?
+                </strong>{' '}
+                Hotels in Gulmarg and Pahalgam for May–June and the Pangong camps for
+                July–August book out months ahead. Message us early even if your dates
+                are not final &mdash; we will tell you what needs locking in first.
               </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="rounded-xl border border-[color:var(--color-ink-200)] bg-white p-6 md:p-8">
-        <h2 className="display text-[28px] text-[color:var(--color-ink-900)]">Send an enquiry</h2>
-        <p className="mt-1 text-[13.5px] text-[color:var(--color-ink-600)]">
-          We reply within a few hours during working hours.
-        </p>
-        <div className="mt-6">
-          <EnquiryForm source="contact_page" />
+          <div className="lg:col-span-7">
+            <div
+              data-reveal="right"
+              className="rounded-2xl border border-paper-300 bg-white p-6 shadow-lg md:p-9"
+            >
+              <p className="kicker">Free itinerary</p>
+              <h2 className="display d3 mt-2 text-ink-900">Send us an enquiry.</h2>
+              <p className="mt-2 text-[13.5px] leading-relaxed text-ink-600">
+                Two minutes to fill, and you get a custom itinerary with honest
+                pricing back within a few hours. No obligation.
+              </p>
+              <div className="mt-7">
+                <EnquiryForm source="contact_page" />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
