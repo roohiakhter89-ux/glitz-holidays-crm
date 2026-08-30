@@ -8,7 +8,7 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 61 of 270**
+**Progress: 70 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
@@ -17,7 +17,7 @@ Queue: `seo/page-manifest.json`.
 | 2 · Honeymoon & family | 4 | 22 |
 | 3 · Transport routes | 1 | 88 |
 | 4 · Place × intent | 1 | 86 |
-| 5 · Month hubs | 1 | 10 |
+| 5 · Month hubs | 10 | 10 |
 | 6 · Hindi | 0 | 10 |
 
 Manifest rebuilt from 472 to 270 on 31 Aug 2026. Not scope reduction —
@@ -25,6 +25,30 @@ consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 022 — /guides/by-month/* (Tier 5 completed: all 10 seasonal month hubs)
+**31 Aug 2026 · Tier 5 · 9 new 12-month seasonal hubs (10 of 10 completed)**
+
+Completes the entire Tier 5 Month Hubs cluster (replaces what would have been 108 thin, cannibalising month pages with 10 authoritative, passage-rankable guides carrying 48,272 impressions).
+
+**Hubs deployed (9 additions):**
+- `/guides/by-month/gulmarg-by-month` (9,247 impr, 3.0 conv) — Ski season powder depth, Gondola Phase 1 vs 2 wind holds, snow chain mandates from Tangmarg.
+- `/guides/by-month/sonmarg-by-month` (4,910 impr, 2.0 conv) — Gagangeer winter closure, Thajiwas glacier pony routes, Zero Point snow walls.
+- `/guides/by-month/patnitop-by-month` (4,430 impr) — Skyview gondola visibility, Sanasar adventure, NH44 winter/monsoon conditions.
+- `/guides/by-month/srinagar-by-month` (3,463 impr, 1.0 conv) — Tulip festival dates, heated houseboat realities, golden Chinar foliage.
+- `/guides/by-month/pahalgam-by-month` (2,917 impr) — Betaab/Aru valley seasons, Lidder river rafting, Amarnath Yatra base camp traffic rules.
+- `/guides/by-month/vaishno-devi-by-month` (1,912 impr) — Chaitra/Sharad Navratri crowd surges (12+ hr wait times), winter vs night trekking.
+- `/guides/by-month/leh-by-month` (872 impr) — Manali/Srinagar pass opening dates, Chadar trek freeze, mandatory 48-hr acclimatisation.
+- `/guides/by-month/ladakh-by-month` (816 impr, 1.0 conv) — Pangong lake freeze, Nubra camel safaris, festival calendars.
+- `/guides/by-month/jammu-by-month` (91 impr) — Winter capital temple sightseeing, summer heat avoidances.
+
+**Information gain:**
+1. Standalone passage-rankable 12-month sections for every destination with explicit daytime & nighttime temperature ranges.
+2. Direct-answer block on every page naming the best season and the specific month to avoid.
+3. Access warnings on mountain passes, snow chains, and yatra security checkpoints.
+4. Zero-orphan verification: all 10 hubs linked from `/guides` and indexed in XML sitemap.
 
 ---
 
