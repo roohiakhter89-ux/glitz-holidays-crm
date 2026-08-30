@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Menu, X, Phone, LogIn } from 'lucide-react';
+import { Menu, X, Phone } from 'lucide-react';
 import { SITE } from '@/lib/site';
 import { cn } from '@/lib/utils';
 
@@ -47,14 +47,6 @@ export function SiteHeader() {
             <Phone className="size-3.5" strokeWidth={1.75} />
             {SITE.phone.display}
           </a>
-          <a
-            href={`${SITE.crmUrl}/login`}
-            className="flex items-center gap-1.5 text-[13.5px] text-[color:var(--color-ink-500)] hover:text-[color:var(--color-brand-600)] transition-colors"
-            title="Staff login"
-          >
-            <LogIn className="size-3.5" strokeWidth={1.75} />
-            Staff
-          </a>
         </nav>
 
         <button
@@ -88,13 +80,6 @@ export function SiteHeader() {
             >
               <Phone className="size-4" strokeWidth={1.75} />
               Call {SITE.phone.display}
-            </a>
-            <a
-              href={`${SITE.crmUrl}/login`}
-              className="flex items-center gap-2 rounded-md border border-[color:var(--color-ink-300)] px-3 py-2.5 text-[13.5px] text-[color:var(--color-ink-700)]"
-            >
-              <LogIn className="size-4" strokeWidth={1.75} />
-              Staff login
             </a>
           </nav>
         </div>

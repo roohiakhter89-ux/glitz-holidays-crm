@@ -35,16 +35,6 @@ export const SITE = {
   leadCaptureUrl:
     process.env.NEXT_PUBLIC_LEAD_CAPTURE_URL ??
     'https://glitz-backend-ugy4.onrender.com/api/leads/capture',
-
-  /**
-   * Staff CRM URL. The public site's "Staff login" link points here.
-   * Set NEXT_PUBLIC_CRM_URL in Vercel once the CRM moves to its final
-   * subdomain (e.g. https://app.glitz-holidays.in). Falling back to the
-   * current Vercel preview URL keeps the link working until then.
-   */
-  crmUrl:
-    process.env.NEXT_PUBLIC_CRM_URL ??
-    'https://glitz-holidays-crm.vercel.app',
 } as const;
 
 /**
