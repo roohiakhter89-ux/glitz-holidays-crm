@@ -57,6 +57,26 @@ const config: NextConfig = {
 
       { source: '/tours', destination: '/packages', permanent: true },
       { source: '/testimonials', destination: '/reviews', permanent: true },
+
+      // Route pages were briefly split by mode before being consolidated to
+      // one page per origin-destination pair. The per-mode URLs shipped, so
+      // they get 301s into the mode section on the consolidated page rather
+      // than being left to 404.
+      {
+        source: '/routes/delhi-to-srinagar-train',
+        destination: '/routes/delhi-to-srinagar#delhi-to-srinagar-train',
+        permanent: true,
+      },
+      {
+        source: '/routes/delhi-to-srinagar-flight',
+        destination: '/routes/delhi-to-srinagar#delhi-to-srinagar-flight',
+        permanent: true,
+      },
+      {
+        source: '/routes/delhi-to-srinagar-road',
+        destination: '/routes/delhi-to-srinagar#delhi-to-srinagar-road',
+        permanent: true,
+      },
     ];
   },
 };

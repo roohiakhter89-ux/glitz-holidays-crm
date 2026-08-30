@@ -7,6 +7,7 @@ import { GUIDES } from '@/lib/guides';
 import { COLLECTIONS } from '@/lib/collections';
 import { ORIGIN_CITIES } from '@/lib/origin-cities';
 import { ROUTES } from '@/lib/routes';
+import { MONTH_HUBS } from '@/lib/month-hubs';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -77,6 +78,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
+  /** Month hubs — one deep page per place, replacing 108 thin month pages. */
+  const monthHubs: MetadataRoute.Sitemap = MONTH_HUBS.map((m) => ({
+    url: `${SITE.domain}/guides/by-month/${m.slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.8,
+  }));
+
   const routes: MetadataRoute.Sitemap = ROUTES.map((r) => ({
     url: `${SITE.domain}/routes/${r.slug}`,
     lastModified: now,
@@ -92,6 +101,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...originCities,
     ...styles,
     ...guides,
+    ...monthHubs,
     ...routes,
   ];
 }

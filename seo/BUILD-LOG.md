@@ -4,19 +4,88 @@ One entry per page built, newest first. Every entry records the information
 gain claimed, so we can check later whether the pages that ranked were the ones
 carrying real differentiation.
 
-Standard: `seo/CONTENT-STANDARD.md`. Queue: `seo/page-manifest.json`.
+Standard: `seo/CONTENT-STANDARD.md` (content quality).
+Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
+Queue: `seo/page-manifest.json`.
 
-**Progress: 17 of 472**
+**Progress: 18 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
 | 0 · Proven converters | 7 | 7 |
 | 1 · Origin city | 5 | 47 |
-| 2 · Honeymoon & family | 1 | 22 |
-| 3 · Transport routes | 1 | 157 |
+| 2 · Honeymoon & family | 4 | 22 |
+| 3 · Transport routes | 1 | 88 |
 | 4 · Place × intent | 0 | 86 |
-| 5 · Month & season | 0 | 108 |
-| 6 · Hindi | 0 | 45 |
+| 5 · Month hubs | 1 | 10 |
+| 6 · Hindi | 0 | 10 |
+
+Manifest rebuilt from 472 to 270 on 31 Aug 2026. Not scope reduction —
+consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
+
+**Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
+until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 019 — /guides/by-month/kashmir-by-month
+**31 Aug 2026 · Tier 5 · reference implementation for 9 more month hubs**
+
+Replaces what would have been 12 separate `kashmir-in-{month}` pages.
+**20,584 impressions, 1,522 queries.**
+
+**Why one page.** Twelve near-identical documents differing by a month name and
+a temperature is the textbook deduplication case, and site diversity caps us at
+roughly two results per query anyway. Passage ranking makes consolidation safe:
+each month section is self-contained — its own temperatures, verdict, packing
+note, closures — so the January block can win "kashmir in january" while the
+page accumulates twelve times the links.
+
+**Information gain (6):**
+1. A verdict table for all twelve months above the prose, not buried.
+2. March marked `mixed` and named in the answer block as the month to skip —
+   "cheap for a reason". No competitor writes this.
+3. Day *and* night temperature ranges per month, as ranges not points.
+4. Snow stated as probability, never promised. December explicitly flagged as
+   less reliable than January or February, which is the opposite of what the
+   month's search volume implies people expect.
+5. Per-month access notes — Sonmarg road closure, gondola wind closures.
+6. Price index per month, so the cheap-vs-peak question is answered in one place.
+
+**Verified:** 200, H1 correct, title 70, meta 144, 12 passage anchors, 17 h2s,
+schema Article + FAQPage(6) + BreadcrumbList all parse, 1 inlink from
+`/guides`, depth 2, not orphaned.
+
+---
+
+## 018 — /routes/delhi-to-srinagar
+**31 Aug 2026 · Tier 3 · consolidation of the page built as 014**
+
+Absorbs the train-only page into a single origin-destination page with three
+self-contained mode sections. Reference implementation for 87 more.
+
+**Why.** The first manifest split routes by mode: 157 pages across 88 pairs,
+with 53 pairs running two or three near-identical pages competing for the same
+"delhi to srinagar" query family. Consolidated: 88 pages, same demand.
+
+**The old URLs shipped**, so `/routes/delhi-to-srinagar-{train,flight,road}`
+now 301 into the matching section anchor rather than 404ing.
+
+**Information gain (5):**
+1. The rail correction, unchanged and still the strongest item — most
+   competitors still say the line stops short of Srinagar.
+2. Road distance given as a **range** (818–869 km), because sources genuinely
+   disagree on routing. Picking one number would have been falsely precise.
+3. A single comparison table across all three modes — time, cost, right-for.
+4. An explicit verdict ("fly, unless the journey is the point") before any
+   mode detail.
+5. Honest self-exclusion: we tell people to book rail themselves on IRCTC
+   because we do not mark it up.
+
+**Two fixes caught in verification:** meta was 172 chars (now 125), and
+`dateModified` published 2026-08-30 for a page verified on the 31st — parsing
+"31 August 2026" and calling `toISOString()` shifted it across the timezone
+boundary. Now stored as an explicit `verifiedOnISO` field.
 
 ---
 
