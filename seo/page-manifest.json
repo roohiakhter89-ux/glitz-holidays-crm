@@ -3480,7 +3480,7 @@
  {
   "tier": 2,
   "family": "honeymoon-from-city",
-  "url": "/packages/honeymoon/from-delhi",
+  "url": "/packages/kashmir-honeymoon-packages-from-delhi",
   "h1": "Kashmir Honeymoon Packages from Delhi",
   "title": "Kashmir Honeymoon Packages from Delhi - All-Inclusive Couple Trips | Glitz Holidays",
   "primary": "honeymoon packages from delhi",
@@ -3693,7 +3693,7 @@
  {
   "tier": 2,
   "family": "honeymoon-from-city",
-  "url": "/packages/honeymoon/from-hyderabad",
+  "url": "/packages/kashmir-honeymoon-packages-from-hyderabad",
   "h1": "Kashmir Honeymoon Packages from Hyderabad",
   "title": "Kashmir Honeymoon Packages from Hyderabad - All-Inclusive Couple Trips | Glitz Holidays",
   "primary": "honeymoon packages from hyderabad",
@@ -4444,7 +4444,7 @@
  {
   "tier": 2,
   "family": "honeymoon-by-place",
-  "url": "/packages/honeymoon/gulmarg",
+  "url": "/packages/gulmarg-honeymoon-packages",
   "h1": "Gulmarg Honeymoon Packages",
   "title": "Gulmarg Honeymoon Package - Prices & Romantic Itinerary | Glitz Holidays",
   "primary": "gulmarg honeymoon package",
@@ -29599,5 +29599,201 @@
   ],
   "words": "900-1300",
   "id": 465
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/packages/kashmir-tour-package-with-flight",
+  "h1": "Kashmir tour packages with flights included",
+  "title": "Kashmir tour packages with flights included | Glitz Holidays",
+  "primary": "kashmir tour package with flight",
+  "n": 87,
+  "impr": 1010,
+  "clicks": 0,
+  "conv": 9.0,
+  "top": [
+   {
+    "q": "kashmir tour package with flight",
+    "impr": 1010,
+    "clicks": 0,
+    "conv": 9.0
+   }
+  ],
+  "content": [
+   "Land price and airfare quoted as two separate lines, never blended",
+   "Why a single all-inclusive number is worse for the buyer",
+   "Family maths: the flight is the dominant variable, not the land cost",
+   "What 'with flights' includes, and what remains an airline charge"
+  ],
+  "words": "1200-1800",
+  "id": 466
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/packages/cheap-kashmir-tour-packages",
+  "h1": "Cheap Kashmir tour packages",
+  "title": "Cheap Kashmir tour packages | Glitz Holidays",
+  "primary": "cheapest tour packages for kashmir",
+  "n": 42,
+  "impr": 480,
+  "clicks": 0,
+  "conv": 7.0,
+  "top": [
+   {
+    "q": "cheapest tour packages for kashmir",
+    "impr": 480,
+    "clicks": 0,
+    "conv": 7.0
+   }
+  ],
+  "content": [
+   "The real floor price and what it buys",
+   "The four ways a cheaper quote is usually constructed",
+   "Fair savings vs unfair omissions, stated as a table",
+   "Season before duration as the lever that actually works"
+  ],
+  "words": "1200-1800",
+  "id": 467
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/packages/jammu-tour-packages",
+  "h1": "Jammu tour packages",
+  "title": "Jammu tour packages | Glitz Holidays",
+  "primary": "jammu tour package",
+  "n": 3903,
+  "impr": 44970,
+  "clicks": 0,
+  "conv": 46.7,
+  "top": [
+   {
+    "q": "jammu tour package",
+    "impr": 44970,
+    "clicks": 0,
+    "conv": 46.7
+   }
+  ],
+  "content": [
+   "Jammu as a destination, not a corridor to somewhere else",
+   "Vaishno Devi yatra logistics: distance, ponies, helicopter, registration",
+   "Why combining with Kashmir beats two separate trips",
+   "Seasonality that runs opposite to the valley"
+  ],
+  "words": "1200-1800",
+  "id": 468
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/packages/srinagar-packages",
+  "h1": "Srinagar packages by length",
+  "title": "Srinagar packages by length | Glitz Holidays",
+  "primary": "srinagar package for 6 nights",
+  "n": 106,
+  "impr": 521,
+  "clicks": 0,
+  "conv": 7.0,
+  "top": [
+   {
+    "q": "srinagar package for 6 nights",
+    "impr": 521,
+    "clicks": 0,
+    "conv": 7.0
+   }
+  ],
+  "content": [
+   "What genuinely fits in 4, 5 and 6 nights",
+   "The weather-buffer argument for the sixth night",
+   "Why the couple itinerary is built at five",
+   "Side-by-side comparison of the three lengths"
+  ],
+  "words": "1200-1800",
+  "id": 469
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/packages/kashmir-packages-for-couples",
+  "h1": "Kashmir packages for couples",
+  "title": "Kashmir packages for couples | Glitz Holidays",
+  "primary": "kashmir packages for couple",
+  "n": 71,
+  "impr": 690,
+  "clicks": 0,
+  "conv": 5.0,
+  "top": [
+   {
+    "q": "kashmir packages for couple",
+    "impr": 690,
+    "clicks": 0,
+    "conv": 5.0
+   }
+  ],
+  "content": [
+   "What is structurally different, not decoratively different",
+   "Private vehicle as base spec, not an upgrade",
+   "Naming the houseboat rather than selling a category",
+   "Month-by-month guidance for couples"
+  ],
+  "words": "1200-1800",
+  "id": 470
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/guides/kashmir-taxi-and-cab-fares-guide",
+  "h1": "Kashmir taxi and cab hire",
+  "title": "Kashmir taxi and cab hire | Glitz Holidays",
+  "primary": "tempo traveller in srinagar",
+  "n": 271,
+  "impr": 1826,
+  "clicks": 0,
+  "conv": 18.0,
+  "top": [
+   {
+    "q": "tempo traveller in srinagar",
+    "impr": 1826,
+    "clicks": 0,
+    "conv": 18.0
+   }
+  ],
+  "content": [
+   "The union system and why packages exclude those charges",
+   "Vehicle classes mapped to group size and luggage",
+   "The four exclusions travellers discover on the day",
+   "Five rules for hiring transport well"
+  ],
+  "words": "1200-1800",
+  "id": 471
+ },
+ {
+  "tier": 0,
+  "family": "proven-converter",
+  "url": "/guides/choosing-a-travel-agency-in-srinagar",
+  "h1": "Choosing a travel agency in Srinagar",
+  "title": "Choosing a travel agency in Srinagar | Glitz Holidays",
+  "primary": "best travel agency in srinagar",
+  "n": 635,
+  "impr": 3856,
+  "clicks": 0,
+  "conv": 20.3,
+  "top": [
+   {
+    "q": "best travel agency in srinagar",
+    "impr": 3856,
+    "clicks": 0,
+    "conv": 20.3
+   }
+  ],
+  "content": [
+   "DMC versus reseller, and why it matters at 9pm",
+   "Six questions that expose the difference",
+   "Warning signs worth walking away from",
+   "How to normalise competing quotes before comparing"
+  ],
+  "words": "1200-1800",
+  "id": 472
  }
 ]
