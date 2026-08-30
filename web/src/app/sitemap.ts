@@ -4,6 +4,9 @@ import { DESTINATIONS } from '@/lib/destinations';
 import { PACKAGES } from '@/lib/packages';
 import { TRAVEL_STYLES } from '@/lib/travel-styles';
 import { GUIDES } from '@/lib/guides';
+import { COLLECTIONS } from '@/lib/collections';
+import { ORIGIN_CITIES } from '@/lib/origin-cities';
+import { ROUTES } from '@/lib/routes';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -14,6 +17,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE.domain}/packages`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${SITE.domain}/plan-my-trip`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${SITE.domain}/guides`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${SITE.domain}/routes`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${SITE.domain}/partner-with-us`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${SITE.domain}/reviews`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${SITE.domain}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
@@ -53,5 +57,41 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...statics, ...destinations, ...packages, ...styles, ...guides];
+  /**
+   * Curated package collections. These share the flat /packages/<slug> space
+   * with individual packages and target commercial queries that already
+   * convert in paid search, so they carry the same priority.
+   */
+  const collections: MetadataRoute.Sitemap = COLLECTIONS.map((c) => ({
+    url: `${SITE.domain}/packages/${c.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
+  /** Origin-city landing pages — the highest-converting template we run. */
+  const originCities: MetadataRoute.Sitemap = ORIGIN_CITIES.map((c) => ({
+    url: `${SITE.domain}/packages/from/${c.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
+  const routes: MetadataRoute.Sitemap = ROUTES.map((r) => ({
+    url: `${SITE.domain}/routes/${r.slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }));
+
+  return [
+    ...statics,
+    ...destinations,
+    ...packages,
+    ...collections,
+    ...originCities,
+    ...styles,
+    ...guides,
+    ...routes,
+  ];
 }

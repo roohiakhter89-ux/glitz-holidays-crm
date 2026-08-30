@@ -212,6 +212,177 @@ Crafted from aromatic fragrant Deodar cedarwood with intricate Khatamband ceilin
 We recommend spending **1 Night on a luxury houseboat** on your arrival or departure evening in Srinagar, combined with luxury resort stays in Gulmarg and Pahalgam for the remainder of your journey.
     `,
   },
+
+  // ───────────────────────────────────────────────────────────────────
+  // The two guides below target query clusters that have already produced
+  // conversions in the Google Ads search-terms report but had no organic
+  // page. Taxi/transfer intent carries the highest CTR of any cluster we
+  // measure (9.15%); "travel agency in Srinagar" runs 11–25% CTR on small
+  // volume. Both are bottom-of-funnel despite reading as informational.
+  // ───────────────────────────────────────────────────────────────────
+  {
+    slug: 'kashmir-taxi-and-cab-fares-guide',
+    image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1200&auto=format&fit=crop',
+    title: 'Kashmir Taxi & Cab Hire: What Every Route Actually Costs',
+    subtitle:
+      'Union rates, private cabs and tempo travellers explained — including the charges most packages exclude and nobody warns you about.',
+    summary:
+      'A plain guide to hiring transport in Kashmir: how the local taxi unions work, what the Srinagar–Gulmarg and Srinagar–Pahalgam runs cost, when a tempo traveller makes sense, and why your package almost certainly excludes union charges.',
+    destination: 'kashmir',
+    destinationName: 'Kashmir',
+    readingTime: '7 min read',
+    author: 'Tariq Ahmad',
+    authorRole: 'Head of Operations, Srinagar',
+    publishedAt: '2026-08-31',
+    updatedAt: '2026-08-31',
+    tags: ['Transport', 'Taxi', 'Tempo Traveller', 'Costs'],
+    relatedPackages: [
+      'classic-kashmir-4-nights',
+      'complete-kashmir-6-nights',
+      'kashmir-snow-winter-5-nights',
+    ],
+    toc: [
+      { id: 'union-system', title: 'The union system, and why it catches people out' },
+      { id: 'vehicle-types', title: 'Which vehicle you actually need' },
+      { id: 'what-packages-exclude', title: 'What your package excludes' },
+      { id: 'hiring-well', title: 'Hiring well: five rules' },
+    ],
+    faqs: [
+      {
+        q: 'Why does my package exclude taxi charges inside Gulmarg and Sonmarg?',
+        a: 'Because those runs are controlled by local taxi unions with state-regulated fixed rates, and outside operators are not permitted to drive them. Your package vehicle takes you to the union stand and waits; the final leg is a union taxi you pay for there. Every honest operator excludes this. Anyone who does not is either absorbing it into an inflated headline price or has not told you yet.',
+      },
+      {
+        q: 'How much should a Srinagar to Gulmarg day trip cost?',
+        a: 'For the main run, a private sedan is the usual choice and an SUV makes sense in snow or with luggage. The union leg beyond Gulmarg to Kongdoori is charged separately at fixed rates. Rates move with fuel and are set locally rather than nationally, so ask us for the current figure on your dates rather than trusting a number published a year ago.',
+      },
+      {
+        q: 'Is a tempo traveller worth it for a family group?',
+        a: 'Above about seven people, almost always. Below that a single SUV is usually cheaper and more comfortable, and it handles mountain roads better. The tipping point is headcount plus luggage, not headcount alone — six adults with large winter cases often need the bigger vehicle.',
+      },
+      {
+        q: 'Can I hire a self-drive car in Kashmir?',
+        a: 'You can, but we rarely recommend it. Mountain road conditions, winter surfaces, and the union system on the tourist runs all reduce the benefit, and any time saved tends to be lost at checkpoints. A car with a local driver costs little more and removes all of it.',
+      },
+      {
+        q: 'Do I need to tip the driver?',
+        a: 'It is not obligatory and it is not built into the fare. If a driver has done a genuinely good job across several days — and on a longer itinerary the driver becomes a big part of the trip — most travellers give something at the end. Anything you offer is appreciated rather than expected.',
+      },
+    ],
+    content: `
+### The union system, and why it catches people out
+Transport in tourist Kashmir works differently from the rest of India, and the difference is the single most common source of unexpected cost on a trip here.
+
+On the main runs — Srinagar to Gulmarg, Srinagar to Pahalgam, Srinagar to Sonmarg — your own vehicle takes you there and back. But the **final stretch at each destination is reserved for the local taxi union**, at fixed, state-regulated rates. Your driver cannot take you up to Kongdoori, into Aru and Betaab valleys, or out to Thajiwas glacier, however much you or he would like him to.
+
+This is not an operator scam. It is a long-standing local arrangement that distributes tourist income among resident drivers, and it is enforced. What *is* a scam is failing to tell you about it until you are standing at the union stand with your wallet out.
+
+### Which vehicle you actually need
+- **Sedan (Dzire, Etios):** Two to three passengers with modest luggage. Perfectly good in summer on all the main runs.
+- **SUV (Innova, Xylo, Scorpio):** Four to six passengers, and the sensible default in winter. Higher clearance and better traction matter on snow, and the difference in comfort over a week of mountain roads is significant.
+- **Tempo traveller (12–17 seat):** Groups of seven or more, or smaller groups with heavy luggage. Genuinely cheaper per head, though slower on the narrow sections.
+
+A useful rule: count your bags, not just your people. Six travellers with winter cases are an SUV-and-a-half, and squeezing them into one vehicle makes a long day considerably longer.
+
+### What your package excludes
+Read this on any operator's page, ours included. Our packages exclude:
+
+- Union taxi charges inside Gulmarg, Sonmarg and Pahalgam
+- Gondola tickets, pony rides, sledging and ATV hire
+- Entry tickets to gardens and monuments
+
+Those exclusions are published rather than buried, because they are the four things travellers most often discover on the day. Budget roughly for them in advance and there is no unpleasant surprise; ignore them and a well-priced trip develops an annoying tail of cash payments.
+
+### Hiring well: five rules
+1. **Agree the vehicle class in writing, not just the price.** "A car" is not a specification. "Innova Crysta, four passengers, five days" is.
+2. **Confirm whether the rate is per day or per route.** Both exist locally and they are not interchangeable.
+3. **Ask what happens on a weather day.** If Sonmarg road is shut, is the driver paid anyway? Usually yes, and that is fair — but know it beforehand.
+4. **Do not book transport from the airport arrivals hall.** Prices there are the worst you will see all trip.
+5. **Keep the same driver for the whole trip if you can.** After two days he knows what you want, and on a six-night itinerary that matters more than the vehicle badge.
+    `,
+  },
+
+  {
+    slug: 'choosing-a-travel-agency-in-srinagar',
+    image: 'https://images.unsplash.com/photo-1566837945700-30057527ade0?q=80&w=1200&auto=format&fit=crop',
+    title: 'How to Choose a Travel Agency in Srinagar (Without Getting Burned)',
+    subtitle:
+      'What actually separates a real Kashmir operator from a reseller — and the questions that expose the difference in under two minutes.',
+    summary:
+      'A candid guide to picking a Kashmir tour operator: DMC versus reseller, the licence and registration to check, the six questions worth asking, and the warning signs that reliably predict a bad trip.',
+    destination: 'kashmir',
+    destinationName: 'Kashmir',
+    readingTime: '8 min read',
+    author: 'Tariq Ahmad',
+    authorRole: 'Head of Operations, Srinagar',
+    publishedAt: '2026-08-31',
+    updatedAt: '2026-08-31',
+    tags: ['Planning', 'Booking', 'Operators', 'Trust'],
+    relatedPackages: [
+      'complete-kashmir-6-nights',
+      'kashmir-honeymoon-5-nights',
+      'classic-kashmir-4-nights',
+    ],
+    toc: [
+      { id: 'dmc-vs-reseller', title: 'DMC or reseller: the distinction that matters' },
+      { id: 'six-questions', title: 'Six questions that expose the difference' },
+      { id: 'red-flags', title: 'Warning signs worth walking away from' },
+      { id: 'fair-comparison', title: 'Comparing quotes fairly' },
+    ],
+    faqs: [
+      {
+        q: 'What is the difference between a DMC and a travel agency?',
+        a: 'A destination management company operates in the destination itself — its own staff, vehicles and hotel relationships on the ground. A reselling agency sells you the trip and then buys it from a DMC. Neither is dishonest, but when something goes wrong at 9pm in Pahalgam, only one of them can actually fix it.',
+      },
+      {
+        q: 'How do I check a Kashmir operator is legitimate?',
+        a: 'Ask for the registered business name and address and confirm it is in J&K, not a marketing office elsewhere. Check the Google Business Profile has a real history of reviews rather than a burst of recent ones. Ask for a GST-compliant invoice. Any operator unwilling to provide all three is telling you something.',
+      },
+      {
+        q: 'Should I pay a full advance?',
+        a: 'No. A deposit to hold hotels and vehicles is entirely normal and necessary in peak season. A demand for the full amount upfront, particularly to a personal account rather than a business one, is a serious warning sign.',
+      },
+      {
+        q: 'Are cheaper quotes always worse?',
+        a: 'Not always, but you must compare like with like. Most large gaps between quotes come down to hotel category, private versus shared vehicle, whether GST is included, and whether the union charges are declared. Normalise those four and the quotes usually converge.',
+      },
+      {
+        q: 'What does Glitz Holidays do differently?',
+        a: 'We are based in Srinagar and have operated here since 2013. Your quote comes from the person who will run your trip, not a call centre, and our exclusions are published on every package page rather than buried in a PDF you receive after paying.',
+      },
+    ],
+    content: `
+### DMC or reseller: the distinction that matters
+Most Kashmir trips are sold by companies that do not operate in Kashmir. They take your booking, mark it up, and pass it to a local operator who does the actual work. That chain is legal and common, and for a simple trip it often works fine.
+
+It stops working the moment something goes wrong. A hotel that has given your room away, a road closed by snow, a family member unwell at altitude — these are problems that need someone with local authority and a phone that gets answered at 9pm. A reseller in another city can only relay your problem down the chain and relay the answer back.
+
+The question to ask is not "are you a DMC?", because everyone will say yes. It is **"where is your office and who will meet me at the airport?"** The answers are specific, checkable, and instantly revealing.
+
+### Six questions that expose the difference
+1. **Which hotel exactly, by name?** A quote listing "4★ hotel or similar" is a quote that has not been costed. Named properties can be looked up; categories cannot.
+2. **Is the sightseeing vehicle private or shared?** This is the most common silent downgrade in the market and the one travellers notice most.
+3. **Is GST included in this figure?** A quote excluding it will look roughly five percent cheaper for no real reason.
+4. **What are the union charges and are they excluded?** Anyone who does not know what you are asking about does not operate here.
+5. **Who is my point of contact during the trip, and are they in Kashmir?** Ask for a name.
+6. **What is your cancellation policy in writing?** Not a verbal assurance. In writing, before you pay.
+
+### Warning signs worth walking away from
+- Pressure to pay the full amount immediately, particularly to a personal bank account
+- A price dramatically below every other quote, with no explanation of what differs
+- Stock photography and no images of their own guests or vehicles
+- A Google Business Profile with a sudden cluster of reviews and no history behind it
+- Reluctance to name hotels until after the deposit
+- No physical address in Jammu & Kashmir
+
+None of these individually proves bad faith. Two or more together reliably predicts a disappointing trip.
+
+### Comparing quotes fairly
+Put competing quotes side by side and normalise them before comparing totals. Set them all to the same hotel category, the same vehicle arrangement, GST included, and union charges declared. Do that and the spread between serious operators is usually narrow — at which point you are choosing on responsiveness and judgement rather than on price, which is the right basis anyway.
+
+Then ask one final question: **who answers the phone at nine at night?** On a good trip you will never need to know. On a difficult one it is the only thing that matters.
+    `,
+  },
 ];
 
 export function getGuide(slug: string): GuideArticle | undefined {

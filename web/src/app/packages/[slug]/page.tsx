@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Check, X, Clock, MapPin, CalendarDays, Users, ArrowUpRight, Bed, Utensils } from 'lucide-react';
 import { PACKAGES, getPackage, packagesFor } from '@/lib/packages';
+import { COLLECTIONS, getCollection } from '@/lib/collections';
+import { CollectionPage } from '@/components/collection-page';
 import { getDestination, TONE_HERO } from '@/lib/destinations';
 import { getTravelStyle } from '@/lib/travel-styles';
 import { PackageCard, SectionHead, Faq, JsonLd } from '@/components/cards';
@@ -13,14 +15,39 @@ import { SITE, inr, whatsAppLink } from '@/lib/site';
 
 type Params = Promise<{ slug: string }>;
 
+/**
+ * This route serves two page types on one flat URL space: individual packages
+ * and curated collections (`/packages/kashmir-tour-package-with-flight`).
+ * Slugs are disjoint, so a package always wins the lookup and collections
+ * fill in behind it. Keeping them flat matters — these collection slugs are
+ * the exact commercial queries they target.
+ */
 export function generateStaticParams() {
-  return PACKAGES.map((p) => ({ slug: p.slug }));
+  return [
+    ...PACKAGES.map((p) => ({ slug: p.slug })),
+    ...COLLECTIONS.map((c) => ({ slug: c.slug })),
+  ];
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
   const p = getPackage(slug);
-  if (!p) return {};
+
+  if (!p) {
+    const c = getCollection(slug);
+    if (!c) return {};
+    return {
+      title: c.seoTitle,
+      description: c.metaDescription,
+      alternates: { canonical: `/packages/${c.slug}` },
+      openGraph: {
+        title: c.seoTitle,
+        description: c.metaDescription,
+        url: `${SITE.domain}/packages/${c.slug}`,
+        type: 'website',
+      },
+    };
+  }
 
   const title = `${p.name} — ${p.nights} Nights ${p.days} Days ${p.destinationName} Package from ${inr(p.priceFrom)}`;
   const description = `${p.summary} Day-by-day itinerary, clear inclusions and exclusions, GST-inclusive pricing from ${inr(p.priceFrom)} per person. Route: ${p.route.join(' → ')}.`;
@@ -41,7 +68,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function PackageDetail({ params }: { params: Params }) {
   const { slug } = await params;
   const p = getPackage(slug);
-  if (!p) notFound();
+
+  if (!p) {
+    const c = getCollection(slug);
+    if (c) return <CollectionPage c={c} />;
+    notFound();
+  }
 
   const dest = getDestination(p.destination);
   const url = `${SITE.domain}/packages/${p.slug}`;
