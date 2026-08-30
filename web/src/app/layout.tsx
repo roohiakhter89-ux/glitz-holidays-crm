@@ -125,6 +125,16 @@ export default function RootLayout({
         <main>{children}</main>
         <SiteFooter />
         <WhatsAppFloat />
+
+        {/*
+          Render free-tier wake-ping. Fires a 1×1 Image() request on every
+          page load so the backend is already warm by the time a visitor
+          submits an enquiry. Silent, no CORS (image request), <1KB overhead.
+          Same pattern the PHP landers use.
+        */}
+        <Script id="backend-wake" strategy="afterInteractive">{`
+          (function(){var i=new Image();i.src='${SITE.wakePingUrl}?t='+Date.now();})();
+        `}</Script>
       </body>
     </html>
   );

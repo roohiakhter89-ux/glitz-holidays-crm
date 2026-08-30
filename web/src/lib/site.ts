@@ -35,6 +35,16 @@ export const SITE = {
   leadCaptureUrl:
     process.env.NEXT_PUBLIC_LEAD_CAPTURE_URL ??
     'https://glitz-backend-ugy4.onrender.com/api/leads/capture',
+
+  /**
+   * Cheap health endpoint used to wake the Render free-tier backend.
+   * Every public page loads a 1×1 Image() request against this URL so
+   * that by the time a visitor clicks "Send my enquiry", the backend
+   * is already awake (Render sleeps after 15 min idle, cold-start ~30s).
+   */
+  wakePingUrl:
+    process.env.NEXT_PUBLIC_WAKE_PING_URL ??
+    'https://glitz-backend-ugy4.onrender.com/api/health',
 } as const;
 
 /**
