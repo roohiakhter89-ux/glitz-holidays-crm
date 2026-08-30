@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
 import { SITE, inr } from '@/lib/site';
 import { PACKAGES } from '@/lib/packages';
 import { DESTINATIONS } from '@/lib/destinations';
 import { TRAVEL_STYLES } from '@/lib/travel-styles';
+import { COLLECTIONS } from '@/lib/collections';
+import { ORIGIN_CITIES } from '@/lib/origin-cities';
 import { PackageCard, SectionHead, JsonLd } from '@/components/cards';
 import { PageHero } from '@/components/page-hero';
 
@@ -108,8 +111,91 @@ export default function PackagesIndex() {
         })}
       </div>
 
-      {/* travel styles cross-link block */}
+      {/*
+        Departure-city hub.
+        These pages were orphaned on first ship — in the sitemap but with no
+        internal link pointing at them, which means almost no link equity
+        reached them and they would have taken months to rank. Link analysis
+        is still a live ranking system; a page nothing links to is a page
+        Google has little reason to trust. This block is the fix.
+      */}
+      <section className="section border-t border-paper-200">
+        <div className="wrap">
+          <SectionHead
+            kicker="Departing from"
+            title="Packages priced from your city."
+            lede="Same land package, different airfare and a different first day. These pages carry the flight and rail picture from each city, and an itinerary built around when you actually land."
+          />
+          <div data-reveal-group className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ORIGIN_CITIES.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/packages/from/${c.slug}`}
+                className="lift group flex items-center justify-between gap-3 rounded-xl border border-paper-300 bg-paper-50 px-5 py-4 transition-colors hover:border-gold-400 hover:bg-white"
+              >
+                <span>
+                  <span className="display block text-[18px] text-ink-900">
+                    Kashmir from {c.name}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-ink-500">{c.state}</span>
+                </span>
+                <ArrowUpRight
+                  className="arrow-slide size-4 shrink-0 text-gold-600"
+                  strokeWidth={2.2}
+                />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Comparison collections — the commercial queries people actually type. */}
       <section className="section border-t border-paper-200 bg-paper-100">
+        <div className="wrap">
+          <SectionHead
+            kicker="Compare by"
+            title="The questions people ask before booking."
+            lede="Length, budget, who is travelling, whether flights are in. Each of these compares the relevant itineraries side by side rather than making you open six tabs."
+          />
+          <div data-reveal-group className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {COLLECTIONS.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/packages/${c.slug}`}
+                className="lift group rounded-xl border border-paper-300 bg-white p-5 transition-colors hover:border-gold-400"
+              >
+                <h3 className="display text-[18px] leading-snug text-ink-900">{c.h1}</h3>
+                <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-relaxed text-ink-600">
+                  {c.lede}
+                </p>
+                <span className="mt-3 inline-block text-[12px] font-medium text-gold-700">
+                  Compare &rarr;
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/routes"
+              className="lift inline-flex items-center gap-2 rounded-xl border border-paper-300 bg-white px-5 py-3.5 text-[14px] font-medium text-ink-800 transition-colors hover:border-gold-400"
+            >
+              Getting here: route guides by train, flight and road
+              <ArrowUpRight className="size-4 text-gold-600" strokeWidth={2.2} />
+            </Link>
+            <Link
+              href="/guides"
+              className="lift inline-flex items-center gap-2 rounded-xl border border-paper-300 bg-white px-5 py-3.5 text-[14px] font-medium text-ink-800 transition-colors hover:border-gold-400"
+            >
+              All travel guides
+              <ArrowUpRight className="size-4 text-gold-600" strokeWidth={2.2} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* travel styles cross-link block */}
+      <section className="section border-t border-paper-200">
         <div className="wrap">
           <SectionHead
             kicker="Not sure which fits?"

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Check, X, Clock, MapPin, CalendarDays, Users, ArrowUpRight, Bed, Utensils } from 'lucide-react';
 import { PACKAGES, getPackage, packagesFor } from '@/lib/packages';
 import { COLLECTIONS, getCollection } from '@/lib/collections';
+import { ORIGIN_CITIES } from '@/lib/origin-cities';
 import { CollectionPage } from '@/components/collection-page';
 import { getDestination, TONE_HERO } from '@/lib/destinations';
 import { getTravelStyle } from '@/lib/travel-styles';
@@ -414,6 +415,54 @@ export default async function PackageDetail({ params }: { params: Params }) {
           </div>
         </section>
       )}
+
+      {/*
+        Contextual cross-links. Package pages carry the most internal link
+        equity on the site, so this is the most effective place to pass it
+        down to the departure-city and comparison pages — which otherwise
+        sit orphaned and rank slowly regardless of how good they are.
+      */}
+      <section className="section-sm border-t border-paper-200">
+        <div className="wrap">
+          <p className="kicker" data-reveal>
+            Planning this trip
+          </p>
+          <div data-reveal-group className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {ORIGIN_CITIES.slice(0, 4).map((c) => (
+              <Link
+                key={c.slug}
+                href={`/packages/from/${c.slug}`}
+                className="lift group flex items-center justify-between gap-3 rounded-xl border border-paper-300 bg-paper-50 px-5 py-4 transition-colors hover:border-gold-400 hover:bg-white"
+              >
+                <span className="text-[14px] text-ink-800">
+                  Travelling from <span className="font-medium">{c.name}</span>?
+                </span>
+                <ArrowUpRight
+                  className="arrow-slide size-4 shrink-0 text-gold-600"
+                  strokeWidth={2.2}
+                />
+              </Link>
+            ))}
+          </div>
+          <div data-reveal className="mt-3 flex flex-wrap gap-2.5">
+            {COLLECTIONS.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/packages/${c.slug}`}
+                className="rounded-full border border-paper-300 bg-white px-4 py-2 text-[13px] text-ink-600 transition-colors hover:border-gold-400 hover:text-gold-700"
+              >
+                {c.crumbLabel}
+              </Link>
+            ))}
+            <Link
+              href="/routes"
+              className="rounded-full border border-paper-300 bg-white px-4 py-2 text-[13px] text-ink-600 transition-colors hover:border-gold-400 hover:text-gold-700"
+            >
+              Route guides
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* ───────────── enquiry */}
       <section className="mesh-pine grain section relative isolate overflow-hidden">

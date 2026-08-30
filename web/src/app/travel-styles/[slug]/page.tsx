@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Check, ArrowUpRight, AlertTriangle, Equal, Sparkles } from 'lucide-react';
 import { TRAVEL_STYLES, getTravelStyle } from '@/lib/travel-styles';
 import { packagesForStyle } from '@/lib/packages';
+import { COLLECTIONS } from '@/lib/collections';
 import { PackageCard, SectionHead, Faq, JsonLd } from '@/components/cards';
 import { PageHero } from '@/components/page-hero';
 import { EnquiryForm } from '@/components/enquiry-form';
@@ -48,6 +49,9 @@ export default async function TravelStylePage({ params }: { params: Params }) {
 
   const pkgs = packagesForStyle(s.slug);
   const url = `${SITE.domain}/travel-styles/${s.slug}`;
+
+  /** Collections whose slug names this style — honeymoon pages feed honeymoon collections. */
+  const related = COLLECTIONS.filter((c) => c.slug.includes(s.slug));
 
   const jsonLd = [
     ...(s.author
@@ -392,6 +396,40 @@ export default async function TravelStylePage({ params }: { params: Params }) {
           </div>
         </div>
       </section>
+
+      {/*
+        Style-specific collection links. Contextual main-content links from a
+        topically-matched page are the strongest internal signal available, so
+        the honeymoon pillar feeds the honeymoon collections directly rather
+        than leaving them on a single hub link.
+      */}
+      {related.length > 0 && (
+        <section className="section-sm border-t border-paper-200">
+          <div className="wrap">
+            <p className="kicker" data-reveal>
+              Go deeper on {s.name.toLowerCase()}
+            </p>
+            <div data-reveal-group className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`/packages/${c.slug}`}
+                  className="lift group rounded-xl border border-paper-300 bg-paper-50 p-5 transition-colors hover:border-gold-400 hover:bg-white"
+                >
+                  <h3 className="display text-[18px] leading-snug text-ink-900">{c.h1}</h3>
+                  <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-relaxed text-ink-600">
+                    {c.lede}
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-gold-700">
+                    See prices
+                    <ArrowUpRight className="size-3.5" strokeWidth={2.2} />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* other styles */}
       <section className="section-sm">
