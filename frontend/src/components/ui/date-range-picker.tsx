@@ -33,8 +33,16 @@ export interface DateRange {
   preset: PresetId;
 }
 
+/**
+ * Local-calendar YYYY-MM-DD. Never use `d.toISOString()` here — it converts
+ * to UTC, so an IST user picking "today" at 22:00 IST would get yesterday's
+ * date in the string. Build from local getters instead.
+ */
 function iso(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 function startOfToday(): Date {
   const d = new Date();

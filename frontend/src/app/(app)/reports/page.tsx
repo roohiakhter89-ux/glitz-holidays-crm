@@ -18,6 +18,7 @@ import { EChart, chartBase, axisStyle } from '@/components/echart';
 import { Chip } from '@/components/ui/badge';
 import { money, moneyShort, percent } from '@/lib/format';
 import { humanise } from '@/lib/constants';
+import { toApiRange, localDateISO } from '@/lib/date-range';
 
 /**
  * Agency-wide numbers. Range picker at top; every panel below re-fetches on
@@ -31,8 +32,7 @@ function defaultRange() {
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 90);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: iso(from), to: iso(to) };
+  return { from: localDateISO(from), to: localDateISO(to) };
 }
 
 export default function ReportsPage() {
@@ -48,7 +48,8 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const q = new URLSearchParams({ from: range.from, to: range.to });
+    const api_range = toApiRange(range);
+    const q = new URLSearchParams({ from: api_range.from ?? '', to: api_range.to ?? '' });
     try {
       const [r, s, v, c, src] = await Promise.all([
         api.get<RevenueRow[]>(`/reports/revenue?${q}`),

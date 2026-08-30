@@ -17,6 +17,7 @@ import { CloseLeadDialog } from '@/components/close-lead-dialog';
 import { ApprovalsDialog } from '@/components/approvals-dialog';
 import { ImportLeadsDialog } from '@/components/import-leads-dialog';
 import { DateRangePicker, defaultRange, type DateRange } from '@/components/ui/date-range-picker';
+import { toApiRange } from '@/lib/date-range';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
 import { relativeDate } from '@/lib/format';
 
@@ -82,11 +83,10 @@ export default function LeadsPage() {
     if (search.trim()) params.set('search', search.trim());
     if (status) params.set('status', status);
     if (source) params.set('source', source);
-    if (range.from) params.set('from', range.from);
-    if (range.to) {
-      // Backend uses lte on createdAt; include the entire end day.
-      params.set('to', range.to + 'T23:59:59.999Z');
-    }
+    // IST-anchored ISO timestamps — see lib/date-range.ts for why.
+    const apiRange = toApiRange(range);
+    if (apiRange.from) params.set('from', apiRange.from);
+    if (apiRange.to) params.set('to', apiRange.to);
 
     try {
       const res = await api.get<Paged<LeadRow>>(`/leads?${params}`);

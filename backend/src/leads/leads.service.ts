@@ -83,6 +83,22 @@ export class LeadsService {
     return digits.length > 10 ? digits.slice(-10) : digits;
   }
 
+  /**
+   * Title-case a free-form destination string so "kashmir", "KASHMIR", and
+   * "Kashmir" all render as one label in the leads list. Preserves the
+   * word "and"/"&" small on multi-word entries.
+   */
+  private normaliseDestination(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const trimmed = raw.trim().replace(/\s+/g, ' ');
+    if (!trimmed) return null;
+    return trimmed
+      .toLowerCase()
+      .split(' ')
+      .map((w) => (w === 'and' || w === '&' ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(' ');
+  }
+
   async capture(dto: CaptureLeadDto, ctx: CaptureContext) {
     // Load the visit early so its stored attribution wins over anything the
     // form fields might carry — the URL had ground truth, form values can be
@@ -99,6 +115,12 @@ export class LeadsService {
     const phoneKey = this.normalisePhone(dto.phone);
     const since = new Date();
     since.setDate(since.getDate() - DEDUPE_WINDOW_DAYS);
+
+    // Title-case the destination so "kashmir", "KASHMIR" and "Kashmir" all
+    // group as one label in the leads list. Mutates once so every downstream
+    // write sees the normalised value.
+    const normalisedDest = this.normaliseDestination(dto.destination);
+    dto.destination = normalisedDest ?? undefined;
 
     // --- dedupe: same phone inside the window is a RE-ENQUIRY, not a new lead
     const existing = await this.prisma.lead.findFirst({
@@ -353,7 +375,7 @@ export class LeadsService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.phone !== undefined) data.phone = dto.phone;
     if (dto.email !== undefined) data.email = dto.email;
-    if (dto.destination !== undefined) data.destination = dto.destination;
+    if (dto.destination !== undefined) data.destination = this.normaliseDestination(dto.destination);
     if (dto.nights !== undefined) data.nights = dto.nights;
     if (dto.adults !== undefined) data.adults = dto.adults;
     if (dto.children !== undefined) data.children = dto.children;
