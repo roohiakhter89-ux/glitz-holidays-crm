@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { SettingsController } from './settings.controller';
+import { LeadsModule } from '../leads/leads.module';
 
 @Module({
+  imports: [LeadsModule],
   controllers: [SettingsController],
   providers: [SettingsService],
   exports: [SettingsService],

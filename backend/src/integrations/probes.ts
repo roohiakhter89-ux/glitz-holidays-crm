@@ -224,6 +224,55 @@ async function probeMeta(c: any): Promise<ProbeResult> {
   return { ok: false, message: `HTTP ${r.status}: ${await readTextSafe(r)}` };
 }
 
+async function probeWhatsAppCloud(c: any): Promise<ProbeResult> {
+  const phoneId = c.phoneNumberId;
+  const token = c.accessToken;
+  if (!phoneId || !token) {
+    return { ok: false, message: 'Phone Number ID and Access Token are required.' };
+  }
+  const r = await safeFetch(
+    `https://graph.facebook.com/v19.0/${phoneId}?access_token=${encodeURIComponent(token)}`,
+    { method: 'GET' },
+  );
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok) {
+    try {
+      const data = await r.json();
+      return {
+        ok: true,
+        message: `WhatsApp Cloud verified: ${data.display_phone_number || phoneId} (${data.verified_name || 'Verified'})`,
+      };
+    } catch {
+      return { ok: true, message: 'WhatsApp Cloud API credentials verified.' };
+    }
+  }
+  return { ok: false, message: `HTTP ${r.status}: ${await readTextSafe(r)}` };
+}
+
+async function probeBrevo(c: any): Promise<ProbeResult> {
+  if (!c.apiKey) return { ok: false, message: 'API Key is required.' };
+  const r = await safeFetch('https://api.brevo.com/v3/account', {
+    method: 'GET',
+    headers: {
+      'api-key': c.apiKey,
+      accept: 'application/json',
+    },
+  });
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok) {
+    try {
+      const data = await r.json();
+      return {
+        ok: true,
+        message: `Brevo account verified: ${data.email || 'Active'} (${data.plan?.[0]?.type || 'Standard'} plan)`,
+      };
+    } catch {
+      return { ok: true, message: 'Brevo email credentials verified.' };
+    }
+  }
+  return { ok: false, message: `HTTP ${r.status}: ${await readTextSafe(r)}` };
+}
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 type Probe = (creds: any) => Promise<ProbeResult>;
@@ -248,6 +297,8 @@ const PROBES: Record<string, Probe> = {
 
   meta_ads: probeMeta,
   meta_page: probeMeta,
+  whatsapp_cloud: probeWhatsAppCloud,
+  brevo: probeBrevo,
 };
 
 export function hasProbe(providerId: string): boolean {

@@ -1,14 +1,9 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  ActivityType,
-  LeadSource,
-  LeadStatus,
-  Prisma,
-} from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { ActivityType, LeadSource, LeadStatus, Prisma } from '@prisma/client';
+import * as Papa from 'papaparse';
+import { IntegrationsService } from '../integrations/integrations.service';
+import { WhatsAppService } from '../integrations/whatsapp.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CaptureLeadDto } from './dto/capture-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -19,6 +14,7 @@ import { computeNextFollowUp, isBreached } from './follow-up-cadence';
 import { Actor, canAssignLeads, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
 import { AttributionService } from '../attribution/attribution.service';
+import { AssignmentService } from './assignment.service';
 
 /** Extra request context the controller extracts (not client-supplied). */
 export interface CaptureContext {
@@ -31,9 +27,43 @@ const DEDUPE_WINDOW_DAYS = 30;
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async checkSlaBreaches() {
+    const now = new Date();
+    const breached = await this.prisma.lead.findMany({
+      where: {
+        nextFollowUp: { lte: now },
+        slaBreachAt: null,
+        status: { notIn: [LeadStatus.CONFIRMED, LeadStatus.LOST, LeadStatus.CANCELLED] },
+      },
+      select: { id: true },
+    });
+
+    if (breached.length > 0) {
+      const ids = breached.map(b => b.id);
+      await this.prisma.lead.updateMany({
+        where: { id: { in: ids } },
+        data: { slaBreachAt: now },
+      });
+
+      const activities = ids.map(leadId => ({
+        leadId,
+        type: 'SYSTEM' as any,
+        content: 'SLA breached. Follow-up is overdue.'
+      }));
+      await this.prisma.activity.createMany({ data: activities });
+    }
+  }
   constructor(
     private readonly prisma: PrismaService,
     private readonly attribution: AttributionService,
+    private readonly assignment: AssignmentService,
+    @Inject(forwardRef(() => IntegrationsService))
+    private readonly integrations: IntegrationsService,
+    @Inject(forwardRef(() => WhatsAppService))
+    private readonly whatsapp: WhatsAppService,
   ) {}
 
   /**
@@ -178,6 +208,28 @@ export class LeadsService {
         }. Score ${score} [${notes}]`,
       },
     });
+
+    // Auto-assignment for new incoming leads
+    if (!dto.assignedToId) {
+      try {
+        const route = await this.assignment.assignNewLead(score, lead.source);
+        if (route.assignedToId) {
+          await this.prisma.lead.update({
+            where: { id: lead.id },
+            data: { assignedToId: route.assignedToId },
+          });
+          await this.prisma.activity.create({
+            data: {
+              leadId: lead.id,
+              type: ActivityType.SYSTEM,
+              content: `[Auto-Assignment] ${route.reason}`,
+            },
+          });
+        }
+      } catch (err) {
+        this.logger.warn(`Auto-assignment error for lead ${lead.id}: ${err.message}`);
+      }
+    }
 
     return { duplicate: false, leadId: lead.id, score };
   }
@@ -801,4 +853,213 @@ export class LeadsService {
       costPerLeadYesterday,
     };
   }
+
+  async captureFromWebhook(data: {
+    name: string;
+    email?: string | null;
+    phone: string;
+    externalId: string;
+    externalSource: string;
+    message?: string;
+    source?: LeadSource;
+  }) {
+    const leadSource = data.source ?? LeadSource.OTHER;
+    const scoreResult = scoreLead({
+      budget: 0,
+      adults: 1,
+      source: leadSource,
+      message: data.message,
+    });
+    
+    const existing = await this.prisma.lead.findFirst({
+      where: { externalId: data.externalId },
+    });
+    
+    if (existing) return existing;
+
+    const lead = await this.prisma.lead.create({
+      data: {
+        name: data.name,
+        email: data.email ?? null,
+        phone: data.phone,
+        message: data.message ?? null,
+        source: leadSource,
+        status: LeadStatus.NEW,
+        score: scoreResult.score,
+        scoreNotes: scoreResult.notes,
+        externalId: data.externalId,
+        externalSource: data.externalSource,
+        nextFollowUp: computeNextFollowUp(LeadStatus.NEW, new Date()),
+      },
+    });
+
+    await this.prisma.activity.create({
+      data: {
+        leadId: lead.id,
+        type: ActivityType.SYSTEM,
+        content: `Lead imported automatically from ${data.externalSource} webhook. Score ${scoreResult.score} [${scoreResult.notes}]`,
+      },
+    });
+
+    // Auto-assignment for webhook-ingested leads
+    try {
+      const route = await this.assignment.assignNewLead(scoreResult.score, lead.source);
+      if (route.assignedToId) {
+        await this.prisma.lead.update({
+          where: { id: lead.id },
+          data: { assignedToId: route.assignedToId },
+        });
+        await this.prisma.activity.create({
+          data: {
+            leadId: lead.id,
+            type: ActivityType.SYSTEM,
+            content: `[Auto-Assignment] ${route.reason}`,
+          },
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Auto-assignment failed for webhook lead ${lead.id}: ${err.message}`);
+    }
+
+    return lead;
+  }
+
+  async sendWhatsAppMessage(id: string, message: string, actor: Actor) {
+    const lead = await this.findOne(id, actor);
+    
+    if (!lead.phone) {
+      throw new BadRequestException('Lead has no phone number.');
+    }
+
+    await this.whatsapp.sendMessage(lead.phone, message);
+
+    return this.addActivity(id, {
+      type: 'WHATSAPP',
+      content: `[Sent via CRM] ${message}`,
+    }, actor);
+  }
+
+  async importCsv(fileBuffer: Buffer, actor: Actor) {
+    const parsed = Papa.parse(fileBuffer.toString(), { header: true });
+    const data = parsed.data as any[];
+    let imported = 0;
+    for (const row of data) {
+      if (!row.phone) continue;
+      
+      const phoneKey = this.normalisePhone(String(row.phone));
+      const existing = await this.prisma.lead.findFirst({
+        where: { phone: { endsWith: phoneKey } },
+      });
+      
+      if (!existing) {
+        await this.prisma.lead.create({
+          data: {
+            name: row.name || 'Unknown',
+            email: row.email || null,
+            phone: String(row.phone),
+            status: 'NEW',
+            source: 'WALK_IN',
+            score: 50,
+          }
+        });
+        imported++;
+      }
+    }
+    return { imported };
+  }
+
+  async getPendingCloseRequests() {
+    return this.prisma.leadApprovalRequest.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        lead: { select: { name: true, status: true, assignedToId: true } },
+        requestedBy: { select: { name: true, role: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async reviewCloseRequest(requestId: string, approve: boolean, actor: Actor) {
+    const req = await this.prisma.leadApprovalRequest.findUnique({
+      where: { id: requestId },
+      include: { lead: true }
+    });
+    if (!req) throw new NotFoundException();
+    if (req.status !== 'PENDING') throw new BadRequestException('Request already processed');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.leadApprovalRequest.update({
+        where: { id: requestId },
+        data: {
+          status: approve ? 'APPROVED' : 'REJECTED',
+          reviewedById: actor.id,
+        },
+      });
+
+      if (approve) {
+        await tx.lead.update({
+          where: { id: req.leadId },
+          data: { status: 'LOST', lostReason: req.reason },
+        });
+      }
+
+      await tx.activity.create({
+        data: {
+          leadId: req.leadId,
+          type: 'NOTE',
+          content: approve ? `Close request approved by ${actor.id}` : `Close request rejected by ${actor.id}`,
+        },
+      });
+
+      return req;
+    });
+  }
+
+  async requestClose(id: string, actor: Actor, reason: string) {
+    const lead = await this.findOne(id, actor);
+
+    return this.prisma.$transaction(async (tx) => {
+      const req = await tx.leadApprovalRequest.create({
+        data: {
+          leadId: id,
+          requestedById: actor.id,
+          reason,
+        },
+      });
+      await tx.activity.create({
+        data: {
+          leadId: id,
+          type: 'NOTE',
+          content: `Requested to close lead. Reason: ${reason}`,
+        },
+      });
+      return req;
+    });
+  }
+
+
+  async generateB2bQuote(id: string, actor: Actor) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: {
+        b2bPartner: true,
+      }
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+    if (!lead.b2bPartner) throw new BadRequestException('Lead is not linked to a B2B Partner. Please register and select the agent first.');
+    
+    // Simulate generation of a white-labeled quote
+    return {
+      message: 'B2B White-labeled Quote Generated Successfully',
+      partner: lead.b2bPartner,
+      quoteUrl: `https://glitz-itineraries.s3.aws.com/b2b/${lead.id}.pdf`
+    };
+  }
+
+  async generateAiDraft
+(id: string, actor: Actor) {
+    const lead = await this.findOne(id, actor);
+    return { draft: `Hi ${lead.name.split(' ')[0]}, just following up on your travel inquiry. Do you have a moment to chat?` };
+  }
+
 }

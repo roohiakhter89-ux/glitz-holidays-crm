@@ -45,8 +45,8 @@ export function prorate(
 
 export function daysInMonth(period: Date): number {
   return new Date(
-    period.getUTCFullYear(),
-    period.getUTCMonth() + 1,
+    period.getFullYear(),
+    period.getMonth() + 1,
     0,
-  ).getUTCDate();
+  ).getDate();
 }

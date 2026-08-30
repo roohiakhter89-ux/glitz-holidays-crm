@@ -917,3 +917,65 @@ export interface BookingDetail {
   costs: BookingCost[];
   financials: BookingFinancials;
 }
+
+export interface CampaignRow {
+  id: string;
+  name: string;
+  channel: 'WHATSAPP' | 'EMAIL';
+  status: 'DRAFT' | 'SCHEDULED' | 'SENDING' | 'SENT' | 'CANCELLED' | 'FAILED';
+  audienceFilter: any;
+  targetCount: number;
+  templateName?: string | null;
+  templateLang?: string | null;
+  templateParams?: any;
+  emailSubject?: string | null;
+  emailHtml?: string | null;
+  scheduledAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  totalSent: number;
+  totalDelivered: number;
+  totalRead: number;
+  totalFailed: number;
+  estimatedCost: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: { id: string; name: string; email: string };
+  recipients?: CampaignRecipientRow[];
+  metrics?: {
+    pending: number;
+    sent: number;
+    delivered: number;
+    read: number;
+    failed: number;
+    bounced: number;
+    unsubscribed: number;
+  };
+}
+
+export interface CampaignRecipientRow {
+  id: string;
+  campaignId: string;
+  leadId?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'BOUNCED' | 'UNSUBSCRIBED';
+  externalId?: string | null;
+  errorMessage?: string | null;
+  sentAt?: string | null;
+  deliveredAt?: string | null;
+  readAt?: string | null;
+  unsubscribedAt?: string | null;
+  createdAt: string;
+}
+
+export interface AudiencePreviewResult {
+  totalMatched: number;
+  optOutCount: number;
+  frequencyCappedCount: number;
+  eligibleCount: number;
+  estimatedCost: number;
+  sampleLeads: { id: string; name: string; phone: string; email: string | null; destination: string | null }[];
+}
+

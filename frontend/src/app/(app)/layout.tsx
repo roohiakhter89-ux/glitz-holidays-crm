@@ -22,6 +22,7 @@ import {
   X,
   Search,
   Plug,
+  Megaphone,
 } from 'lucide-react';
 import { tokenStore, type SessionUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -46,12 +47,18 @@ const NAV: {
     roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
   { href: '/leads',       label: 'Leads',       icon: Users,
     roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
+  { href: '/b2b-partners',label: 'B2B Partners',icon: Users,
+    roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','MARKETING','OPERATIONS'] },
   { href: '/follow-ups',  label: 'Follow-ups',  icon: AlarmClock,
     roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','OPERATIONS'] },
   { href: '/itineraries', label: 'Itineraries', icon: Map,
     roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
   { href: '/bookings',    label: 'Bookings',    icon: CalendarCheck,
     roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','SALES_EXEC','ACCOUNTS','OPERATIONS'] },
+  { href: '/marketing',        label: 'Marketing',       icon: Megaphone,
+    roles: ['OWNER','SUPER_ADMIN','MARKETING'] },
+  { href: '/marketing/social', label: 'Social Studio',   icon: Globe,
+    roles: ['OWNER','SUPER_ADMIN','MARKETING','SALES_MANAGER'] },
   { href: '/attribution', label: 'Attribution', icon: TrendingUp,
     roles: ['OWNER','SUPER_ADMIN','SALES_MANAGER','MARKETING'] },
   { href: '/finance',     label: 'Finance',     icon: Wallet,

@@ -4,7 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Render/Vercel sit behind a proxy — without this every lead records the
   // load balancer's IP and rate limiting would throttle all users as one.
@@ -20,7 +20,10 @@ async function bootstrap() {
     }),
   );
 
-  const origins = (process.env.CORS_ORIGIN ?? '*')
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error('CORS_ORIGIN must be set in production to prevent open access');
+  }
+  const origins = process.env.CORS_ORIGIN
     .split(',')
     .map((s) => s.trim());
   app.enableCors({ origin: origins.includes('*') ? true : origins });

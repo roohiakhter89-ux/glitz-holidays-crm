@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Save, Sliders, TrendingUp, ShieldCheck, Calculator } from 'lucide-react';
+import { Save, Sliders, TrendingUp, ShieldCheck, Calculator, Users } from 'lucide-react';
 import { api, ApiError, type PricingSettings } from '@/lib/api';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { money, percent } from '@/lib/format';
+import { RoutingSettingsPanel } from './routing-settings-panel';
 
 /**
  * Commercial policy — the numbers that shape every quotation. Split into
@@ -14,11 +15,6 @@ import { money, percent } from '@/lib/format';
  *   1. Global defaults (round-to, GST, currency)
  *   2. Margin floor + break-even inputs
  *   3. Per-service-type markup overrides
- *
- * Every field is a controlled input with a local buffer; changes save on the
- * Save-all button rather than per-field, because the pricing chain re-runs
- * across every draft quote when settings change and we don't want mid-edit
- * turbulence.
  */
 
 interface Draft extends PricingSettings {
@@ -44,6 +40,7 @@ const SERVICES: { key: keyof Draft; label: string }[] = [
 ];
 
 export default function SettingsPage() {
+  const [tab, setTab] = useState<'commercial' | 'routing'>('commercial');
   const [server, setServer] = useState<Draft | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +75,6 @@ export default function SettingsPage() {
     setBusy(true);
     setError(null);
     try {
-      // Only send fields that actually changed.
       const patch: Record<string, unknown> = {};
       for (const k of Object.keys(draft) as (keyof Draft)[]) {
         if (JSON.stringify(draft[k]) !== JSON.stringify(server?.[k])) {
@@ -104,8 +100,6 @@ export default function SettingsPage() {
     );
   }
 
-  // Live worked example — shows the effect of the current settings on a
-  // hypothetical ₹10,000-cost line. Makes abstract percentages concrete.
   const exampleCost = 10000;
   const exampleSell = Math.round(exampleCost * (1 + draft.defaultMarkupPercent / 100));
   const exampleMargin = exampleSell - exampleCost;
@@ -124,22 +118,51 @@ export default function SettingsPage() {
             Settings
           </h1>
           <p className="mt-0.5 text-[13px] text-ink-400">
-            Commercial policy that shapes every quotation.
+            Commercial policies, quotation markups, and automated lead routing rules.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {saved && (
-            <span className="text-[12px] text-healthy-500">Saved.</span>
-          )}
-          <Button
-            disabled={busy || !dirty}
-            onClick={save}
-          >
-            <Save className="size-4" strokeWidth={1.75} />
-            Save changes
-          </Button>
-        </div>
+        {tab === 'commercial' && (
+          <div className="flex items-center gap-2">
+            {saved && (
+              <span className="text-[12px] text-healthy-500">Saved.</span>
+            )}
+            <Button
+              disabled={busy || !dirty}
+              onClick={save}
+            >
+              <Save className="size-4" strokeWidth={1.75} />
+              Save changes
+            </Button>
+          </div>
+        )}
       </header>
+
+      {/* Tabs */}
+      <div className="mb-6 flex border-b border-ink-800 gap-6 text-[13.5px]">
+        <button
+          onClick={() => setTab('commercial')}
+          className={`pb-3 font-semibold transition border-b-2 flex items-center gap-2 ${
+            tab === 'commercial'
+              ? 'border-signal-500 text-signal-400'
+              : 'border-transparent text-ink-400 hover:text-ink-200'
+          }`}
+        >
+          <Sliders className="size-4" />
+          Commercial & Pricing
+        </button>
+
+        <button
+          onClick={() => setTab('routing')}
+          className={`pb-3 font-semibold transition border-b-2 flex items-center gap-2 ${
+            tab === 'routing'
+              ? 'border-signal-500 text-signal-400'
+              : 'border-transparent text-ink-400 hover:text-ink-200'
+          }`}
+        >
+          <Users className="size-4" />
+          Lead Auto-Assignment & Routing
+        </button>
+      </div>
 
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-loss-500/40 bg-loss-500/10 px-3 py-2 text-[13px] text-loss-500">
@@ -147,147 +170,151 @@ export default function SettingsPage() {
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-4">
-          {/* Global defaults */}
-          <Panel>
-            <PanelHeader>
-              <PanelTitle className="flex items-center gap-2">
-                <Sliders className="size-3.5" strokeWidth={1.75} />
-                Global
-              </PanelTitle>
-            </PanelHeader>
-            <PanelBody className="grid gap-4 sm:grid-cols-2">
-              <Field label="Default markup %" hint="Fallback when no service-type override applies">
-                <NumberInput
-                  value={draft.defaultMarkupPercent}
-                  onChange={(v) => set('defaultMarkupPercent', v)}
-                  step={0.5} min={0} max={500}
-                />
-              </Field>
-              <Field label="Round sell prices to (₹)" hint="0 = no rounding">
-                <NumberInput
-                  value={draft.roundTo}
-                  onChange={(v) => set('roundTo', v)}
-                  step={1} min={0}
-                />
-              </Field>
-              <Field label="GST %" hint="Shown on client-facing invoices">
-                <NumberInput
-                  value={draft.gstPercent}
-                  onChange={(v) => set('gstPercent', v)}
-                  step={0.5} min={0} max={100}
-                />
-              </Field>
-              <Field label="Currency" hint="Three-letter code">
-                <Input
-                  value={draft.currency}
-                  onChange={(e) => set('currency', e.target.value.toUpperCase())}
-                  maxLength={3}
-                />
-              </Field>
-            </PanelBody>
-          </Panel>
-
-          {/* Margin floor + break-even */}
-          <Panel>
-            <PanelHeader>
-              <PanelTitle className="flex items-center gap-2">
-                <ShieldCheck className="size-3.5" strokeWidth={1.75} />
-                Margin floor
-              </PanelTitle>
-            </PanelHeader>
-            <PanelBody className="space-y-4">
-              <Field label="Minimum margin %" hint="Warnings fire on any tier below this">
-                <NumberInput
-                  value={draft.minMarginPercent}
-                  onChange={(v) => set('minMarginPercent', v)}
-                  step={0.5} min={0} max={95}
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Monthly overhead (₹)" hint="Salaries + rent + tools + fees">
+      {tab === 'routing' ? (
+        <RoutingSettingsPanel />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-4">
+            {/* Global defaults */}
+            <Panel>
+              <PanelHeader>
+                <PanelTitle className="flex items-center gap-2">
+                  <Sliders className="size-3.5" strokeWidth={1.75} />
+                  Global Defaults
+                </PanelTitle>
+              </PanelHeader>
+              <PanelBody className="grid gap-4 sm:grid-cols-2">
+                <Field label="Default markup %" hint="Fallback when no service-type override applies">
                   <NumberInput
-                    value={draft.monthlyOverhead ?? 0}
-                    onChange={(v) => set('monthlyOverhead', v || null)}
-                    step={500} min={0}
+                    value={draft.defaultMarkupPercent}
+                    onChange={(v) => set('defaultMarkupPercent', v)}
+                    step={0.5} min={0} max={500}
                   />
                 </Field>
-                <Field label="Files per month" hint="Typical monthly file volume">
+                <Field label="Round sell prices to (₹)" hint="0 = no rounding">
                   <NumberInput
-                    value={draft.filesPerMonth ?? 0}
-                    onChange={(v) => set('filesPerMonth', v || null)}
+                    value={draft.roundTo}
+                    onChange={(v) => set('roundTo', v)}
                     step={1} min={0}
                   />
                 </Field>
-              </div>
-              {breakEven !== null && (
-                <p className="rounded-md border border-signal-500/20 bg-signal-500/[0.04] px-3 py-2 text-[12px] text-signal-500">
-                  Break-even overhead ≈ <span className="tabular font-semibold">{money(breakEven)}</span> per file.
-                  Quote below this and the file loses money once overheads are counted.
-                </p>
-              )}
-            </PanelBody>
-          </Panel>
-
-          {/* Per-service overrides */}
-          <Panel>
-            <PanelHeader>
-              <PanelTitle className="flex items-center gap-2">
-                <TrendingUp className="size-3.5" strokeWidth={1.75} />
-                Per-service markup
-              </PanelTitle>
-              <span className="text-[11px] text-ink-500">
-                Leave blank to inherit {draft.defaultMarkupPercent}%
-              </span>
-            </PanelHeader>
-            <PanelBody className="grid gap-4 sm:grid-cols-2">
-              {SERVICES.map(({ key, label }) => (
-                <Field key={key} label={`${label} markup %`}>
+                <Field label="GST %" hint="Shown on client-facing invoices">
                   <NumberInput
-                    value={(draft[key] as number | null | undefined) ?? undefined}
-                    onChange={(v) => set(key as keyof Draft, (v === 0 || v ? v : null) as any)}
-                    step={0.5} min={0} max={500}
-                    placeholder={`Auto (${draft.defaultMarkupPercent}%)`}
+                    value={draft.gstPercent}
+                    onChange={(v) => set('gstPercent', v)}
+                    step={0.5} min={0} max={100}
                   />
                 </Field>
-              ))}
-            </PanelBody>
-          </Panel>
-        </div>
+                <Field label="Currency" hint="Three-letter code">
+                  <Input
+                    value={draft.currency}
+                    onChange={(e) => set('currency', e.target.value.toUpperCase())}
+                    maxLength={3}
+                  />
+                </Field>
+              </PanelBody>
+            </Panel>
 
-        {/* Right rail — live example */}
-        <div className="space-y-4">
-          <Panel>
-            <PanelHeader>
-              <PanelTitle className="flex items-center gap-2">
-                <Calculator className="size-3.5" strokeWidth={1.75} />
-                What this means
-              </PanelTitle>
-            </PanelHeader>
-            <PanelBody className="space-y-3 text-[13px]">
-              <p className="text-[12px] text-ink-500">
-                Worked example against a hypothetical ₹10,000 cost:
-              </p>
-              <ExampleRow label="Cost"           value={money(exampleCost)} />
-              <ExampleRow label="Sell (default)" value={money(exampleSell)} strong />
-              <ExampleRow label="Margin"         value={money(exampleMargin)} />
-              <ExampleRow
-                label="Margin %"
-                value={percent(exampleMarginPct)}
-                tone={
-                  exampleMarginPct >= draft.minMarginPercent
-                    ? 'healthy' : 'warn'
-                }
-              />
-              <p className="border-t border-ink-800 pt-3 text-[11.5px] text-ink-500">
-                Every draft quotation re-prices when you save — this is not a
-                one-time snapshot.
-              </p>
-            </PanelBody>
-          </Panel>
+            {/* Margin floor + break-even */}
+            <Panel>
+              <PanelHeader>
+                <PanelTitle className="flex items-center gap-2">
+                  <ShieldCheck className="size-3.5" strokeWidth={1.75} />
+                  Margin Floor & Break-even
+                </PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-4">
+                <Field label="Minimum margin %" hint="Warnings fire on any tier below this">
+                  <NumberInput
+                    value={draft.minMarginPercent}
+                    onChange={(v) => set('minMarginPercent', v)}
+                    step={0.5} min={0} max={95}
+                  />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Monthly overhead (₹)" hint="Salaries + rent + tools + fees">
+                    <NumberInput
+                      value={draft.monthlyOverhead ?? 0}
+                      onChange={(v) => set('monthlyOverhead', v || null)}
+                      step={500} min={0}
+                    />
+                  </Field>
+                  <Field label="Files per month" hint="Typical monthly file volume">
+                    <NumberInput
+                      value={draft.filesPerMonth ?? 0}
+                      onChange={(v) => set('filesPerMonth', v || null)}
+                      step={1} min={0}
+                    />
+                  </Field>
+                </div>
+                {breakEven !== null && (
+                  <p className="rounded-md border border-signal-500/20 bg-signal-500/[0.04] px-3 py-2 text-[12px] text-signal-500">
+                    Break-even overhead ≈ <span className="tabular font-semibold">{money(breakEven)}</span> per file.
+                    Quote below this and the file loses money once overheads are counted.
+                  </p>
+                )}
+              </PanelBody>
+            </Panel>
+
+            {/* Per-service overrides */}
+            <Panel>
+              <PanelHeader>
+                <PanelTitle className="flex items-center gap-2">
+                  <TrendingUp className="size-3.5" strokeWidth={1.75} />
+                  Per-Service Markup Overrides
+                </PanelTitle>
+                <span className="text-[11px] text-ink-500">
+                  Leave blank to inherit {draft.defaultMarkupPercent}%
+                </span>
+              </PanelHeader>
+              <PanelBody className="grid gap-4 sm:grid-cols-2">
+                {SERVICES.map(({ key, label }) => (
+                  <Field key={key} label={`${label} markup %`}>
+                    <NumberInput
+                      value={(draft[key] as number | null | undefined) ?? undefined}
+                      onChange={(v) => set(key as keyof Draft, (v === 0 || v ? v : null) as any)}
+                      step={0.5} min={0} max={500}
+                      placeholder={`Auto (${draft.defaultMarkupPercent}%)`}
+                    />
+                  </Field>
+                ))}
+              </PanelBody>
+            </Panel>
+          </div>
+
+          {/* Right rail — live example */}
+          <div className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle className="flex items-center gap-2">
+                  <Calculator className="size-3.5" strokeWidth={1.75} />
+                  Live Quote Effect
+                </PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-3 text-[13px]">
+                <p className="text-[12px] text-ink-500">
+                  Worked example against a hypothetical ₹10,000 cost:
+                </p>
+                <ExampleRow label="Cost"           value={money(exampleCost)} />
+                <ExampleRow label="Sell (default)" value={money(exampleSell)} strong />
+                <ExampleRow label="Margin"         value={money(exampleMargin)} />
+                <ExampleRow
+                  label="Margin %"
+                  value={percent(exampleMarginPct)}
+                  tone={
+                    exampleMarginPct >= draft.minMarginPercent
+                      ? 'healthy' : 'warn'
+                  }
+                />
+                <p className="border-t border-ink-800 pt-3 text-[11.5px] text-ink-500">
+                  Every draft quotation re-prices when you save — this is not a
+                  one-time snapshot.
+                </p>
+              </PanelBody>
+            </Panel>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

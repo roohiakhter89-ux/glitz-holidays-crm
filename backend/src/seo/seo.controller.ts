@@ -23,6 +23,12 @@ const SEO_WRITE: Role[] = [Role.SUPER_ADMIN, Role.OWNER, Role.MARKETING];
 export class SeoController {
   constructor(private readonly seo: SeoService) {}
 
+  @Roles(...SEO_WRITE)
+  @Post('refresh-all')
+  refreshAll() {
+    return this.seo.refreshAll();
+  }
+
   @Get('sites')
   listSites() {
     return this.seo.listSites();
@@ -43,6 +49,11 @@ export class SeoController {
   @Get('sites/:id/audit')
   latestAudit(@Param('id') id: string) {
     return this.seo.latestAudit(id);
+  }
+
+  @Get('sites/:id/history')
+  history(@Param('id') id: string) {
+    return this.seo.getHistory(id);
   }
 
   @Roles(...SEO_WRITE)

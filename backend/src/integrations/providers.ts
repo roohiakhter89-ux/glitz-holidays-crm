@@ -220,6 +220,26 @@ const ads: ProviderSpec[] = [
 // ── Social ──────────────────────────────────────────────────────────────────
 const social: ProviderSpec[] = [
   {
+    id: 'whatsapp_cloud', label: 'WhatsApp Cloud API', category: 'SOCIAL',
+    docsUrl: 'https://developers.facebook.com/docs/whatsapp/cloud-api',
+    fields: [
+      { key: 'phoneNumberId', label: 'Phone Number ID', type: 'text', required: true },
+      { key: 'wabaId', label: 'WhatsApp Business Account ID', type: 'text', required: true },
+      { key: 'accessToken', label: 'System User Access Token', type: 'password', required: true },
+    ],
+    hasTest: true,
+  },
+  {
+    id: 'brevo', label: 'Brevo (Email Marketing)', category: 'SOCIAL',
+    docsUrl: 'https://app.brevo.com/settings/keys/api',
+    fields: [
+      { key: 'apiKey', label: 'API Key (v3)', type: 'password', required: true, placeholder: 'xkeysib-...' },
+      { key: 'senderEmail', label: 'Default Sender Email', type: 'text', placeholder: 'hello@glitzholidays.in' },
+      { key: 'senderName', label: 'Sender Name', type: 'text', placeholder: 'Glitz Holidays' },
+    ],
+    hasTest: true,
+  },
+  {
     id: 'meta_page', label: 'Facebook / Instagram Page', category: 'SOCIAL',
     docsUrl: 'https://developers.facebook.com/docs/pages-api/',
     fields: [

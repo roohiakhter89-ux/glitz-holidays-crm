@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Mountain, Compass, Sparkles } from 'lucide-react';
 import { api, tokenStore, ApiError, type SessionUser } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { Input, Label } from '@/components/ui/input';
 
 /**
@@ -198,7 +199,10 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-primary-400 hover:text-primary-300">Forgot password?</Link>
+              </div>
               <Input
                 id="password"
                 type="password"

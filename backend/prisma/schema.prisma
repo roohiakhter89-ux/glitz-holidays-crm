@@ -26,6 +26,18 @@ enum Role {
   OPERATIONS
 }
 
+enum InvoiceStatus {
+  DRAFT
+  PAID
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum LeadStatus {
   NEW
   CONTACTED
@@ -49,11 +61,11 @@ enum LeadStatus {
 // can be produced before the lead is confirmed as a booking.
 
 enum ItineraryItemKind {
-  STAY         // hotel / houseboat night
-  TRANSFER     // pickup, drop, inter-city drive
-  SIGHTSEEING  // gardens, monuments, viewpoints
-  MEAL         // breakfast, lunch, dinner
-  ACTIVITY     // shikara, skiing, trekking
+  STAY // hotel / houseboat night
+  TRANSFER // pickup, drop, inter-city drive
+  SIGHTSEEING // gardens, monuments, viewpoints
+  MEAL // breakfast, lunch, dinner
+  ACTIVITY // shikara, skiing, trekking
   FREE_TIME
   NOTE
 }
@@ -85,6 +97,7 @@ model Itinerary {
 
   days    ItineraryDay[]
   options ItineraryOption[]
+  socialPosts SocialPost[] @relation("SocialPostPackage")
 
   @@index([leadId])
 }
@@ -95,7 +108,7 @@ model Itinerary {
 /// has at least one option — the service auto-creates a "Package" on new
 /// itineraries so simple single-price flows still work.
 model ItineraryOption {
-  id          String @id @default(cuid())
+  id          String    @id @default(cuid())
   itineraryId String
   itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
 
@@ -107,14 +120,14 @@ model ItineraryOption {
   markupPercent Float?
 
   // --- computed, denormalised on every pricing write ---
-  totalNet      Int   @default(0)
-  totalSell     Int   @default(0)
-  totalMargin   Int   @default(0)
+  totalNet               Int   @default(0)
+  totalSell              Int   @default(0)
+  totalMargin            Int   @default(0)
   /// profit / sell * 100
-  marginPercent Float @default(0)
+  marginPercent          Float @default(0)
   /// profit / cost * 100
   markupPercentEffective Float @default(0)
-  perPersonSell Int   @default(0)
+  perPersonSell          Int   @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -125,9 +138,9 @@ model ItineraryOption {
 }
 
 model ItineraryDay {
-  id           String @id @default(cuid())
-  itineraryId  String
-  itinerary    Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  itineraryId String
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
 
   /// 1-based, unique per itinerary. Reordering days re-numbers this — see
   /// ItinerariesService.reorderDays.
@@ -207,10 +220,10 @@ model ItineraryItemPricing {
   vendorRateId String?
   /// Optional vendor for display when the rate wasn't picked from stored
   /// rates (e.g. one-off transport quote).
-  vendorId String?
+  vendorId     String?
 
   /// REQUIRED. Net cost per unit per quantity (whole rupees).
-  unitNet Int
+  unitNet       Int
   /// Line-level markup override. Null = use option / global default.
   markupPercent Float?
 
@@ -270,7 +283,7 @@ model Employee {
   bloodGroup  String?
   dob         DateTime?
   gender      String?
-  nationality String? @default("Indian")
+  nationality String?   @default("Indian")
 
   // --- contact ---
   phone       String
@@ -291,16 +304,16 @@ model Employee {
   pan     String?
 
   // --- employment ---
-  designation      String
-  department       String?
-  employmentType   EmploymentType   @default(FULL_TIME)
-  status           EmploymentStatus @default(ACTIVE)
-  joinedOn         DateTime
-  confirmedOn      DateTime?
-  exitedOn         DateTime?
-  reportsToId      String?
-  reportsTo        Employee?        @relation("EmployeeReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
-  reports          Employee[]       @relation("EmployeeReportsTo")
+  designation    String
+  department     String?
+  employmentType EmploymentType   @default(FULL_TIME)
+  status         EmploymentStatus @default(ACTIVE)
+  joinedOn       DateTime
+  confirmedOn    DateTime?
+  exitedOn       DateTime?
+  reportsToId    String?
+  reportsTo      Employee?        @relation("EmployeeReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports        Employee[]       @relation("EmployeeReportsTo")
 
   /// Optional link to the login account. Set when the employee also has CRM
   /// access. Nullable because most HR records outlive their login (or never
@@ -309,17 +322,17 @@ model Employee {
   user   User?   @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
 
   // --- pay structure (monthly, in paise-consistent integer INR) ---
-  ctcMonthly    Int?
-  basicMonthly  Int?
-  hraMonthly    Int?
-  allowMonthly  Int?
-  pfMonthly     Int?
-  esiMonthly    Int?
-  taxMonthly    Int?
+  ctcMonthly      Int?
+  basicMonthly    Int?
+  hraMonthly      Int?
+  allowMonthly    Int?
+  pfMonthly       Int?
+  esiMonthly      Int?
+  taxMonthly      Int?
   otherDedMonthly Int?
-  bankName      String?
-  accountNumber String?
-  ifsc          String?
+  bankName        String?
+  accountNumber   String?
+  ifsc            String?
 
   // --- free-form ---
   notes String?
@@ -327,8 +340,8 @@ model Employee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  salarySlips    SalarySlip[]
-  interviews     Interview[]  @relation("InterviewInterviewer")
+  salarySlips SalarySlip[]
+  interviews  Interview[]  @relation("InterviewInterviewer")
 
   @@index([status])
   @@index([department])
@@ -346,22 +359,22 @@ model SalarySlip {
   /// The month this slip is for. First day of month at 00:00 UTC.
   periodMonth DateTime
 
-  daysWorked Int?
+  daysWorked  Int?
   daysInMonth Int?
-  lop        Int?  // loss of pay days
+  lop         Int? // loss of pay days
 
   // ---- earnings (all in whole rupees) ----
-  basic       Int @default(0)
-  hra         Int @default(0)
-  allowances  Int @default(0)
-  bonus       Int @default(0)
-  arrears     Int @default(0)
+  basic      Int @default(0)
+  hra        Int @default(0)
+  allowances Int @default(0)
+  bonus      Int @default(0)
+  arrears    Int @default(0)
 
   // ---- deductions ----
-  pf         Int @default(0)
-  esi        Int @default(0)
-  tax        Int @default(0)
-  otherDed   Int @default(0)
+  pf       Int @default(0)
+  esi      Int @default(0)
+  tax      Int @default(0)
+  otherDed Int @default(0)
 
   // ---- computed and stored so historic slips never drift ----
   grossPay Int @default(0)
@@ -388,7 +401,7 @@ model Interview {
   candidateEmail  String?
   role            String
   scheduledAt     DateTime
-  durationMinutes Int?    @default(45)
+  durationMinutes Int?     @default(45)
 
   // --- interviewer (optional link to Employee) ---
   interviewerId   String?
@@ -400,7 +413,7 @@ model Interview {
   /// can evolve without a schema migration on every tweak.
   questionnaire Json? @default("[]")
 
-  overallRating Int?  // 1..5
+  overallRating Int? // 1..5
   strengths     String?
   concerns      String?
   outcome       InterviewOutcome @default(PENDING)
@@ -458,10 +471,10 @@ model SeoAudit {
 
   /// PageSpeed Insights scores (0-100). Nullable when the API was skipped
   /// or returned an error.
-  perfScore   Int?
-  a11yScore   Int?
-  bpScore     Int?
-  seoScore    Int?
+  perfScore Int?
+  a11yScore Int?
+  bpScore   Int?
+  seoScore  Int?
 
   /// Core Web Vitals (LCP ms, CLS x1000, INP ms).
   lcpMs  Int?
@@ -529,34 +542,43 @@ enum ActivityType {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role     @default(SALES_EXEC)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  b2bPartners        B2bPartner[]          @relation("B2bOwner")
+  createdInvoices    Invoice[]             @relation("CreatedInvoices")
+  createdCampaigns   Campaign[]            @relation("CreatedCampaigns")
+  createdSocialPosts  SocialPost[]          @relation("CreatedSocialPosts")
+  attachments        Attachment[]          @relation("UploadedAttachments")
+  requestedApprovals LeadApprovalRequest[] @relation("RequestedApprovals")
+  reviewedApprovals  LeadApprovalRequest[] @relation("ReviewedApprovals")
+  id                 String                @id @default(cuid())
+  email              String                @unique
+  passwordHash       String
+  name               String
+  role               Role                  @default(SALES_EXEC)
+  isActive           Boolean               @default(true)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
-  assignedLeads Lead[]     @relation("LeadAssignee")
-  createdBookings Booking[]        @relation("BookingCreator")
-  createdItineraries Itinerary[]   @relation("ItineraryCreator")
-  recordedPayments BookingPayment[] @relation("PaymentRecorder")
-  activities    Activity[]
+  assignedLeads      Lead[]           @relation("LeadAssignee")
+  createdBookings    Booking[]        @relation("BookingCreator")
+  createdItineraries Itinerary[]      @relation("ItineraryCreator")
+  recordedPayments   BookingPayment[] @relation("PaymentRecorder")
+  activities         Activity[]
 
   /// Set when this login corresponds to a person on payroll.
-  employee      Employee? @relation("EmployeeUser")
+  employee Employee? @relation("EmployeeUser")
 
   @@index([role])
 }
 
 model Lead {
-  id     String @id @default(cuid())
+  id String @id @default(cuid())
 
   // --- who ---
   name    String
   phone   String
   email   String?
+  address String?
+  state   String?
   city    String?
   country String?
 
@@ -575,6 +597,12 @@ model Lead {
   score      Int        @default(0)
   scoreNotes String?
   lostReason String?
+
+  b2bPartnerId String?
+  b2bPartner   B2bPartner? @relation(fields: [b2bPartnerId], references: [id])
+
+  invoices             Invoice[]
+  leadApprovalRequests LeadApprovalRequest[]
 
   assignedToId String?
   assignedTo   User?   @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -596,7 +624,7 @@ model Lead {
   userAgent String?
   ipAddress String?
 
-  enquiryCount Int       @default(1)
+  enquiryCount   Int       @default(1)
   lastContact    DateTime?
   firstContactAt DateTime?
   nextFollowUp   DateTime?
@@ -604,7 +632,7 @@ model Lead {
   /// auto-cadence scheduler will NOT overwrite manual dates — the exec's
   /// judgement wins. Cleared when the lead advances to a new stage that
   /// has its own SLA (a resumed cadence is intentional).
-  followUpManual Boolean @default(false)
+  followUpManual Boolean   @default(false)
   /// Stamped when the auto-cadence check finds a lead past its
   /// nextFollowUp. Cleared the moment a contact activity is logged.
   /// Used to surface "SLA breached" in the UI + dashboard tile.
@@ -619,25 +647,26 @@ model Lead {
   // --- import / external system linkage ---
   /// Free-form tags. Used first for 'unassigned' (owner lookup failed on
   /// import), 'imported' (came from a bulk source), plus future segmentation.
-  tags String[] @default([])
+  tags           String[]  @default([])
   /// e.g. 'brevo_import_2026_08_21'. Null for organic captures. Groups leads
   /// by which import batch brought them in.
   externalSource String?
   /// Original ID in the source system (Brevo contact_id, etc). Unique per
   /// externalSource so re-runs are idempotent — same row won't insert twice.
-  externalId String?
+  externalId     String?
   /// Whole original CSV row as JSON. Preserves 200+ Brevo fields we don't
   /// model individually. Never queried in the hot path — cold-storage safety
   /// net so nothing is lost.
-  externalRaw Json?
-  importedAt DateTime?
+  externalRaw    Json?
+  importedAt     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  activities Activity[]
-  bookings   Booking[]
+  activities  Activity[]
+  bookings    Booking[]
   itineraries Itinerary[]
+  campaignRecipients CampaignRecipient[]
 
   @@unique([externalSource, externalId], map: "Lead_external_natural_key")
   @@index([status])
@@ -667,11 +696,11 @@ model Lead {
 // Lead.gclid and Booking.totalSell.
 
 model LandingPage {
-  id   String @id @default(cuid())
+  id   String  @id @default(cuid())
   /// URL slug, e.g. "kashmir-honeymoon-2026". Not the full URL — the page can
   /// live under multiple hostnames (staging, prod, apex, www) and still be
   /// the same funnel.
-  slug String @unique
+  slug String  @unique
   name String
   /// Optional canonical URL for display on the dashboard.
   url  String?
@@ -705,7 +734,7 @@ model Visit {
   landingPage   LandingPage? @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
   /// Path or slug the beacon reported. Kept even when landingPageId is null
   /// so unregistered pages still show up in the dashboard.
-  pagePath String
+  pagePath      String
 
   // --- attribution copied straight off the URL ---
   utmSource   String?
@@ -840,8 +869,8 @@ model Vendor {
   address String?
 
   // internal grading — your own quality call, not the star rating
-  starRating    Int?
-  falconGrade   String?
+  starRating  Int?
+  falconGrade String?
 
   // --- SENSITIVE: redacted for sales execs (supplier protection) ---
   contactPerson String?
@@ -879,7 +908,7 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  rates VendorRate[]
+  rates          VendorRate[]
   itineraryItems ItineraryItem[]
 
   @@index([type])
@@ -899,13 +928,13 @@ model VendorRate {
   rateBasis RateBasis @default(PER_ROOM_NIGHT)
 
   /// REQUIRED. What you actually pay the supplier.
-  netRate Int
+  netRate  Int
   /// Optional. Published/rack rate for showing discount.
   rackRate Int?
 
-  extraBedRate  Int?
-  childRate     Int?
-  maxOccupancy  Int?
+  extraBedRate Int?
+  childRate    Int?
+  maxOccupancy Int?
 
   validFrom DateTime?
   validTo   DateTime?
@@ -955,7 +984,6 @@ enum MarkupMode {
   MANUAL
 }
 
-
 /// Singleton config row (id is always "default").
 model PricingSettings {
   id String @id @default("default")
@@ -987,7 +1015,6 @@ model PricingSettings {
   currency  String   @default("INR")
   updatedAt DateTime @updatedAt
 }
-
 
 // ============================================================================
 // PHASE 6 — Bookings + Payments
@@ -1024,8 +1051,8 @@ model Booking {
   /// Where it came from. Frozen snapshot — the totals below do NOT follow
   /// later edits to the itinerary tier. Nullable so a manual lead-only
   /// booking (no plan behind it) can still exist.
-  itineraryId        String?
-  itineraryOptionId  String?
+  itineraryId       String?
+  itineraryOptionId String?
 
   createdById String?
   createdBy   User?   @relation("BookingCreator", fields: [createdById], references: [id], onDelete: SetNull)
@@ -1047,7 +1074,7 @@ model Booking {
   totalReceived Int @default(0)
   totalCostPaid Int @default(0)
 
-  notes      String?
+  notes           String?
   cancelledReason String?
 
   createdAt DateTime @default(now())
@@ -1127,7 +1154,6 @@ enum IntegrationTestStatus {
  * Third-party service credential. One row per configured provider — you can
  * have multiple rows of the same provider (e.g. two Razorpay accounts) which
  * is why `provider` is not @unique.
- *
  * `credentials` is an AES-256-GCM blob of a JSON `{key: value}` map whose
  * shape is defined by the provider registry. `priority` is used by the AI
  * failover helper: higher = tried first.
@@ -1136,7 +1162,7 @@ model Integration {
   id String @id @default(cuid())
 
   category IntegrationCategory
-  provider String  // e.g. "razorpay", "openai" — from providers.ts registry
+  provider String // e.g. "razorpay", "openai" — from providers.ts registry
   label    String? // user-friendly name, e.g. "Razorpay (main)"
 
   /// AES-256-GCM ciphertext of the JSON credentials. Never returned to the
@@ -1144,9 +1170,9 @@ model Integration {
   /// service.
   credentials String
 
-  isActive  Boolean @default(true)
+  isActive Boolean @default(true)
   /// Higher = tried first when the failover helper picks an integration.
-  priority  Int     @default(0)
+  priority Int     @default(0)
 
   lastTestedAt    DateTime?
   lastTestStatus  IntegrationTestStatus @default(UNTESTED)
@@ -1158,3 +1184,307 @@ model Integration {
   @@index([category, isActive, priority])
   @@index([provider])
 }
+
+model B2bPartner {
+  id             String  @id @default(uuid())
+  agencyName     String
+  contactName    String
+  phone          String  @unique
+  email          String?
+  city           String?
+  state          String?
+  address        String?
+  commissionRate Float   @default(10.0)
+
+  assignedToId String
+  assignedTo   User   @relation("B2bOwner", fields: [assignedToId], references: [id])
+
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id            String @id @default(uuid())
+  invoiceNumber String @unique
+  leadId        String
+  lead          Lead   @relation(fields: [leadId], references: [id])
+
+  subtotal  Float
+  gstRate   Float @default(18.0)
+  gstAmount Float
+  total     Float
+
+  status  InvoiceStatus @default(DRAFT)
+  dueDate DateTime?
+  notes   String?
+
+  createdById String
+  createdBy   User   @relation("CreatedInvoices", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems InvoiceLineItem[]
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  total       Float
+}
+
+model LeadApprovalRequest {
+  id            String         @id @default(uuid())
+  leadId        String
+  lead          Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status        ApprovalStatus @default(PENDING)
+  reason        String?
+  requestedById String
+  requestedBy   User           @relation("RequestedApprovals", fields: [requestedById], references: [id])
+  reviewedById  String?
+  reviewedBy    User?          @relation("ReviewedApprovals", fields: [reviewedById], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+
+// ============================================================================
+// FILE STORAGE � generic attachment linked to any entity
+// ============================================================================
+
+model Attachment {
+  id           String   @id @default(uuid())
+  url          String
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  folder       String   @default("general")
+
+  /// Polymorphic link � "lead", "employee", "booking", "itinerary", etc.
+  entityType   String?
+  entityId     String?
+
+  uploadedById String
+  uploadedBy   User     @relation("UploadedAttachments", fields: [uploadedById], references: [id])
+
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([uploadedById])
+}
+
+// ============================================================================
+// PHASE 33 � MARKETING & BROADCAST ENGINE
+// ============================================================================
+
+enum CampaignChannel {
+  WHATSAPP
+  EMAIL
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  BOUNCED
+  UNSUBSCRIBED
+}
+
+model Campaign {
+  id             String          @id @default(uuid())
+  name           String
+  channel        CampaignChannel
+  status         CampaignStatus  @default(DRAFT)
+
+  // Audience filter definition stored as JSON
+  audienceFilter Json            @default("{}")
+  targetCount    Int             @default(0)
+
+  // WhatsApp template details
+  templateName   String?
+  templateLang   String?         @default("en")
+  templateParams Json?
+
+  // Email fields
+  emailSubject   String?
+  emailHtml      String?
+
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  totalSent      Int             @default(0)
+  totalDelivered Int             @default(0)
+  totalRead      Int             @default(0)
+  totalFailed    Int             @default(0)
+  estimatedCost  Float           @default(0.0)
+
+  createdById    String
+  createdBy      User            @relation("CreatedCampaigns", fields: [createdById], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  recipients     CampaignRecipient[]
+
+  @@index([status])
+  @@index([channel])
+  @@index([createdById])
+}
+
+model CampaignRecipient {
+  id               String                  @id @default(uuid())
+  campaignId       String
+  campaign         Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  leadId           String?
+  lead             Lead?                   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  phone            String?
+  email            String?
+  name             String?
+
+  status           CampaignRecipientStatus @default(PENDING)
+  externalId       String?
+  errorMessage     String?
+
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  unsubscribedAt   DateTime?
+  unsubscribeToken String                  @unique @default(uuid())
+
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([campaignId, status])
+  @@index([leadId])
+  @@index([unsubscribeToken])
+}
+
+// ============================================================================
+// LEAD ROUTING & AUTO-ASSIGNMENT SETTINGS
+// ============================================================================
+
+enum RoutingStrategy {
+  ROUND_ROBIN
+  PERFORMANCE_WEIGHTED
+  LOAD_BALANCED
+  MANUAL
+}
+
+model LeadRoutingSettings {
+  id                 String          @id @default("default")
+  isEnabled          Boolean         @default(true)
+  strategy           RoutingStrategy @default(ROUND_ROBIN)
+  highScoreThreshold Int             @default(60)
+  lastAssignedUserId String?
+  excludedUserIds    String[]        @default([])
+  updatedAt          DateTime        @updatedAt
+}
+
+// ============================================================================
+// PHASE 34 � SOCIAL MEDIA STUDIO & AI CONTENT ENGINE
+// ============================================================================
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  PINTEREST
+  LINKEDIN
+  X
+}
+
+enum SocialPostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum ContentTone {
+  STORYTELLING
+  PROMOTIONAL
+  PUNCHY_REEL
+  INFORMATIVE
+}
+
+model SocialAccount {
+  id           String         @id @default(uuid())
+  platform     SocialPlatform
+  accountName  String         // e.g. "Glitz Holidays Official"
+  handle       String         // e.g. "@glitzholidays"
+  externalId   String         // Page ID or IG Business ID
+  accessToken  String         // Encrypted AES-256-GCM
+  expiresAt    DateTime?
+  avatarUrl    String?
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  posts        SocialPost[]
+
+  @@unique([platform, externalId])
+}
+
+model SocialPost {
+  id             String           @id @default(uuid())
+  platform       SocialPlatform
+  caption        String           @db.Text
+  mediaUrls      String[]         @default([])
+  status         SocialPostStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  externalPostId String?
+  errorMessage   String?
+
+  /// Metrics JSON: { likes: 0, comments: 0, shares: 0, reach: 0, impressions: 0 }
+  metrics        Json?            @default("{}")
+
+  accountId      String?
+  account        SocialAccount?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  packageId      String?
+  package        Itinerary?       @relation("SocialPostPackage", fields: [packageId], references: [id], onDelete: SetNull)
+
+  createdById    String
+  createdBy      User             @relation("CreatedSocialPosts", fields: [createdById], references: [id])
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([platform, status])
+  @@index([scheduledAt])
+}
+
+model ContentIdea {
+  id                String      @id @default(uuid())
+  destination       String      // e.g. "Kashmir", "Ladakh", "Gulmarg"
+  topic             String      // e.g. "Autumn Chinar Leaves at Nishat Bagh"
+  tone              ContentTone @default(STORYTELLING)
+  promptSeed        String?
+  generatedVariants Json        // Array of { title, caption, hashtags, tone }
+  hashtags          String[]    @default([])
+  status            String      @default("IDEA") // IDEA | DRAFTED | PUBLISHED
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+

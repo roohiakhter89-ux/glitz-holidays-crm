@@ -8,7 +8,10 @@ import {
   Post,
   Query,
   Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { LeadsService } from './leads.service';
@@ -19,7 +22,7 @@ import { QueryLeadsDto } from './dto/query-leads.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Actor, LEAD_ASSIGN_ACCESS, LEAD_DELETE_ACCESS, LEAD_MODULE_ROLES } from '../common/access';
+import { Actor, LEAD_ASSIGN_ACCESS, LEAD_DELETE_ACCESS, LEAD_MODULE_ROLES, LEAD_CLOSE_REQUEST_ACCESS } from '../common/access';
 
 function detectDevice(ua: string): string {
   const s = ua.toLowerCase();
@@ -122,6 +125,39 @@ export class LeadsController {
     return this.leads.bulkAssign(body.leadIds, body.assignedToId ?? null, actor);
   }
 
+  @Roles(...LEAD_ASSIGN_ACCESS)
+  @Post('bulk-import')
+  @UseInterceptors(FileInterceptor('file'))
+  async bulkImport(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() actor: Actor,
+  ) {
+    if (!file) throw new BadRequestException('CSV file is required');
+    return this.leads.importCsv(file.buffer, actor);
+  }
+
+  @Roles(...LEAD_DELETE_ACCESS)
+  @Get('approvals/pending')
+  getPendingCloseRequests() {
+    return this.leads.getPendingCloseRequests();
+  }
+
+  @Roles(...LEAD_DELETE_ACCESS)
+  @Post('approvals/:requestId/review')
+  reviewCloseRequest(
+    @Param('requestId') requestId: string,
+    @Body('approve') approve: boolean,
+    @CurrentUser() actor: Actor,
+  ) {
+    return this.leads.reviewCloseRequest(requestId, approve, actor);
+  }
+
+  @Roles(...LEAD_MODULE_ROLES)
+  @Get(':id/ai-draft')
+  generateAiDraft(@Param('id') id: string, @CurrentUser() actor: Actor) {
+    return this.leads.generateAiDraft(id, actor);
+  }
+
   @Roles(...LEAD_MODULE_ROLES)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: Actor) {
@@ -155,6 +191,19 @@ export class LeadsController {
     return this.leads.deactivate(id, actor, reason.trim());
   }
 
+  @Roles(...LEAD_CLOSE_REQUEST_ACCESS)
+  @Post(':id/close-request')
+  requestCloseLead(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @CurrentUser() actor: Actor,
+  ) {
+    if (!reason || reason.trim().length < 10) {
+      throw new BadRequestException('A valid reason (min 10 characters) is required to request closing a lead.');
+    }
+    return this.leads.requestClose(id, actor, reason.trim());
+  }
+
   @Roles(...LEAD_MODULE_ROLES)
   @Post(':id/activities')
   addActivity(
@@ -163,5 +212,24 @@ export class LeadsController {
     @CurrentUser() actor: Actor,
   ) {
     return this.leads.addActivity(id, dto, actor);
+  }
+
+  @Roles(...LEAD_MODULE_ROLES)
+  @Post(':id/whatsapp')
+  async sendWhatsAppMessage(
+    @Param('id') id: string,
+    @Body('message') message: string,
+    @CurrentUser() actor: Actor,
+  ) {
+    if (!message || !message.trim()) {
+      throw new BadRequestException('Message cannot be empty.');
+    }
+    return this.leads.sendWhatsAppMessage(id, message, actor);
+  }
+
+  @Roles(...LEAD_MODULE_ROLES)
+  @Get(':id/b2b-quote')
+  generateB2bQuote(@Param('id') id: string, @CurrentUser() actor: Actor) {
+    return this.leads.generateB2bQuote(id, actor);
   }
 }

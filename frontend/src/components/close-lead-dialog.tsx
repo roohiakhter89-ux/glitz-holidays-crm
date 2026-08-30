@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, tokenStore } from '@/lib/api';
 import {
   Dialog,
   DialogClose,
@@ -28,6 +28,9 @@ export function CloseLeadDialog({
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
+  const user = tokenStore.user();
+  const isManager = user?.role === 'SALES_MANAGER';
+
   function reset() {
     setReason('');
     setError(null);
@@ -42,7 +45,7 @@ export function CloseLeadDialog({
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/leads/${leadId}/close`, { reason: reason.trim() });
+      await api.post(`/leads/${leadId}/${isManager ? 'close-request' : 'close'}`, { reason: reason.trim() });
       setOpen(false);
       reset();
       onClosed();
@@ -66,8 +69,8 @@ export function CloseLeadDialog({
       </DialogTrigger>
 
       <DialogContent
-        title={`Close ${leadName}`}
-        description="This will mark the lead as LOST. Please explain why this lead didn't convert."
+        title={isManager ? `Request to close ${leadName}` : `Close ${leadName}`}
+        description={isManager ? "This will send a close request to the owner. Please explain why this lead should be closed." : "This will mark the lead as LOST. Please explain why this lead didn't convert."}
       >
         <form onSubmit={submit} className="p-5">
           <div className="space-y-1">
@@ -103,7 +106,7 @@ export function CloseLeadDialog({
               variant="danger"
               disabled={busy || reason.trim().length < 10}
             >
-              {busy ? 'Closing…' : 'Close lead'}
+              {busy ? (isManager ? 'Requesting...' : 'Closing...') : (isManager ? 'Request close' : 'Close lead')}
             </Button>
           </div>
         </form>

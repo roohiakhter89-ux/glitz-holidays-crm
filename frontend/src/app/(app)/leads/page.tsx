@@ -14,6 +14,8 @@ import { RowActions } from '@/components/ui/row-actions';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { AddLeadDialog } from '@/components/add-lead-dialog';
 import { CloseLeadDialog } from '@/components/close-lead-dialog';
+import { ApprovalsDialog } from '@/components/approvals-dialog';
+import { ImportLeadsDialog } from '@/components/import-leads-dialog';
 import { DateRangePicker, defaultRange, type DateRange } from '@/components/ui/date-range-picker';
 import { LEAD_SOURCES, LEAD_STATUSES, humanise } from '@/lib/constants';
 import { relativeDate } from '@/lib/format';
@@ -128,6 +130,8 @@ export default function LeadsPage() {
         </div>
         <div className="flex items-center gap-2">
           <DateRangePicker value={range} onChange={(r) => { setRange(r); setPage(1); }} />
+          <ImportLeadsDialog onImported={load} />
+          <ApprovalsDialog onResolved={load} />
           <AddLeadDialog onCreated={(id) => router.push(`/leads/${id}`)} />
         </div>
       </header>

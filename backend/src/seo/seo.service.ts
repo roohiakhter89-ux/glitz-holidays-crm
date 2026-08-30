@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, HttpException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
@@ -22,7 +23,23 @@ interface PagespeedScores {
 
 @Injectable()
 export class SeoService {
+  private readonly logger = new Logger(SeoService.name);
   constructor(private readonly prisma: PrismaService) {}
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async refreshAll() {
+    this.logger.log('Running daily SEO audits for active sites...');
+    const sites = await this.prisma.seoSite.findMany({ where: { isActive: true } });
+    for (const site of sites) {
+      try {
+        await this.runAudit(site.id);
+        this.logger.log(`Audit completed for site ${site.id}`);
+      } catch (err) {
+        this.logger.error(`Audit failed for site ${site.id}`, err);
+      }
+    }
+    return { message: `Queued/ran audit for ${sites.length} sites` };
+  }
 
   // ---- sites ----
 
@@ -88,6 +105,22 @@ export class SeoService {
   }
 
   // ---- audits ----
+
+  async getHistory(id: string) {
+    const audits = await this.prisma.seoAudit.findMany({
+      where: { siteId: id },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        createdAt: true,
+        runId: true,
+        url: true,
+        score: true,
+        perfScore: true,
+        seoScore: true,
+      }
+    });
+    return audits;
+  }
 
   async latestAudit(id: string) {
     const site = await this.findSite(id);

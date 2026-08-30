@@ -37,6 +37,7 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [noteType, setNoteType] = useState<string>('CALL');
   const [note, setNote] = useState('');
@@ -47,16 +48,14 @@ export default function LeadDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.get<LeadDetail>(`/leads/${id}`);
-      setLead(data);
-    } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? e.status === 404
-            ? 'That lead does not exist, or it is not assigned to you.'
-            : e.message
-          : 'Could not load this lead.',
-      );
+      const [ld, st] = await Promise.all([
+        api.get<LeadDetail>(`/leads/${id}`),
+        api.get<UserRow[]>('/users'),
+      ]);
+      setLead(ld);
+      setStaff(st.filter((s) => s.isActive));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load lead');
     } finally {
       setLoading(false);
     }
@@ -66,13 +65,18 @@ export default function LeadDetailPage() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (!canAssign) return;
-    api
-      .get<UserRow[]>('/users')
-      .then((u) => setStaff(u.filter((x) => x.isActive)))
-      .catch(() => setStaff([]));
-  }, [canAssign]);
+  async function generateAiDraft() {
+    setGenerating(true);
+    try {
+      const res = await api.get<{ draft: string }>(`/leads/${id}/ai-draft`);
+      setNote(res.draft);
+      setNoteType("WHATSAPP");
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to generate draft");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function patch(body: Record<string, unknown>) {
     setSaving(true);
@@ -297,9 +301,12 @@ export default function LeadDetailPage() {
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="What did they say? Dates, budget, objections — the things you will not remember next week."
               />
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="secondary" onClick={generateAiDraft} disabled={generating}>
+                  {generating ? 'Drafting...' : 'AI Draft Message'}
+                </Button>
                 <Button onClick={logActivity} disabled={saving || !note.trim()}>
-                  {saving ? 'Saving…' : 'Save entry'}
+                  {saving ? 'Saving...' : 'Save entry'}
                 </Button>
               </div>
             </PanelBody>
