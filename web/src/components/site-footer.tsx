@@ -112,10 +112,19 @@ export function SiteFooter() {
             ))}
           </ul>
 
-          <h3 className="mt-8 text-[11px] font-semibold uppercase tracking-[0.18em] text-paper-50">
+          <h3 className="mt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-paper-50">
+            Planning & Resources
+          </h3>
+          <ul className="mt-3 space-y-2 text-[13px]">
+            <FooterLink href="/plan-my-trip">Custom Itinerary Wizard</FooterLink>
+            <FooterLink href="/guides">Travel Guides & Blog</FooterLink>
+            <FooterLink href="/partner-with-us">B2B Travel Agent DMC</FooterLink>
+          </ul>
+
+          <h3 className="mt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-paper-50">
             Reach us
           </h3>
-          <ul className="mt-4 space-y-3 text-[13px]">
+          <ul className="mt-3 space-y-2.5 text-[13px]">
             <li>
               <a
                 href={`tel:${SITE.phone.tel}`}
@@ -152,6 +161,15 @@ export function SiteFooter() {
             © {year} {SITE.name}. All rights reserved.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            <Link href="/privacy-policy" className="transition-colors hover:text-gold-300">
+              Privacy Policy
+            </Link>
+            <Link href="/terms-and-conditions" className="transition-colors hover:text-gold-300">
+              Terms & Conditions
+            </Link>
+            <Link href="/cancellation-and-refund-policy" className="transition-colors hover:text-gold-300">
+              Cancellation & Refund
+            </Link>
             <Link href="/faq" className="transition-colors hover:text-gold-300">
               FAQ
             </Link>

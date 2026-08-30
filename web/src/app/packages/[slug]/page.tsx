@@ -8,6 +8,7 @@ import { getTravelStyle } from '@/lib/travel-styles';
 import { PackageCard, SectionHead, Faq, JsonLd } from '@/components/cards';
 import { PageHero, FactStrip } from '@/components/page-hero';
 import { EnquiryForm } from '@/components/enquiry-form';
+import { StickyMobileCta } from '@/components/sticky-mobile-cta';
 import { SITE, inr, whatsAppLink } from '@/lib/site';
 
 type Params = Promise<{ slug: string }>;
@@ -408,7 +409,7 @@ export default async function PackageDetail({ params }: { params: Params }) {
               </p>
             </div>
           </div>
-          <div data-reveal="right" className="glass-dark rounded-2xl p-6 md:p-8">
+          <div data-reveal="right" className="glass-dark rounded-2xl p-6 md:p-8" id="enquiry">
             <EnquiryForm
               source={`package_${p.slug}`}
               packageName={p.name}
@@ -418,6 +419,8 @@ export default async function PackageDetail({ params }: { params: Params }) {
           </div>
         </div>
       </section>
+
+      <StickyMobileCta packageName={p.name} priceFrom={p.priceFrom} />
     </>
   );
 }

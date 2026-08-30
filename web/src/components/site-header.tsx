@@ -106,6 +106,9 @@ export function SiteHeader() {
               onEnter={() => setDrop('styles')}
               onToggle={() => setDrop(drop === 'styles' ? null : 'styles')}
             />
+            <Link href="/guides" className={linkBase}>
+              Guides
+            </Link>
             <Link href="/reviews" className={linkBase}>
               Reviews
             </Link>
@@ -122,7 +125,7 @@ export function SiteHeader() {
               <Phone className="size-3.5 transition-transform duration-300 group-hover:rotate-12" strokeWidth={2} />
               {SITE.phone.display}
             </a>
-            <Link href="/contact" className="btn btn-gold btn-shine">
+            <Link href="/plan-my-trip" className="btn btn-gold btn-shine">
               Plan my trip
             </Link>
           </div>
@@ -235,8 +238,10 @@ export function SiteHeader() {
               <div className="mt-2 space-y-0.5">
                 {[
                   ['/packages', 'All packages'],
+                  ['/guides', 'Travel Guides'],
                   ['/reviews', 'Reviews'],
                   ['/about', 'About us'],
+                  ['/partner-with-us', 'B2B Travel Partner'],
                   ['/contact', 'Contact'],
                 ].map(([href, label]) => (
                   <Link
@@ -250,7 +255,7 @@ export function SiteHeader() {
               </div>
 
               <div className="mt-5 grid gap-2.5">
-                <Link href="/contact" className="btn btn-gold w-full">
+                <Link href="/plan-my-trip" className="btn btn-gold w-full">
                   Plan my trip
                 </Link>
                 <a href={`tel:${SITE.phone.tel}`} className="btn btn-ghost w-full">

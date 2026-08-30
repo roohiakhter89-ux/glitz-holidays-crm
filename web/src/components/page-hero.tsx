@@ -6,11 +6,13 @@ import { ChevronRight } from 'lucide-react';
  * hero so every page feels like the same site, but shorter so content starts
  * above the fold on a laptop.
  */
+const DEFAULT_HERO_BG = 'linear-gradient(135deg, #0a2419 0%, #124430 50%, #17573c 100%)';
+
 export function PageHero({
   kicker,
   title,
   lede,
-  background,
+  background = DEFAULT_HERO_BG,
   crumbs,
   children,
   tall = false,
@@ -18,14 +20,14 @@ export function PageHero({
   kicker: string;
   title: React.ReactNode;
   lede?: string;
-  background: string;
+  background?: string;
   crumbs?: { label: string; href?: string }[];
   children?: React.ReactNode;
   tall?: boolean;
 }) {
   return (
     <section className="relative isolate overflow-hidden">
-      <div aria-hidden className="absolute inset-0 -z-20" style={{ background }} />
+      <div aria-hidden className="absolute inset-0 -z-20" style={{ background: background || DEFAULT_HERO_BG }} />
       <div
         aria-hidden
         className="blob -z-10 left-[8%] top-[10%] h-[340px] w-[340px]"
