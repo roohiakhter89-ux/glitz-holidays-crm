@@ -235,6 +235,15 @@ export default function LoginPage() {
             <p className="pt-2 text-center text-[11.5px] text-ink-500">
               Trouble signing in? Ask your admin to reset the password.
             </p>
+
+            <p className="pt-4 text-center text-[11.5px] text-ink-500">
+              <a
+                href="https://glitz-holidays.in"
+                className="hover:text-brand-500 transition-colors"
+              >
+                ← Back to glitz-holidays.in
+              </a>
+            </p>
           </div>
         </div>
       </section>

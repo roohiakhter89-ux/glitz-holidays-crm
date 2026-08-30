@@ -45,6 +45,14 @@ export function SiteFooter() {
             <li><Link href="/about" className="hover:text-[color:var(--color-brand-300)] transition-colors">About us</Link></li>
             <li><Link href="/contact" className="hover:text-[color:var(--color-brand-300)] transition-colors">Contact</Link></li>
             <li><Link href="/blog" className="hover:text-[color:var(--color-brand-300)] transition-colors">Travel guides</Link></li>
+            <li>
+              <a
+                href={`${SITE.crmUrl}/login`}
+                className="text-[color:var(--color-ink-500)] hover:text-[color:var(--color-brand-300)] transition-colors"
+              >
+                Staff login
+              </a>
+            </li>
           </ul>
         </div>
 
