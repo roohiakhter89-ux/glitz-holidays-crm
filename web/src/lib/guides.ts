@@ -18,12 +18,14 @@ export type GuideArticle = {
   faqs: { q: string; a: string }[];
   toc: { id: string; title: string }[];
   content: string;
+  image: string;
   relatedPackages: string[];
 };
 
 export const GUIDES: GuideArticle[] = [
   {
     slug: 'gulmarg-gondola-booking-guide-2026',
+    image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1200&auto=format&fit=crop',
     title: 'Gulmarg Gondola Phase 1 vs Phase 2: Complete 2026 Booking & Travel Guide',
     subtitle: 'Everything you need to know about tickets, slot timings, high-altitude tips, and avoiding tourist traps at Asia’s highest cable car.',
     summary: 'A step-by-step local guide to booking Gulmarg Gondola Phase 1 (Kongdoori) and Phase 2 (Apharwat Peak) tickets online, timing your ride, and what to do if slots are sold out.',
@@ -77,6 +79,7 @@ Tickets are issued exclusively via the official online booking portal of J&K Tou
   },
   {
     slug: 'best-time-to-visit-kashmir-month-by-month',
+    image: 'https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1200&auto=format&fit=crop',
     title: 'Best Time to Visit Kashmir: Month-by-Month Weather, Snow & Seasonal Guide',
     subtitle: 'From the spring Tulip blooms in April to summer Dal Lake houseboats, autumn golden Chinars, and winter Gulmarg ski slopes.',
     summary: 'A seasonal planning guide breaking down Kashmir temperatures, tourist crowds, clothing recommendations, and ideal itineraries across all four distinct seasons.',
@@ -129,6 +132,7 @@ The famous *Chillai Kalan* brings heavy snowfall to Gulmarg and Pahalgam. Gulmar
   },
   {
     slug: 'ladakh-altitude-acclimatization-guide',
+    image: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=1200&auto=format&fit=crop',
     title: 'How to Acclimatize in Leh Ladakh: Essential High-Altitude Health & Travel Tips',
     subtitle: 'Prevent Acute Mountain Sickness (AMS), understand oxygen saturation levels, and plan your route safely across 17,000+ ft passes.',
     summary: 'Crucial medical and itinerary advice for first-time Ladakh travelers: why 48 hours of rest in Leh is non-negotiable, hydration rules, and emergency oxygen protocols.',
@@ -172,6 +176,7 @@ Leh sits at 11,500 feet (3,500 meters) above sea level, where atmospheric pressu
   },
   {
     slug: 'srinagar-houseboat-vs-hotel-guide',
+    image: 'https://images.unsplash.com/photo-1566837945700-30057527ade0?q=80&w=1200&auto=format&fit=crop',
     title: 'Srinagar Houseboat vs Luxury Hotel: How to Choose for Your Kashmir Itinerary',
     subtitle: 'Nigeen Lake vs Dal Lake, heritage cedarwood suites, dining differences, and how to combine both for the perfect stay.',
     summary: 'A detailed comparison of staying on a traditional Kashmiri houseboat versus a hillside luxury resort, covering heritage charm, privacy, lake ambiance, and heating.',

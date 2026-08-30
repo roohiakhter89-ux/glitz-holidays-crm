@@ -9,6 +9,8 @@ import type { Review } from '@/lib/reviews';
 /* ---------------------------------------------------------------- destination */
 
 export function DestinationCard({ d, tall = false }: { d: Destination; tall?: boolean }) {
+  const bg = d.image ? `url("${d.image}")` : TONE_BG[d.tone];
+
   return (
     <Link
       href={`/destinations/${d.slug}`}
@@ -16,7 +18,7 @@ export function DestinationCard({ d, tall = false }: { d: Destination; tall?: bo
     >
       <div
         className={`zoom relative bg-cover bg-center ${tall ? 'aspect-[3/4.4]' : 'aspect-[4/5]'}`}
-        style={{ backgroundImage: TONE_BG[d.tone] }}
+        style={{ backgroundImage: bg }}
       />
       {/* legibility scrim, separate layer so the zoom doesn't stretch it */}
       <div
@@ -54,12 +56,14 @@ export function DestinationCard({ d, tall = false }: { d: Destination; tall?: bo
 /* -------------------------------------------------------------------- package */
 
 export function PackageCard({ p }: { p: Pkg }) {
+  const bg = p.image ? `url("${p.image}")` : TONE_BG[p.tone];
+
   return (
     <article className="lift edge-gold group relative flex flex-col overflow-hidden rounded-2xl border border-paper-200 bg-white shadow-sm">
       <Link href={`/packages/${p.slug}`} className="zoom-wrap relative block">
         <div
           className="zoom aspect-[16/10] bg-cover bg-center"
-          style={{ backgroundImage: TONE_BG[p.tone] }}
+          style={{ backgroundImage: bg }}
         />
         <div
           aria-hidden

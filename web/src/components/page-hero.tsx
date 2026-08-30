@@ -27,7 +27,7 @@ export function PageHero({
 }) {
   return (
     <section className="relative isolate overflow-hidden">
-      <div aria-hidden className="absolute inset-0 -z-20" style={{ background: background || DEFAULT_HERO_BG }} />
+      <div aria-hidden className="absolute inset-0 -z-20 bg-cover bg-center" style={{ background: background || DEFAULT_HERO_BG }} />
       <div
         aria-hidden
         className="blob -z-10 left-[8%] top-[10%] h-[340px] w-[340px]"

@@ -111,6 +111,14 @@ export default async function GuideDetailPage({ params }: { params: Params }) {
                 </div>
               </div>
 
+              {/* Featured Image */}
+              <div className="relative aspect-[16/9] rounded-3xl overflow-hidden shadow-lg border border-paper-300">
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url("${guide.image}")` }}
+                />
+              </div>
+
               {/* Table of Contents */}
               {guide.toc.length > 0 && (
                 <div className="p-6 rounded-2xl bg-gold-50/70 border border-gold-300/80">

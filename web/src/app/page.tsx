@@ -98,10 +98,10 @@ export default function HomePage() {
       <section className="relative isolate flex min-h-[92svh] items-end overflow-hidden">
         <div
           aria-hidden
-          className="absolute inset-0 -z-20"
+          className="absolute inset-0 -z-20 bg-cover bg-center"
           style={{
             background:
-              'linear-gradient(180deg, rgba(6,12,16,0.30) 0%, rgba(6,12,16,0.55) 45%, rgba(6,12,16,0.93) 100%), radial-gradient(140% 120% at 22% 8%, #3b7183 0%, #17384a 44%, #060e14 100%)',
+              'linear-gradient(180deg, rgba(6,12,16,0.45) 0%, rgba(6,12,16,0.65) 45%, rgba(6,12,16,0.95) 100%), url("https://images.unsplash.com/photo-1598091383021-15ddea10925d?q=80&w=2000&auto=format&fit=crop")',
           }}
         />
         {/* drifting light blobs — pure decoration, aria-hidden */}

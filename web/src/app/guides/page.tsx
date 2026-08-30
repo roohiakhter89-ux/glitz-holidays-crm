@@ -40,37 +40,48 @@ export default function GuidesIndexPage() {
         <div className="wrap">
           <div className="grid md:grid-cols-2 gap-8">
             {GUIDES.map((guide) => (
-              <article key={guide.slug} className="glass-panel card-tilt rounded-3xl p-8 flex flex-col justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className="px-3 py-1 rounded-full bg-gold-100 text-gold-800 text-xs font-semibold">
-                      {guide.destinationName}
-                    </span>
-                    <span className="flex items-center gap-1 text-xs text-ink-500">
+              <article key={guide.slug} className="glass-panel card-tilt rounded-3xl overflow-hidden flex flex-col justify-between">
+                <Link href={`/guides/${guide.slug}`} className="zoom-wrap relative block aspect-[16/9] overflow-hidden">
+                  <div
+                    className="zoom absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: `url("${guide.image}")` }}
+                  />
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 bg-gradient-to-t from-ink-950/70 via-transparent to-transparent"
+                  />
+                  <span className="absolute left-4 bottom-4 px-3 py-1 rounded-full bg-gold-400/90 text-ink-950 text-[11px] font-bold uppercase tracking-wider backdrop-blur-sm">
+                    {guide.destinationName}
+                  </span>
+                </Link>
+
+                <div className="p-7 md:p-8 flex flex-col flex-1 justify-between">
+                  <div>
+                    <div className="flex items-center gap-1 text-xs text-ink-500 mb-3">
                       <Clock className="size-3.5" /> {guide.readingTime}
-                    </span>
+                    </div>
+
+                    <h2 className="display text-xl md:text-2xl font-semibold text-ink-950 hover:text-gold-600 transition-colors">
+                      <Link href={`/guides/${guide.slug}`}>{guide.title}</Link>
+                    </h2>
+
+                    <p className="mt-3 text-[14px] leading-relaxed text-ink-600">
+                      {guide.summary}
+                    </p>
                   </div>
 
-                  <h2 className="display text-2xl font-semibold text-ink-950 hover:text-gold-600 transition-colors">
-                    <Link href={`/guides/${guide.slug}`}>{guide.title}</Link>
-                  </h2>
-
-                  <p className="mt-3 text-[14.5px] leading-relaxed text-ink-600">
-                    {guide.summary}
-                  </p>
-                </div>
-
-                <div className="pt-6 mt-6 border-t border-paper-300 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs text-ink-700">
-                    <UserCheck className="size-4 text-pine-600" />
-                    <span>{guide.author} · {guide.authorRole}</span>
+                  <div className="pt-6 mt-6 border-t border-paper-300 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-ink-700">
+                      <UserCheck className="size-4 text-pine-600" />
+                      <span>{guide.author} · {guide.authorRole}</span>
+                    </div>
+                    <Link
+                      href={`/guides/${guide.slug}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-pine-700 hover:text-gold-600"
+                    >
+                      Read Guide <ArrowRight className="size-3.5" />
+                    </Link>
                   </div>
-                  <Link
-                    href={`/guides/${guide.slug}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-pine-700 hover:text-gold-600"
-                  >
-                    Read Guide <ArrowRight className="size-3.5" />
-                  </Link>
                 </div>
               </article>
             ))}

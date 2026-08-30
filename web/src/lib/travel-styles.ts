@@ -15,11 +15,13 @@ export type TravelStyle = {
   faqs: { q: string; a: string }[];
   /** Tailwind-free inline gradient for the hero. */
   hero: string;
+  image: string;
 };
 
 export const TRAVEL_STYLES: TravelStyle[] = [
   {
     slug: 'honeymoon',
+    image: 'https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1000&auto=format&fit=crop',
     name: 'Honeymoon',
     seoTitle: 'Kashmir & Himalayan Honeymoon Packages',
     headline: 'A first holiday that is actually a holiday',
@@ -55,6 +57,7 @@ export const TRAVEL_STYLES: TravelStyle[] = [
 
   {
     slug: 'family',
+    image: 'https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1000&auto=format&fit=crop',
     name: 'Family',
     seoTitle: 'Family Tour Packages — Kashmir, Himachal & Vaishno Devi',
     headline: 'Built around the slowest person in the group',
@@ -90,6 +93,7 @@ export const TRAVEL_STYLES: TravelStyle[] = [
 
   {
     slug: 'adventure',
+    image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1000&auto=format&fit=crop',
     name: 'Adventure',
     seoTitle: 'Himalayan Adventure Tour Packages',
     headline: 'High passes, real snow, and roads that count as an activity',
@@ -125,6 +129,7 @@ export const TRAVEL_STYLES: TravelStyle[] = [
 
   {
     slug: 'pilgrimage',
+    image: 'https://images.unsplash.com/photo-1626714485848-d3e91d575fa9?q=80&w=1000&auto=format&fit=crop',
     name: 'Pilgrimage',
     seoTitle: 'Vaishno Devi & Amarnath Pilgrimage Packages',
     headline: 'The logistics handled, so the journey is the only thing left',
@@ -160,6 +165,7 @@ export const TRAVEL_STYLES: TravelStyle[] = [
 
   {
     slug: 'group',
+    image: 'https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?q=80&w=1000&auto=format&fit=crop',
     name: 'Groups & Corporate',
     seoTitle: 'Group & Corporate Tour Packages — Kashmir & Ladakh',
     headline: 'Fifteen people, one plan, nobody left at a petrol pump',

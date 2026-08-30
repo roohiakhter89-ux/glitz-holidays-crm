@@ -28,6 +28,8 @@ export type Destination = {
   knowBefore: { label: string; value: string }[];
   faqs: { q: string; a: string }[];
   tone: Tone;
+  image: string;
+  heroImage: string;
 };
 
 export const DESTINATIONS: Destination[] = [
@@ -94,6 +96,8 @@ export const DESTINATIONS: Destination[] = [
       },
     ],
     tone: 'kashmir',
+    image: 'https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1000&auto=format&fit=crop',
+    heroImage: 'https://images.unsplash.com/photo-1598091383021-15ddea10925d?q=80&w=1600&auto=format&fit=crop',
   },
 
   {
@@ -159,6 +163,8 @@ export const DESTINATIONS: Destination[] = [
       },
     ],
     tone: 'ladakh',
+    image: 'https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?q=80&w=1000&auto=format&fit=crop',
+    heroImage: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=1600&auto=format&fit=crop',
   },
 
   {
@@ -220,6 +226,8 @@ export const DESTINATIONS: Destination[] = [
       },
     ],
     tone: 'himachal',
+    image: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?q=80&w=1000&auto=format&fit=crop',
+    heroImage: 'https://images.unsplash.com/photo-1605649487212-47bdab064df8?q=80&w=1600&auto=format&fit=crop',
   },
 
   {
@@ -281,6 +289,8 @@ export const DESTINATIONS: Destination[] = [
       },
     ],
     tone: 'vaishno',
+    image: 'https://images.unsplash.com/photo-1626714485848-d3e91d575fa9?q=80&w=1000&auto=format&fit=crop',
+    heroImage: 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?q=80&w=1600&auto=format&fit=crop',
   },
 ];
 
@@ -289,28 +299,28 @@ export function getDestination(slug: string): Destination | undefined {
 }
 
 /**
- * Gradient placeholders per destination. Replace the whole map once real
- * photography drops into /public/images/destinations/.
+ * Visual background scrims per destination. Blends authentic Himalayan
+ * landscape photography with dark gradients for maximum text readability.
  */
 export const TONE_BG: Record<Tone, string> = {
   kashmir:
-    'radial-gradient(120% 100% at 25% 15%, #2d5f6e 0%, #17384a 48%, #08161f 100%)',
+    'linear-gradient(180deg, rgba(6,12,16,0.10) 0%, rgba(6,12,16,0.85) 100%), url("https://images.unsplash.com/photo-1595815771614-ade9d652a65d?q=80&w=1000&auto=format&fit=crop")',
   ladakh:
-    'radial-gradient(120% 100% at 70% 18%, #c99a5e 0%, #7a5433 46%, #241708 100%)',
+    'linear-gradient(180deg, rgba(16,10,4,0.10) 0%, rgba(16,10,4,0.85) 100%), url("https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?q=80&w=1000&auto=format&fit=crop")',
   himachal:
-    'radial-gradient(120% 100% at 45% 12%, #3f6b48 0%, #1f3d2b 50%, #0a1710 100%)',
+    'linear-gradient(180deg, rgba(6,14,9,0.10) 0%, rgba(6,14,9,0.85) 100%), url("https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?q=80&w=1000&auto=format&fit=crop")',
   vaishno:
-    'radial-gradient(120% 100% at 38% 22%, #c2701c 0%, #7a3d0d 48%, #240f04 100%)',
+    'linear-gradient(180deg, rgba(14,7,2,0.10) 0%, rgba(14,7,2,0.85) 100%), url("https://images.unsplash.com/photo-1626714485848-d3e91d575fa9?q=80&w=1000&auto=format&fit=crop")',
 };
 
-/** Slightly darker variant for hero sections, where text sits on top. */
+/** High-contrast dark photography backdrop for hero sections. */
 export const TONE_HERO: Record<Tone, string> = {
   kashmir:
-    'linear-gradient(180deg, rgba(6,12,16,0.42), rgba(6,12,16,0.82)), radial-gradient(130% 110% at 25% 10%, #2d5f6e 0%, #14303f 50%, #060e14 100%)',
+    'linear-gradient(180deg, rgba(6,12,16,0.65) 0%, rgba(6,12,16,0.92) 100%), url("https://images.unsplash.com/photo-1598091383021-15ddea10925d?q=80&w=1600&auto=format&fit=crop")',
   ladakh:
-    'linear-gradient(180deg, rgba(16,10,4,0.40), rgba(16,10,4,0.84)), radial-gradient(130% 110% at 70% 14%, #c99a5e 0%, #6d4a2c 48%, #180f05 100%)',
+    'linear-gradient(180deg, rgba(16,10,4,0.65) 0%, rgba(16,10,4,0.92) 100%), url("https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=1600&auto=format&fit=crop")',
   himachal:
-    'linear-gradient(180deg, rgba(6,14,9,0.40), rgba(6,14,9,0.84)), radial-gradient(130% 110% at 45% 10%, #3f6b48 0%, #1a3524 52%, #06110b 100%)',
+    'linear-gradient(180deg, rgba(6,14,9,0.65) 0%, rgba(6,14,9,0.92) 100%), url("https://images.unsplash.com/photo-1605649487212-47bdab064df8?q=80&w=1600&auto=format&fit=crop")',
   vaishno:
-    'linear-gradient(180deg, rgba(14,7,2,0.42), rgba(14,7,2,0.84)), radial-gradient(130% 110% at 38% 18%, #c2701c 0%, #6d360b 48%, #180a03 100%)',
+    'linear-gradient(180deg, rgba(14,7,2,0.65) 0%, rgba(14,7,2,0.92) 100%), url("https://images.unsplash.com/photo-1609840114035-3c981b782dfe?q=80&w=1600&auto=format&fit=crop")',
 };

@@ -37,6 +37,7 @@ export type Pkg = {
   exclusions: string[];
   faqs: { q: string; a: string }[];
   tone: Tone;
+  image: string;
   /** Surfaces on the home page and the packages index as a featured card. */
   featured?: boolean;
 };
@@ -65,6 +66,7 @@ export const PACKAGES: Pkg[] = [
   // ─────────────────────────────────────────────── KASHMIR
   {
     slug: 'classic-kashmir-4-nights',
+    image: 'https://images.unsplash.com/photo-1566837945700-30057527ade0?q=80&w=1000&auto=format&fit=crop',
     name: 'Classic Kashmir',
     destination: 'kashmir',
     destinationName: 'Kashmir',
@@ -135,6 +137,7 @@ export const PACKAGES: Pkg[] = [
 
   {
     slug: 'complete-kashmir-6-nights',
+    image: 'https://images.unsplash.com/photo-1598091383021-15ddea10925d?q=80&w=1000&auto=format&fit=crop',
     name: 'Complete Kashmir',
     destination: 'kashmir',
     destinationName: 'Kashmir',
@@ -219,6 +222,7 @@ export const PACKAGES: Pkg[] = [
 
   {
     slug: 'kashmir-honeymoon-5-nights',
+    image: 'https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1000&auto=format&fit=crop',
     name: 'Kashmir Honeymoon',
     destination: 'kashmir',
     destinationName: 'Kashmir',
@@ -302,6 +306,7 @@ export const PACKAGES: Pkg[] = [
 
   {
     slug: 'kashmir-snow-winter-5-nights',
+    image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1000&auto=format&fit=crop',
     name: 'Kashmir in Snow',
     destination: 'kashmir',
     destinationName: 'Kashmir',
@@ -391,6 +396,7 @@ export const PACKAGES: Pkg[] = [
   // ─────────────────────────────────────────────── LADAKH
   {
     slug: 'ladakh-leh-nubra-pangong-6-nights',
+    image: 'https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?q=80&w=1000&auto=format&fit=crop',
     name: 'Leh, Nubra & Pangong',
     destination: 'ladakh',
     destinationName: 'Ladakh',
@@ -495,6 +501,7 @@ export const PACKAGES: Pkg[] = [
 
   {
     slug: 'ladakh-complete-8-nights',
+    image: 'https://images.unsplash.com/photo-1518457607834-6e8d80c183c5?q=80&w=1000&auto=format&fit=crop',
     name: 'Complete Ladakh',
     destination: 'ladakh',
     destinationName: 'Ladakh',
@@ -557,6 +564,7 @@ export const PACKAGES: Pkg[] = [
   // ─────────────────────────────────────────────── HIMACHAL
   {
     slug: 'shimla-manali-6-nights',
+    image: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?q=80&w=1000&auto=format&fit=crop',
     name: 'Shimla & Manali',
     destination: 'himachal',
     destinationName: 'Himachal',
@@ -617,6 +625,7 @@ export const PACKAGES: Pkg[] = [
   // ─────────────────────────────────────────────── VAISHNO DEVI
   {
     slug: 'vaishno-devi-2-nights',
+    image: 'https://images.unsplash.com/photo-1626714485848-d3e91d575fa9?q=80&w=1000&auto=format&fit=crop',
     name: 'Vaishno Devi Yatra',
     destination: 'vaishno-devi',
     destinationName: 'Vaishno Devi',
@@ -690,6 +699,7 @@ export const PACKAGES: Pkg[] = [
 
   {
     slug: 'vaishno-devi-kashmir-7-nights',
+    image: 'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?q=80&w=1000&auto=format&fit=crop',
     name: 'Vaishno Devi & Kashmir',
     destination: 'vaishno-devi',
     destinationName: 'Vaishno Devi',
