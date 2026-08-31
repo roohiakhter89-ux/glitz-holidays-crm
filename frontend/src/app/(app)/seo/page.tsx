@@ -29,6 +29,8 @@ import {
   Share2,
   Newspaper,
   BookOpen,
+  Eye,
+  CheckCheck,
 } from 'lucide-react';
 import {
   api,
@@ -42,6 +44,7 @@ import {
   type MediaAssetRow,
   type PageManifestItem,
 } from '@/lib/api';
+import MANIFEST_DATA from '@/lib/page-manifest.json';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
@@ -67,13 +70,49 @@ export default function SeoPage() {
   const [loading, setLoading] = useState(true);
   const [rankingsLoading, setRankingsLoading] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [busy, setBusy] = useState<'idle' | 'audit' | 'auditPage' | 'saveOffPage' | 'uploadMedia'>('idle');
+  const [busy, setBusy] = useState<'idle' | 'audit' | 'auditPage' | 'saveOffPage' | 'uploadMedia' | 'quickRegister'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Modals / Drawers state
   const [selectedPageForOffPage, setSelectedPageForOffPage] = useState<SeoRankedPage | null>(null);
   const [selectedPageForChecklist, setSelectedPageForChecklist] = useState<SeoRankedPage | null>(null);
+
+  // Default manifest pages list (guaranteed 270 pages even before DB audit)
+  const defaultManifestPages: SeoRankedPage[] = useMemo(() => {
+    const baseSite = sites.find((s) => s.id === selectedSiteId)?.url || 'https://glitzholidays.in';
+    return (MANIFEST_DATA as any[]).map((m) => {
+      let fullUrl = m.url;
+      try {
+        fullUrl = new URL(m.url, baseSite).toString();
+      } catch {}
+      return {
+        url: fullUrl,
+        path: m.url,
+        title: m.title || m.h1 || m.url,
+        h1: m.h1,
+        tier: m.tier,
+        family: m.family,
+        targetKeyword: m.primary,
+        impr: m.impr ?? null,
+        clicks: m.clicks ?? null,
+        conv: m.conv ?? null,
+        words: m.words ?? null,
+        auditId: null,
+        lastAuditedAt: null,
+        score: null,
+        perfScore: null,
+        seoScore: null,
+        lcpMs: null,
+        clsX1k: null,
+        inpMs: null,
+        checks: [],
+        tasks: [],
+        errors: null,
+        offPage: null,
+      };
+    });
+  }, [sites, selectedSiteId]);
 
   // Load sites
   const loadSites = useCallback(async () => {
@@ -84,7 +123,8 @@ export default function SeoPage() {
         cur && rows.some((r) => r.id === cur) ? cur : (rows[0]?.id ?? null),
       );
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load SEO sites.');
+      // Non-fatal, manifest fallback will display
+      console.warn('Could not load SEO sites from API, using manifest fallback', e);
     } finally {
       setLoading(false);
     }
@@ -95,7 +135,7 @@ export default function SeoPage() {
     try {
       setAudit(await api.get<SeoAuditResponse>(`/seo/sites/${id}/audit`));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load site audit.');
+      console.warn('Could not load site audit', e);
     }
   }, []);
 
@@ -106,7 +146,7 @@ export default function SeoPage() {
       const res = await api.get<SeoRankingsResponse>(`/seo/sites/${id}/rankings`);
       setRankingsData(res);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load page rankings.');
+      console.warn('Could not load page rankings, using default manifest list', e);
     } finally {
       setRankingsLoading(false);
     }
@@ -123,7 +163,7 @@ export default function SeoPage() {
       setMediaAssets(assets);
       setWebsitePages(pages);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load media library.');
+      console.warn('Could not load media library', e);
     } finally {
       setMediaLoading(false);
     }
@@ -152,9 +192,32 @@ export default function SeoPage() {
     setTimeout(() => setSuccessMsg(null), 4000);
   };
 
+  // Quick auto-register default site
+  async function quickRegisterDefaultSite() {
+    setBusy('quickRegister');
+    setError(null);
+    try {
+      const res = await api.post<{ id: string }>('/seo/sites', {
+        name: 'Glitz Holidays Main Website',
+        url: 'https://glitzholidays.in',
+        crawlPaths: ['/', '/packages', '/destinations/gulmarg', '/destinations/pahalgam', '/destinations/sonmarg'],
+      });
+      await loadSites();
+      setSelectedSiteId(res.id);
+      notifySuccess('Glitz Holidays website registered successfully!');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Registration failed');
+    } finally {
+      setBusy('idle');
+    }
+  }
+
   // Run full site audit
   async function runAudit() {
-    if (!selectedSiteId) return;
+    if (!selectedSiteId) {
+      await quickRegisterDefaultSite();
+      return;
+    }
     setBusy('audit');
     setError(null);
     try {
@@ -174,14 +237,19 @@ export default function SeoPage() {
 
   // Audit single page
   async function auditSinglePage(url: string, keyword?: string) {
-    if (!selectedSiteId) return;
+    if (!selectedSiteId) {
+      await quickRegisterDefaultSite();
+    }
+    const currentSiteId = selectedSiteId || sites[0]?.id;
+    if (!currentSiteId) return;
+
     setBusy('auditPage');
     setError(null);
     try {
-      await api.post(`/seo/sites/${selectedSiteId}/audit-page`, { url, keyword });
+      await api.post(`/seo/sites/${currentSiteId}/audit-page`, { url, keyword });
       await Promise.all([
-        loadAudit(selectedSiteId),
-        loadRankings(selectedSiteId),
+        loadAudit(currentSiteId),
+        loadRankings(currentSiteId),
       ]);
       notifySuccess(`Audited page: ${url}`);
     } catch (e) {
@@ -191,8 +259,33 @@ export default function SeoPage() {
     }
   }
 
+  // Effective unified rankings list
+  const effectiveRankings: SeoRankedPage[] = useMemo(() => {
+    if (rankingsData?.rankings && rankingsData.rankings.length > 0) {
+      return rankingsData.rankings;
+    }
+    return defaultManifestPages;
+  }, [rankingsData, defaultManifestPages]);
+
+  const effectiveStats = useMemo(() => {
+    if (rankingsData?.stats) return rankingsData.stats;
+    const audited = effectiveRankings.filter((p) => p.score !== null);
+    const avg =
+      audited.length > 0
+        ? Math.round(audited.reduce((sum, p) => sum + (p.score ?? 0), 0) / audited.length)
+        : null;
+    return {
+      totalPages: effectiveRankings.length,
+      auditedPages: audited.length,
+      averageScore: avg,
+      highScoreCount: effectiveRankings.filter((p) => (p.score ?? 0) >= 80).length,
+      medScoreCount: effectiveRankings.filter((p) => (p.score ?? 0) >= 60 && (p.score ?? 0) < 80).length,
+      lowScoreCount: effectiveRankings.filter((p) => p.score !== null && (p.score ?? 0) < 60).length,
+    };
+  }, [rankingsData, effectiveRankings]);
+
   return (
-    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="mx-auto max-w-[1360px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Header */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -211,20 +304,18 @@ export default function SeoPage() {
         </div>
         <div className="flex items-center gap-3">
           <AddSiteDialog onCreated={(id) => { setSelectedSiteId(id); loadSites(); }} />
-          {selectedSiteId && (
-            <Button
-              size="sm"
-              onClick={runAudit}
-              disabled={busy !== 'idle'}
-              className="gap-1.5"
-            >
-              <RefreshCw
-                className={`size-3.5 ${busy === 'audit' ? 'animate-spin' : ''}`}
-                strokeWidth={1.75}
-              />
-              {busy === 'audit' ? 'Auditing…' : 'Run Full Site Audit'}
-            </Button>
-          )}
+          <Button
+            size="sm"
+            onClick={runAudit}
+            disabled={busy !== 'idle'}
+            className="gap-1.5"
+          >
+            <RefreshCw
+              className={`size-3.5 ${busy === 'audit' ? 'animate-spin' : ''}`}
+              strokeWidth={1.75}
+            />
+            {busy === 'audit' ? 'Auditing…' : 'Run Full Site Audit'}
+          </Button>
         </div>
       </header>
 
@@ -251,147 +342,158 @@ export default function SeoPage() {
         </div>
       )}
 
-      {loading ? (
-        <div className="space-y-4">
-          <div className="h-12 w-full rounded-xl shimmer bg-ink-900" />
-          <div className="h-64 w-full rounded-xl shimmer bg-ink-900" />
+      {/* Unregistered domain banner */}
+      {sites.length === 0 && (
+        <div className="mb-6 rounded-xl border border-signal-500/30 bg-signal-500/5 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Globe className="size-5 text-signal-500 shrink-0" />
+            <div>
+              <p className="text-[13px] font-semibold text-ink-100">
+                Tracking Glitz Holidays (270 Programmatic Pages)
+              </p>
+              <p className="text-[11.5px] text-ink-400">
+                All 270 pages are loaded from the manifest below. Connect the domain to run live crawling and store off-page backlinks.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={quickRegisterDefaultSite}
+            disabled={busy === 'quickRegister'}
+            className="text-[12px] h-8"
+          >
+            {busy === 'quickRegister' ? 'Registering…' : '⚡ Connect https://glitzholidays.in'}
+          </Button>
         </div>
-      ) : sites.length === 0 ? (
-        <Panel>
-          <PanelBody className="py-16 text-center">
-            <Globe aria-hidden strokeWidth={1.25} className="mx-auto size-8 text-ink-500" />
-            <p className="mt-3 text-[14px] font-medium text-ink-200">No sites registered</p>
-            <p className="mt-1 text-[12px] text-ink-500">
-              Register the Glitz website domain to track SEO algorithm rankings.
-            </p>
-          </PanelBody>
-        </Panel>
-      ) : (
-        <>
-          {/* Site Selector Bar */}
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <span className="text-[12px] font-medium uppercase tracking-wider text-ink-500">
-              Target Domain:
+      )}
+
+      {/* Site Selector Bar (when multiple sites exist) */}
+      {sites.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <span className="text-[12px] font-medium uppercase tracking-wider text-ink-500">
+            Target Domain:
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {sites.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedSiteId(s.id)}
+                className={`group flex items-center gap-2.5 rounded-lg border px-3.5 py-2 text-left transition-all duration-200 ${
+                  selectedSiteId === s.id
+                    ? 'border-signal-500/60 bg-ink-900 text-ink-100 shadow-sm'
+                    : 'border-ink-800 bg-ink-950 text-ink-400 hover:border-ink-700 hover:text-ink-200'
+                }`}
+              >
+                <ScoreRing score={s.avgScore ?? 0} unknown={s.avgScore === null} size={28} stroke={3} />
+                <div>
+                  <span className="text-[12.5px] font-medium">{s.name}</span>
+                  <span className="ml-2 text-[10.5px] text-ink-500">({new URL(s.url).host})</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Navigation Tabs */}
+      <div className="mb-6 border-b border-ink-800/80">
+        <nav className="flex space-x-6">
+          <button
+            onClick={() => setActiveTab('rankings')}
+            className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'rankings'
+                ? 'border-signal-500 text-signal-500'
+                : 'border-transparent text-ink-400 hover:text-ink-200'
+            }`}
+          >
+            <Trophy className="size-4" />
+            Algorithm Leaderboard & All Pages
+            <span className="ml-1 rounded-full bg-ink-800 px-2 py-0.5 text-[11px] text-ink-300">
+              {effectiveStats.totalPages}
             </span>
-            <div className="flex flex-wrap gap-2">
-              {sites.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedSiteId(s.id)}
-                  className={`group flex items-center gap-2.5 rounded-lg border px-3.5 py-2 text-left transition-all duration-200 ${
-                    selectedSiteId === s.id
-                      ? 'border-signal-500/60 bg-ink-900 text-ink-100 shadow-sm'
-                      : 'border-ink-800 bg-ink-950 text-ink-400 hover:border-ink-700 hover:text-ink-200'
-                  }`}
-                >
-                  <ScoreRing score={s.avgScore ?? 0} unknown={s.avgScore === null} size={28} stroke={3} />
-                  <div>
-                    <span className="text-[12.5px] font-medium">{s.name}</span>
-                    <span className="ml-2 text-[10.5px] text-ink-500">({new URL(s.url).host})</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          </button>
 
-          {/* Navigation Tabs */}
-          <div className="mb-6 border-b border-ink-800/80">
-            <nav className="flex space-x-6">
-              <button
-                onClick={() => setActiveTab('rankings')}
-                className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
-                  activeTab === 'rankings'
-                    ? 'border-signal-500 text-signal-500'
-                    : 'border-transparent text-ink-400 hover:text-ink-200'
-                }`}
-              >
-                <Trophy className="size-4" />
-                Algorithm Leaderboard & Rankings
-                {rankingsData?.stats.totalPages ? (
-                  <span className="ml-1 rounded-full bg-ink-800 px-2 py-0.5 text-[11px] text-ink-300">
-                    {rankingsData.stats.totalPages}
-                  </span>
-                ) : null}
-              </button>
+          <button
+            onClick={() => setActiveTab('media')}
+            className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'media'
+                ? 'border-signal-500 text-signal-500'
+                : 'border-transparent text-ink-400 hover:text-ink-200'
+            }`}
+          >
+            <ImageIcon className="size-4" />
+            Website Media Library
+            {mediaAssets.length > 0 && (
+              <span className="ml-1 rounded-full bg-ink-800 px-2 py-0.5 text-[11px] text-ink-300">
+                {mediaAssets.length}
+              </span>
+            )}
+          </button>
 
-              <button
-                onClick={() => setActiveTab('media')}
-                className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
-                  activeTab === 'media'
-                    ? 'border-signal-500 text-signal-500'
-                    : 'border-transparent text-ink-400 hover:text-ink-200'
-                }`}
-              >
-                <ImageIcon className="size-4" />
-                Website Media Library
-                {mediaAssets.length > 0 && (
-                  <span className="ml-1 rounded-full bg-ink-800 px-2 py-0.5 text-[11px] text-ink-300">
-                    {mediaAssets.length}
-                  </span>
-                )}
-              </button>
+          <button
+            onClick={() => setActiveTab('audits')}
+            className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'audits'
+                ? 'border-signal-500 text-signal-500'
+                : 'border-transparent text-ink-400 hover:text-ink-200'
+            }`}
+          >
+            <Gauge className="size-4" />
+            Site Health & PageSpeed
+          </button>
+        </nav>
+      </div>
 
-              <button
-                onClick={() => setActiveTab('audits')}
-                className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
-                  activeTab === 'audits'
-                    ? 'border-signal-500 text-signal-500'
-                    : 'border-transparent text-ink-400 hover:text-ink-200'
-                }`}
-              >
-                <Gauge className="size-4" />
-                Site Health & PageSpeed
-              </button>
-            </nav>
-          </div>
+      {/* TAB 1: RANKINGS LEADERBOARD */}
+      {activeTab === 'rankings' && (
+        <RankingsLeaderboard
+          pages={effectiveRankings}
+          stats={effectiveStats}
+          loading={rankingsLoading}
+          onAuditPage={auditSinglePage}
+          onEditOffPage={(page) => setSelectedPageForOffPage(page)}
+          onViewChecklist={(page) => setSelectedPageForChecklist(page)}
+          busy={busy === 'auditPage'}
+        />
+      )}
 
-          {/* TAB 1: RANKINGS LEADERBOARD */}
-          {activeTab === 'rankings' && (
-            <RankingsLeaderboard
-              data={rankingsData}
-              loading={rankingsLoading}
-              onAuditPage={auditSinglePage}
-              onEditOffPage={(page) => setSelectedPageForOffPage(page)}
-              onViewChecklist={(page) => setSelectedPageForChecklist(page)}
-              busy={busy === 'auditPage'}
+      {/* TAB 2: MEDIA LIBRARY */}
+      {activeTab === 'media' && (
+        <MediaLibraryTab
+          assets={mediaAssets}
+          pages={websitePages.length > 0 ? websitePages : (MANIFEST_DATA as any[])}
+          loading={mediaLoading}
+          onReload={loadMedia}
+          notifySuccess={notifySuccess}
+        />
+      )}
+
+      {/* TAB 3: SITE HEALTH & AUDITS */}
+      {activeTab === 'audits' && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-4">
+            <SitePages
+              audit={audit || { site: sites[0] || ({ name: 'Glitz', url: 'https://glitzholidays.in' } as any), pages: [] }}
+              busy={busy === 'audit'}
+              onAudit={runAudit}
             />
-          )}
-
-          {/* TAB 2: MEDIA LIBRARY */}
-          {activeTab === 'media' && (
-            <MediaLibraryTab
-              assets={mediaAssets}
-              pages={websitePages}
-              loading={mediaLoading}
-              onReload={loadMedia}
-              notifySuccess={notifySuccess}
-            />
-          )}
-
-          {/* TAB 3: SITE HEALTH & AUDITS */}
-          {activeTab === 'audits' && audit && (
-            <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-              <div className="space-y-4">
-                <SitePages audit={audit} busy={busy === 'audit'} onAudit={runAudit} />
-              </div>
-              <div className="space-y-4">
-                <TasksPanel audit={audit} />
-                <ExternalIntegrations />
-              </div>
-            </div>
-          )}
-        </>
+          </div>
+          <div className="space-y-4">
+            <TasksPanel audit={audit || { site: sites[0] || ({} as any), pages: [] }} />
+            <ExternalIntegrations />
+          </div>
+        </div>
       )}
 
       {/* Off-Page Signals Modal / Drawer */}
-      {selectedPageForOffPage && selectedSiteId && (
+      {selectedPageForOffPage && (
         <OffPageEditDialog
           page={selectedPageForOffPage}
-          siteId={selectedSiteId}
+          siteId={selectedSiteId || sites[0]?.id || 'default'}
           onClose={() => setSelectedPageForOffPage(null)}
           onSaved={() => {
             setSelectedPageForOffPage(null);
-            loadRankings(selectedSiteId);
+            if (selectedSiteId) loadRankings(selectedSiteId);
             notifySuccess('Off-page signals updated & score recalculated!');
           }}
         />
@@ -417,14 +519,23 @@ export default function SeoPage() {
  * ========================================================================== */
 
 function RankingsLeaderboard({
-  data,
+  pages,
+  stats,
   loading,
   onAuditPage,
   onEditOffPage,
   onViewChecklist,
   busy,
 }: {
-  data: SeoRankingsResponse | null;
+  pages: SeoRankedPage[];
+  stats: {
+    totalPages: number;
+    auditedPages: number;
+    averageScore: number | null;
+    highScoreCount: number;
+    medScoreCount: number;
+    lowScoreCount: number;
+  };
   loading: boolean;
   onAuditPage: (url: string, keyword?: string) => void;
   onEditOffPage: (page: SeoRankedPage) => void;
@@ -434,11 +545,10 @@ function RankingsLeaderboard({
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [scoreFilter, setScoreFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'score_desc' | 'score_asc' | 'tier' | 'title'>('score_desc');
+  const [sortBy, setSortBy] = useState<'score_desc' | 'score_asc' | 'impr_desc' | 'conv_desc' | 'tier' | 'title'>('score_desc');
 
   const filteredPages = useMemo(() => {
-    if (!data?.rankings) return [];
-    let list = [...data.rankings];
+    let list = [...pages];
 
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
@@ -471,7 +581,7 @@ function RankingsLeaderboard({
 
     list.sort((a, b) => {
       if (sortBy === 'score_desc') {
-        if (a.score === null && b.score === null) return 0;
+        if (a.score === null && b.score === null) return (b.impr ?? 0) - (a.impr ?? 0);
         if (a.score === null) return 1;
         if (b.score === null) return -1;
         return (b.score ?? 0) - (a.score ?? 0);
@@ -481,6 +591,12 @@ function RankingsLeaderboard({
         if (a.score === null) return 1;
         if (b.score === null) return -1;
         return (a.score ?? 0) - (b.score ?? 0);
+      }
+      if (sortBy === 'impr_desc') {
+        return (b.impr ?? 0) - (a.impr ?? 0);
+      }
+      if (sortBy === 'conv_desc') {
+        return (b.conv ?? 0) - (a.conv ?? 0);
       }
       if (sortBy === 'tier') {
         return (a.tier ?? 99) - (b.tier ?? 99);
@@ -492,58 +608,43 @@ function RankingsLeaderboard({
     });
 
     return list;
-  }, [data, searchTerm, tierFilter, scoreFilter, sortBy]);
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 rounded-xl shimmer bg-ink-900" />
-          ))}
-        </div>
-        <div className="h-96 rounded-xl shimmer bg-ink-900" />
-      </div>
-    );
-  }
-
-  if (!data) return null;
+  }, [pages, searchTerm, tierFilter, scoreFilter, sortBy]);
 
   return (
     <div className="space-y-6">
       {/* Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="rounded-xl border border-ink-800 bg-ink-900/60 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">Total Pages</p>
-          <p className="mt-1 text-2xl font-bold text-ink-100">{data.stats.totalPages}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">Manifest Pages</p>
+          <p className="mt-1 text-2xl font-bold text-ink-100">{stats.totalPages}</p>
         </div>
         <div className="rounded-xl border border-ink-800 bg-ink-900/60 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">Avg SEO Score</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">Avg Quality Score</p>
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className={`text-2xl font-bold ${
-              (data.stats.averageScore ?? 0) >= 80 ? 'text-healthy-500' :
-              (data.stats.averageScore ?? 0) >= 60 ? 'text-warn-500' : 'text-loss-500'
+              (stats.averageScore ?? 0) >= 80 ? 'text-healthy-500' :
+              (stats.averageScore ?? 0) >= 60 ? 'text-warn-500' : 'text-signal-500'
             }`}>
-              {data.stats.averageScore ?? '—'}
+              {stats.averageScore ?? 'Ready'}
             </span>
-            <span className="text-[11px] text-ink-500">/ 100</span>
+            {stats.averageScore && <span className="text-[11px] text-ink-500">/ 100</span>}
           </div>
         </div>
         <div className="rounded-xl border border-ink-800 bg-ink-900/60 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">Audited</p>
-          <p className="mt-1 text-2xl font-bold text-signal-500">{data.stats.auditedPages}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-500">Audited Live</p>
+          <p className="mt-1 text-2xl font-bold text-signal-500">{stats.auditedPages} / {stats.totalPages}</p>
         </div>
         <div className="rounded-xl border border-healthy-500/20 bg-healthy-500/5 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-healthy-500">High (80-100)</p>
-          <p className="mt-1 text-2xl font-bold text-healthy-500">{data.stats.highScoreCount}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-healthy-500">High Tier (80+)</p>
+          <p className="mt-1 text-2xl font-bold text-healthy-500">{stats.highScoreCount}</p>
         </div>
         <div className="rounded-xl border border-warn-500/20 bg-warn-500/5 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-warn-500">Mid (60-79)</p>
-          <p className="mt-1 text-2xl font-bold text-warn-500">{data.stats.medScoreCount}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-warn-500">Mid Tier (60-79)</p>
+          <p className="mt-1 text-2xl font-bold text-warn-500">{stats.medScoreCount}</p>
         </div>
         <div className="rounded-xl border border-loss-500/20 bg-loss-500/5 p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-loss-500">Needs Work (&lt;60)</p>
-          <p className="mt-1 text-2xl font-bold text-loss-500">{data.stats.lowScoreCount}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-loss-500">Needs Audit</p>
+          <p className="mt-1 text-2xl font-bold text-loss-500">{stats.totalPages - stats.auditedPages}</p>
         </div>
       </div>
 
@@ -555,7 +656,7 @@ function RankingsLeaderboard({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search pages by keyword, slug, title..."
+            placeholder="Search all 270 pages by keyword, slug, destination, city..."
             className="w-full bg-transparent text-[13px] text-ink-100 placeholder:text-ink-500 focus:outline-none"
           />
           {searchTerm && (
@@ -575,14 +676,14 @@ function RankingsLeaderboard({
             onChange={(e) => setTierFilter(e.target.value)}
             className="rounded-lg border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-ink-200 focus:border-signal-500 focus:outline-none"
           >
-            <option value="all">All Tiers</option>
-            <option value="0">Tier 0 (Core/Pillars)</option>
-            <option value="1">Tier 1 (Origin Cities)</option>
-            <option value="2">Tier 2 (Collections)</option>
-            <option value="3">Tier 3 (Routes)</option>
-            <option value="4">Tier 4 (Place Guides)</option>
-            <option value="5">Tier 5 (Month Hubs)</option>
-            <option value="6">Tier 6 (Hindi Pages)</option>
+            <option value="all">All Tiers (270 Pages)</option>
+            <option value="0">Tier 0 · Core Pillars (7)</option>
+            <option value="1">Tier 1 · Origin Cities (47)</option>
+            <option value="2">Tier 2 · Honeymoon & Family (22)</option>
+            <option value="3">Tier 3 · Transport Routes (88)</option>
+            <option value="4">Tier 4 · Place Guides (86)</option>
+            <option value="5">Tier 5 · Month Hubs (10)</option>
+            <option value="6">Tier 6 · Hindi Pages (10)</option>
           </select>
 
           {/* Score Filter */}
@@ -591,13 +692,13 @@ function RankingsLeaderboard({
             onChange={(e) => setScoreFilter(e.target.value)}
             className="rounded-lg border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-ink-200 focus:border-signal-500 focus:outline-none"
           >
-            <option value="all">All Scores</option>
+            <option value="all">All Statuses</option>
             <option value="audited">Audited Only</option>
             <option value="high">Score 80+ (High)</option>
             <option value="mid">Score 60–79 (Mid)</option>
             <option value="low">Score &lt;60 (Low)</option>
             <option value="has_offpage">Has Off-Page Data</option>
-            <option value="unaudited">Not Audited</option>
+            <option value="unaudited">Pending Audit</option>
           </select>
 
           {/* Sort By */}
@@ -607,7 +708,8 @@ function RankingsLeaderboard({
             className="rounded-lg border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-ink-200 focus:border-signal-500 focus:outline-none"
           >
             <option value="score_desc">Highest Score First</option>
-            <option value="score_asc">Lowest Score First</option>
+            <option value="impr_desc">Highest Search Demand (Google Ads)</option>
+            <option value="conv_desc">Highest Historical Conversions</option>
             <option value="tier">By Manifest Tier</option>
             <option value="title">By Title (A-Z)</option>
           </select>
@@ -618,21 +720,21 @@ function RankingsLeaderboard({
       <div className="overflow-hidden rounded-xl border border-ink-800 bg-ink-950">
         <div className="border-b border-ink-800 bg-ink-900/90 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-ink-400 grid grid-cols-12 gap-4 items-center">
           <div className="col-span-1">Rank / Tier</div>
-          <div className="col-span-5">Page & Target Intent</div>
+          <div className="col-span-4">Page Title & URL</div>
+          <div className="col-span-3">Target Query & Google Ads Demand</div>
           <div className="col-span-2 text-center">Algorithm Score</div>
-          <div className="col-span-2 text-center">Off-Page Signals</div>
           <div className="col-span-2 text-right">Actions</div>
         </div>
 
         {filteredPages.length === 0 ? (
           <div className="py-16 text-center text-ink-500 text-[13px]">
-            No pages match the current filter or search criteria.
+            No pages match the search criteria.
           </div>
         ) : (
-          <div className="divide-y divide-ink-800/60">
+          <div className="divide-y divide-ink-800/60 max-h-[800px] overflow-y-auto">
             {filteredPages.map((p, idx) => (
               <PageRankRow
-                key={p.url}
+                key={p.url || idx}
                 rank={idx + 1}
                 page={p}
                 onAudit={() => onAuditPage(p.url, p.targetKeyword)}
@@ -678,28 +780,38 @@ function PageRankRow({
     p.tier === 6 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
     'bg-ink-800 text-ink-400 border-ink-700';
 
+  const tierLabel =
+    p.tier === 0 ? 'T0 Core' :
+    p.tier === 1 ? 'T1 Origin' :
+    p.tier === 2 ? 'T2 Honeymoon' :
+    p.tier === 3 ? 'T3 Route' :
+    p.tier === 4 ? 'T4 Guide' :
+    p.tier === 5 ? 'T5 Month' :
+    p.tier === 6 ? 'T6 Hindi' : 'T' + p.tier;
+
   return (
     <div className="grid grid-cols-12 gap-4 px-4 py-3.5 items-center hover:bg-ink-900/40 transition-colors">
       {/* Col 1: Rank & Tier */}
       <div className="col-span-1 flex items-center gap-2">
-        <span className="text-[12px] font-mono font-medium text-ink-400 w-5">
+        <span className="text-[12px] font-mono font-medium text-ink-500 w-5">
           #{rank}
         </span>
         {p.tier !== undefined && (
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border ${tierBadge}`}>
-            T{p.tier}
+          <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-semibold border ${tierBadge}`}>
+            {tierLabel}
           </span>
         )}
       </div>
 
-      {/* Col 2: Page & Target Intent */}
-      <div className="col-span-5 min-w-0 pr-2">
+      {/* Col 2: Page Title & URL */}
+      <div className="col-span-4 min-w-0 pr-2">
         <div className="flex items-center gap-1.5">
           <a
             href={p.url}
             target="_blank"
             rel="noreferrer"
-            className="truncate text-[13.5px] font-medium text-ink-100 hover:text-signal-500 inline-flex items-center gap-1"
+            className="truncate text-[13px] font-medium text-ink-100 hover:text-signal-500 inline-flex items-center gap-1"
+            title={p.title || p.path}
           >
             {p.title || p.path}
             <ExternalLink className="size-3 text-ink-500 shrink-0" />
@@ -707,15 +819,33 @@ function PageRankRow({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ink-400">
           <span className="font-mono text-ink-500">{p.path}</span>
-          {p.targetKeyword && (
-            <span className="rounded bg-ink-900 border border-ink-800 px-1.5 py-0.2 text-signal-500">
-              🔑 {p.targetKeyword}
+          {p.family && (
+            <span className="rounded bg-ink-900 border border-ink-800 px-1.5 py-0.2 text-ink-400 text-[10px]">
+              {p.family}
             </span>
           )}
         </div>
       </div>
 
-      {/* Col 3: Algorithm Score */}
+      {/* Col 3: Target Query & Demand */}
+      <div className="col-span-3 min-w-0 pr-2">
+        {p.targetKeyword && (
+          <p className="text-[12px] font-medium text-signal-400 truncate" title={p.targetKeyword}>
+            🔑 {p.targetKeyword}
+          </p>
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10.5px] text-ink-500">
+          {p.impr !== null && p.impr !== undefined && (
+            <span>📈 {p.impr.toLocaleString()} impr</span>
+          )}
+          {p.conv !== null && p.conv !== undefined && (
+            <span className="text-emerald-400">🎯 {p.conv} conv</span>
+          )}
+          {p.words && <span>📝 {p.words} words</span>}
+        </div>
+      </div>
+
+      {/* Col 4: Algorithm Score */}
       <div className="col-span-2 flex flex-col items-center justify-center">
         {p.score !== null ? (
           <div className="flex items-center gap-2">
@@ -728,41 +858,15 @@ function PageRankRow({
             </div>
           </div>
         ) : (
-          <span className="text-[11px] text-ink-600 italic">Not audited yet</span>
-        )}
-      </div>
-
-      {/* Col 4: Off-Page Signals */}
-      <div className="col-span-2 text-center text-[11.5px]">
-        {p.offPage ? (
-          <div className="flex items-center justify-center gap-2 text-ink-300">
-            <span title="Backlinks" className="flex items-center gap-0.5">
-              <LinkIcon className="size-3 text-signal-500" />
-              {p.offPage.backlinkCount}
-            </span>
-            <span title="Referring Domains" className="flex items-center gap-0.5">
-              <Globe className="size-3 text-emerald-400" />
-              {p.offPage.referringDomains}
-            </span>
-            {p.offPage.pageAuthority !== null && (
-              <span title="Page Authority" className="rounded bg-ink-800 px-1 text-[10px] text-amber-400 font-mono">
-                PA:{p.offPage.pageAuthority}
-              </span>
-            )}
-            {p.offPage.prMentions > 0 && (
-              <span title="PR Mentions" className="flex items-center gap-0.5 text-purple-400">
-                <Newspaper className="size-3" />
-                {p.offPage.prMentions}
-              </span>
-            )}
-          </div>
-        ) : (
-          <button
-            onClick={onEditOffPage}
-            className="text-[11px] text-ink-500 hover:text-signal-500 underline"
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[11px] text-signal-400 border border-signal-500/20 hover:bg-signal-500/10 px-2.5"
+            onClick={onAudit}
+            disabled={busy}
           >
-            + Add off-page
-          </button>
+            Audit Page
+          </Button>
         )}
       </div>
 
@@ -771,7 +875,7 @@ function PageRankRow({
         <Button
           size="sm"
           variant="secondary"
-          className="h-7 text-[11.5px] px-2"
+          className="h-7 text-[11.5px] px-2.5"
           onClick={onViewChecklist}
         >
           Checklist
@@ -866,7 +970,11 @@ function MediaLibraryTab({
   const filteredAssets = useMemo(() => {
     return assets.filter((a) => {
       if (filterPage !== 'all' && a.pageSlug !== filterPage) return false;
-      if (searchTag.trim() && !a.tags?.some((t) => t.toLowerCase().includes(searchTag.toLowerCase())) && !a.filename.toLowerCase().includes(searchTag.toLowerCase())) {
+      if (
+        searchTag.trim() &&
+        !a.tags?.some((t) => t.toLowerCase().includes(searchTag.toLowerCase())) &&
+        !a.filename.toLowerCase().includes(searchTag.toLowerCase())
+      ) {
         return false;
       }
       return true;
@@ -919,7 +1027,7 @@ function MediaLibraryTab({
                   <option value="">-- General Website Asset --</option>
                   {pages.map((p) => (
                     <option key={p.url} value={p.url}>
-                      {p.url} ({p.title.slice(0, 45)})
+                      {p.url} ({p.title?.slice(0, 45)})
                     </option>
                   ))}
                 </select>
@@ -1282,9 +1390,28 @@ function PageChecklistDialog({
             <ScoreRing score={page.score ?? 0} size={56} stroke={5} />
           </div>
 
+          {/* Quick demand card */}
+          {(page.impr || page.conv || page.words) && (
+            <div className="rounded-lg bg-ink-950 border border-ink-800 p-3 grid grid-cols-3 gap-2 text-center text-[11px]">
+              <div>
+                <p className="text-ink-500 uppercase text-[9.5px]">Search Demand</p>
+                <p className="font-semibold text-ink-200">{page.impr ? page.impr.toLocaleString() + ' impr' : '—'}</p>
+              </div>
+              <div>
+                <p className="text-ink-500 uppercase text-[9.5px]">Conversions</p>
+                <p className="font-semibold text-emerald-400">{page.conv ?? '0'}</p>
+              </div>
+              <div>
+                <p className="text-ink-500 uppercase text-[9.5px]">Target Depth</p>
+                <p className="font-semibold text-ink-200">{page.words || '1000+ words'}</p>
+              </div>
+            </div>
+          )}
+
           {checks.length === 0 ? (
-            <div className="py-8 text-center text-ink-500 text-[13px]">
-              This page has not been audited yet.
+            <div className="py-8 text-center text-ink-500 text-[13px] bg-ink-950 rounded-lg border border-ink-800 p-4">
+              <p>This page has not been crawled live yet.</p>
+              <p className="text-xs text-ink-400 mt-1">Click &quot;Re-audit This Page Now&quot; below to fetch HTML and run all 18 Google ranking factor checks.</p>
             </div>
           ) : (
             <div className="space-y-3">

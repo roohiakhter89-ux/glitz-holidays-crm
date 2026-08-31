@@ -65,7 +65,7 @@ export class SeoService {
   }
 
   async listSites() {
-    const sites = await this.prisma.seoSite.findMany({
+    let sites = await this.prisma.seoSite.findMany({
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
       include: {
         audits: {
@@ -74,6 +74,25 @@ export class SeoService {
         },
       },
     });
+
+    if (sites.length === 0) {
+      try {
+        const defaultSite = await this.prisma.seoSite.create({
+          data: {
+            name: 'Glitz Holidays Main Website',
+            url: 'https://glitzholidays.in',
+            crawlPaths: ['/', '/packages', '/destinations/gulmarg', '/destinations/pahalgam', '/destinations/sonmarg'],
+            isActive: true,
+          },
+        });
+        sites = [{
+          ...defaultSite,
+          audits: [],
+        }] as any;
+      } catch {
+        // Ignored if already created concurrently
+      }
+    }
 
     return sites.map((s: any) => {
       const latestByUrl = new Map<string, any>();
@@ -220,6 +239,10 @@ export class SeoService {
         tier: mp.tier,
         family: mp.family,
         targetKeyword: mp.primary,
+        impr: mp.impr ?? null,
+        clicks: mp.clicks ?? null,
+        conv: mp.conv ?? null,
+        words: mp.words ?? null,
         auditId: audit?.id ?? null,
         lastAuditedAt: audit?.createdAt ?? null,
         score: audit?.score ?? null,
@@ -529,8 +552,12 @@ export class SeoService {
 
   private loadManifestPages(): any[] {
     const paths = [
-      path.resolve(process.cwd(), '../seo/page-manifest.json'),
+      path.resolve(__dirname, './page-manifest.json'),
+      path.resolve(__dirname, '../seo/page-manifest.json'),
+      path.resolve(process.cwd(), 'src/seo/page-manifest.json'),
+      path.resolve(process.cwd(), 'dist/seo/page-manifest.json'),
       path.resolve(process.cwd(), 'seo/page-manifest.json'),
+      path.resolve(process.cwd(), '../seo/page-manifest.json'),
       path.resolve(__dirname, '../../../../seo/page-manifest.json'),
       'c:\\Users\\user\\Desktop\\glitz\\seo\\page-manifest.json',
     ];

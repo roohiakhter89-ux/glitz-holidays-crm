@@ -947,6 +947,10 @@ export interface SeoRankedPage {
   tier?: number;
   family?: string;
   targetKeyword?: string;
+  impr?: number | null;
+  clicks?: number | null;
+  conv?: number | null;
+  words?: string | null;
   auditId: string | null;
   lastAuditedAt: string | null;
   score: number | null;
