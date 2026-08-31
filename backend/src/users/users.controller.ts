@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles } from '../common/decorators/roles.decorator';
+import { INTERNAL_STAFF } from '../common/access';
 
 @Controller('users')
 export class UsersController {
@@ -15,7 +16,7 @@ export class UsersController {
     return this.users.create(dto);
   }
 
-  @Roles(Role.OWNER, Role.SUPER_ADMIN, Role.SALES_MANAGER)
+  @Roles(...INTERNAL_STAFF)
   @Get()
   findAll() {
     return this.users.findAll();

@@ -26,9 +26,15 @@ export class CreateInvoiceDto {
   @IsString()
   leadId: string;
 
+  /**
+   * Optional. Omit to use PricingSettings.gstPercent — the configured rate for
+   * the business (5% for Indian tour packages). Only send this to override the
+   * configured rate for one invoice.
+   */
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  gstRate: number;
+  gstRate?: number;
 
   @IsOptional()
   @IsDateString()

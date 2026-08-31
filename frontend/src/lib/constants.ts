@@ -1,3 +1,38 @@
+/**
+ * Canonical public site. The business moved from glitzholidays.in (the legacy
+ * PHP site, est. 2013) to the hyphenated domain — see migration/README.md.
+ * The legacy host now 301s everything here, so any stored URL still pointing
+ * at it produces a redirect hop and shows the old site in the SEO dashboard.
+ *
+ * Anything that builds a public URL must go through here rather than
+ * hardcoding a host, which is how the two domains drifted apart in the first
+ * place.
+ */
+export const SITE_DOMAIN = 'https://glitz-holidays.in';
+
+/** Hosts that have been retired in favour of SITE_DOMAIN. */
+export const LEGACY_HOSTS = ['glitzholidays.in', 'www.glitzholidays.in'];
+
+/**
+ * Resolve a manifest path against a site URL, forcing the canonical host.
+ *
+ * `base` comes from the SeoSite row, which can still hold a legacy domain on
+ * installations created before the migration. Normalising at render time means
+ * a stale row shows the right link instead of sending the team to the old site.
+ */
+export function canonicalSiteUrl(path: string, base: string = SITE_DOMAIN): string {
+  try {
+    const resolved = new URL(path, base || SITE_DOMAIN);
+    if (LEGACY_HOSTS.includes(resolved.hostname)) {
+      resolved.protocol = 'https:';
+      resolved.hostname = new URL(SITE_DOMAIN).hostname;
+    }
+    return resolved.toString();
+  } catch {
+    return path;
+  }
+}
+
 export const LEAD_STATUSES = [
   'NEW',
   'CONTACTED',

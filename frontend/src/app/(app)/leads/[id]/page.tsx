@@ -48,12 +48,14 @@ export default function LeadDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ld, st] = await Promise.all([
-        api.get<LeadDetail>(`/leads/${id}`),
-        api.get<UserRow[]>('/users'),
-      ]);
+      const ld = await api.get<LeadDetail>(`/leads/${id}`);
       setLead(ld);
-      setStaff(st.filter((s) => s.isActive));
+      try {
+        const st = await api.get<UserRow[]>('/users');
+        setStaff(st.filter((s) => s.isActive));
+      } catch {
+        // Non-blocking staff directory fallback
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load lead');
     } finally {

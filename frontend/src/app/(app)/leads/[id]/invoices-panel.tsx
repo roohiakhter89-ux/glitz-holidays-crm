@@ -15,8 +15,11 @@ export function InvoicesPanel({ leadId }: { leadId: string }) {
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  // Form State
-  const [gstRate, setGstRate] = useState(18);
+  // Form State.
+  // Seeded from PricingSettings rather than hardcoded: tour packages carry 5%,
+  // and defaulting to 18% quietly billed the wrong slab. null until loaded so
+  // we never post a rate the operator did not see.
+  const [gstRate, setGstRate] = useState<number | null>(null);
   const [lineItems, setLineItems] = useState([{ description: '', quantity: 1, unitPrice: 0 }]);
 
   const loadInvoices = async () => {
@@ -34,6 +37,16 @@ export function InvoicesPanel({ leadId }: { leadId: string }) {
     loadInvoices();
   }, [leadId]);
 
+  // Pull the configured GST slab once. If settings are unreachable we leave the
+  // field empty and omit gstRate on submit, so the backend applies the same
+  // configured rate rather than the form guessing one.
+  useEffect(() => {
+    api
+      .get<{ gstPercent: number }>('/settings/pricing')
+      .then((s) => setGstRate(s.gstPercent))
+      .catch(() => {});
+  }, []);
+
   const addLine = () => setLineItems([...lineItems, { description: '', quantity: 1, unitPrice: 0 }]);
   const removeLine = (i: number) => setLineItems(lineItems.filter((_, idx) => idx !== i));
   const updateLine = (i: number, field: string, val: any) => {
@@ -50,7 +63,9 @@ export function InvoicesPanel({ leadId }: { leadId: string }) {
     try {
       await api.post('/invoices', {
         leadId,
-        gstRate,
+        // Omitted when settings have not loaded — the backend then uses the
+        // configured rate instead of a hardcoded default.
+        ...(gstRate === null ? {} : { gstRate }),
         lineItems,
       });
       setShowForm(false);
@@ -112,7 +127,13 @@ export function InvoicesPanel({ leadId }: { leadId: string }) {
             <div className="flex items-center gap-4 mt-4">
               <div className="w-32">
                 <label className="text-sm font-medium">GST Slab (%)</label>
-                <Select value={gstRate.toString()} onChange={(e) => setGstRate(parseInt(e.target.value))}>
+                <Select
+                  value={gstRate === null ? '' : gstRate.toString()}
+                  onChange={(e) => setGstRate(parseInt(e.target.value))}
+                >
+                  <option value="" disabled>
+                    Loading…
+                  </option>
                   <option value="0">0%</option>
                   <option value="5">5%</option>
                   <option value="12">12%</option>

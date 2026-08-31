@@ -45,6 +45,7 @@ import {
   type PageManifestItem,
 } from '@/lib/api';
 import MANIFEST_DATA from '@/lib/page-manifest.json';
+import { SITE_DOMAIN, canonicalSiteUrl } from '@/lib/constants';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
@@ -80,12 +81,11 @@ export default function SeoPage() {
 
   // Default manifest pages list (guaranteed 270 pages even before DB audit)
   const defaultManifestPages: SeoRankedPage[] = useMemo(() => {
-    const baseSite = sites.find((s) => s.id === selectedSiteId)?.url || 'https://glitz-holidays.in';
+    const baseSite = sites.find((s) => s.id === selectedSiteId)?.url || SITE_DOMAIN;
     return (MANIFEST_DATA as any[]).map((m) => {
-      let fullUrl = m.url;
-      try {
-        fullUrl = new URL(m.url, baseSite).toString();
-      } catch {}
+      // canonicalSiteUrl forces the live domain even when the stored SeoSite
+      // row still points at the retired glitzholidays.in host.
+      const fullUrl = canonicalSiteUrl(m.url, baseSite);
       return {
         url: fullUrl,
         path: m.url,
@@ -199,7 +199,7 @@ export default function SeoPage() {
     try {
       const res = await api.post<{ id: string }>('/seo/sites', {
         name: 'Glitz Holidays Main Website',
-        url: 'https://glitz-holidays.in',
+        url: SITE_DOMAIN,
         crawlPaths: ['/', '/packages', '/destinations/gulmarg', '/destinations/pahalgam', '/destinations/sonmarg'],
       });
       await loadSites();
@@ -259,10 +259,17 @@ export default function SeoPage() {
     }
   }
 
-  // Effective unified rankings list
+  // Effective unified rankings list.
+  // Audited rows carry whatever host was stored on SeoAudit at crawl time,
+  // which on older installs is the retired glitzholidays.in. Normalise here —
+  // the single point every link, dropdown and dialog reads from — so no view
+  // can send the team to the legacy site.
   const effectiveRankings: SeoRankedPage[] = useMemo(() => {
     if (rankingsData?.rankings && rankingsData.rankings.length > 0) {
-      return rankingsData.rankings;
+      return rankingsData.rankings.map((p) => ({
+        ...p,
+        url: canonicalSiteUrl(p.path || p.url, p.url),
+      }));
     }
     return defaultManifestPages;
   }, [rankingsData, defaultManifestPages]);
@@ -362,7 +369,7 @@ export default function SeoPage() {
             disabled={busy === 'quickRegister'}
             className="text-[12px] h-8"
           >
-            {busy === 'quickRegister' ? 'Registering…' : '⚡ Connect https://glitz-holidays.in'}
+            {busy === 'quickRegister' ? 'Registering…' : `⚡ Connect ${SITE_DOMAIN}`}
           </Button>
         </div>
       )}
@@ -473,7 +480,7 @@ export default function SeoPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
           <div className="space-y-4">
             <SitePages
-              audit={audit || { site: sites[0] || ({ name: 'Glitz', url: 'https://glitz-holidays.in' } as any), pages: [] }}
+              audit={audit || { site: sites[0] || ({ name: 'Glitz', url: SITE_DOMAIN } as any), pages: [] }}
               busy={busy === 'audit'}
               onAudit={runAudit}
             />
@@ -1583,7 +1590,7 @@ function AddSiteDialog({ onCreated }: { onCreated: (id: string) => void }) {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://glitz-holidays.in"
+              placeholder={SITE_DOMAIN}
             />
           </div>
           <div className="space-y-1">

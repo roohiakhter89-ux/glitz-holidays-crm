@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ConfigService } from '@nestjs/config';
+import { crmBaseUrl } from '../common/site';
 
 @Injectable()
 export class AuthService {
@@ -59,7 +60,8 @@ export class AuthService {
     const brevoKey = this.config.get<string>('BREVO_API_KEY');
     if (brevoKey) {
       try {
-        const resetUrl = `https://crm.glitz-holidays.in/reset-password?token=${token}`;
+        const base = crmBaseUrl(this.config.get<string>('CRM_BASE_URL'));
+        const resetUrl = `${base}/reset-password?token=${token}`;
         await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: {
