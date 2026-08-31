@@ -269,7 +269,7 @@ export default function ItineraryEditorPage() {
         }}
       />
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <DayList
           days={it.days}
           selectedId={selectedDayId}

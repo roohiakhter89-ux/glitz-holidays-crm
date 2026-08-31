@@ -71,7 +71,7 @@ export function Timeline({ items }: { items: ActivityRow[] }) {
             <div className="min-w-0 flex-1">
               <p
                 className={
-                  'text-[13px] leading-relaxed ' +
+                  'text-[13px] leading-relaxed break-words [overflow-wrap:anywhere] ' +
                   (machine ? 'text-ink-500' : 'text-ink-100')
                 }
               >

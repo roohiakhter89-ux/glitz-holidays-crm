@@ -294,9 +294,9 @@ export default function LeadDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* Left: the conversation */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Panel>
             <PanelHeader>
               <PanelTitle>Log what happened</PanelTitle>
@@ -347,7 +347,7 @@ export default function LeadDetailPage() {
         </div>
 
         {/* Right: the facts */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Panel>
             <PanelHeader>
               <PanelTitle>Stage</PanelTitle>
