@@ -12,15 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Select, Textarea } from '@/components/ui/select';
-import { LEAD_SOURCES, humanise } from '@/lib/constants';
+import { INBOUND_MEDIUMS, MARKETING_CHANNELS } from '@/lib/constants';
 
 /**
- * Manual lead capture — the "customer just called" flow.
+ * Manual lead capture — the "customer just called / messaged" flow.
  *
- * Only NAME and PHONE are required. Everything else is optional; the sales
- * exec can enrich the record on the detail page while the customer talks.
- * The dedupe rule (same phone within 30 days = re-enquiry, not new lead)
- * lives on the server and applies here too.
+ * Only NAME and PHONE are required. Separates the Inbound Medium
+ * (Phone, WhatsApp, Form, Email) from the Marketing Channel
+ * (Google Ads, Meta Ads, Organic, Referral).
  */
 const CAN_ASSIGN_ROLES = new Set(['OWNER', 'SUPER_ADMIN']);
 
@@ -41,7 +40,9 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [source, setSource] = useState<string>('PHONE');
+  const [inboundMedium, setInboundMedium] = useState<string>('PHONE');
+  const [marketingChannel, setMarketingChannel] = useState<string>('GOOGLE_ADS');
+  const [campaign, setCampaign] = useState('');
   const [destination, setDestination] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
@@ -60,7 +61,9 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
     setName('');
     setPhone('');
     setEmail('');
-    setSource('PHONE');
+    setInboundMedium('PHONE');
+    setMarketingChannel('GOOGLE_ADS');
+    setCampaign('');
     setDestination('');
     setTravelDate('');
     setNights('');
@@ -81,10 +84,10 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
       const body: Record<string, unknown> = {
         name: name.trim(),
         phone: phone.trim(),
-        source,
+        source: inboundMedium,
+        utmSource: marketingChannel,
       };
-      // Send only what the operator actually filled. Empty strings would fail
-      // validation (@IsEmail on ""), and null would overwrite defaults.
+      if (campaign.trim()) body.campaign = campaign.trim();
       if (email.trim()) body.email = email.trim();
       if (destination.trim()) body.destination = destination.trim();
       if (travelDate) body.travelDate = travelDate;
@@ -169,15 +172,30 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="al-source">Source</Label>
+              <Label htmlFor="al-medium">Inbound Medium *</Label>
               <Select
-                id="al-source"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
+                id="al-medium"
+                value={inboundMedium}
+                onChange={(e) => setInboundMedium(e.target.value)}
               >
-                {LEAD_SOURCES.map((s) => (
-                  <option key={s} value={s}>
-                    {humanise(s)}
+                {INBOUND_MEDIUMS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="al-channel">Marketing Channel</Label>
+              <Select
+                id="al-channel"
+                value={marketingChannel}
+                onChange={(e) => setMarketingChannel(e.target.value)}
+              >
+                {MARKETING_CHANNELS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
                   </option>
                 ))}
               </Select>

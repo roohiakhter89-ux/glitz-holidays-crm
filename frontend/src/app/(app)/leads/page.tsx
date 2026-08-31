@@ -327,7 +327,16 @@ export default function LeadsPage() {
                     {lead.destination ?? '—'}
                   </td>
                   <td className="px-5 py-3">
-                    <Chip>{humanise(lead.source)}</Chip>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[12.5px] font-medium text-ink-200">
+                        {humanise(lead.source)}
+                      </span>
+                      {lead.utmSource && lead.utmSource !== lead.source && (
+                        <span className="text-[11px] font-normal text-signal-400">
+                          {humanise(lead.utmSource)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3">
                     <Stage value={lead.status} />

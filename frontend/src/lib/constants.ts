@@ -46,21 +46,43 @@ export const LEAD_STATUSES = [
 ] as const;
 
 export const LEAD_SOURCES = [
-  'GOOGLE_ADS',
-  'META_ADS',
-  'INSTAGRAM',
-  'FACEBOOK',
-  'LANDING_PAGE',
-  'WEBSITE',
-  'ORGANIC',
-  'REFERRAL',
-  'WALK_IN',
   'PHONE',
   'WHATSAPP',
-  'TRADE_FAIR',
+  'WEBSITE',
+  'LANDING_PAGE',
   'EMAIL',
+  'WALK_IN',
   'B2B_AGENT',
+  'GOOGLE_ADS',
+  'META_ADS',
+  'ORGANIC',
+  'REFERRAL',
+  'TRADE_FAIR',
   'OTHER',
+] as const;
+
+export const INBOUND_MEDIUMS = [
+  { value: 'PHONE', label: 'Phone call' },
+  { value: 'WHATSAPP', label: 'WhatsApp chat' },
+  { value: 'WEBSITE', label: 'Website / Landing form' },
+  { value: 'EMAIL', label: 'Direct email' },
+  { value: 'WALK_IN', label: 'Office walk-in' },
+  { value: 'B2B_AGENT', label: 'B2B Partner inquiry' },
+  { value: 'OTHER', label: 'Other medium' },
+] as const;
+
+export const MARKETING_CHANNELS = [
+  { value: 'GOOGLE_ADS', label: 'Google Ads (Paid Search)' },
+  { value: 'META_ADS', label: 'Meta Ads (Facebook / Instagram)' },
+  { value: 'ORGANIC', label: 'Organic Search (SEO / Google)' },
+  { value: 'WEBSITE', label: 'Website Direct' },
+  { value: 'INSTAGRAM', label: 'Instagram (Organic)' },
+  { value: 'FACEBOOK', label: 'Facebook (Organic)' },
+  { value: 'REFERRAL', label: 'Referral / Word of mouth' },
+  { value: 'B2B_AGENT', label: 'B2B Agent / Partner' },
+  { value: 'TRADE_FAIR', label: 'Trade Fair / Offline Expo' },
+  { value: 'WALK_IN', label: 'Direct Walk-in' },
+  { value: 'OTHER', label: 'Direct / Unattributed' },
 ] as const;
 
 export const ACTIVITY_TYPES = [

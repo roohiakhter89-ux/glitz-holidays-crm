@@ -137,7 +137,8 @@ export default function LeadDetailPage() {
   if (!lead) return null;
 
   const attribution = [
-    ['Source', humanise(lead.source)],
+    ['Inbound medium', humanise(lead.source)],
+    ['Marketing channel', lead.utmSource ? humanise(lead.utmSource) : null],
     ['Campaign', lead.utmCampaign],
     ['Medium', lead.utmMedium],
     ['Keyword', lead.utmTerm ?? lead.keyword],

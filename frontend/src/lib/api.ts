@@ -317,6 +317,8 @@ export interface LeadRow {
   destination: string | null;
   status: string;
   source: string;
+  utmSource?: string | null;
+  utmCampaign?: string | null;
   score: number;
   createdAt: string;
   firstContactAt: string | null;
