@@ -1,15 +1,24 @@
-import { Injectable, NotFoundException, HttpException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  HttpException,
+  Logger,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
+import { UpdateOffPageDto } from './dto/update-offpage.dto';
 import {
-  aggregateScore,
+  calculateCompositeScore,
   CheckResult,
+  OffPageSignals,
   parseMeta,
   runChecks,
 } from './seo-checks';
 import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface PagespeedScores {
   perf?: number;
@@ -24,6 +33,7 @@ interface PagespeedScores {
 @Injectable()
 export class SeoService {
   private readonly logger = new Logger(SeoService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -55,18 +65,16 @@ export class SeoService {
   }
 
   async listSites() {
-    // Attach the most recent audit per URL so the dashboard has the current
-    // health scores in one round-trip. Prisma doesn't have a native
-    // "latest-per-group" so we group ourselves.
     const sites = await this.prisma.seoSite.findMany({
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
       include: {
         audits: {
           orderBy: { createdAt: 'desc' },
-          take: 20, // enough to cover a multi-URL last-run
+          take: 300,
         },
       },
     });
+
     return sites.map((s: any) => {
       const latestByUrl = new Map<string, any>();
       for (const a of s.audits) {
@@ -77,6 +85,7 @@ export class SeoService {
         latest.length > 0
           ? Math.round(latest.reduce((a, b) => a + b.score, 0) / latest.length)
           : null;
+
       return {
         id: s.id,
         name: s.name,
@@ -91,7 +100,10 @@ export class SeoService {
   }
 
   async findSite(id: string) {
-    const site = await this.prisma.seoSite.findUnique({ where: { id } });
+    const site = await this.prisma.seoSite.findUnique({
+      where: { id },
+      include: { offPageScores: true },
+    });
     if (!site) throw new NotFoundException('Site not found');
     return site;
   }
@@ -104,10 +116,10 @@ export class SeoService {
     });
   }
 
-  // ---- audits ----
+  // ---- audits & rankings ----
 
   async getHistory(id: string) {
-    const audits = await this.prisma.seoAudit.findMany({
+    return this.prisma.seoAudit.findMany({
       where: { siteId: id },
       orderBy: { createdAt: 'asc' },
       select: {
@@ -117,9 +129,8 @@ export class SeoService {
         score: true,
         perfScore: true,
         seoScore: true,
-      }
+      },
     });
-    return audits;
   }
 
   async latestAudit(id: string) {
@@ -127,11 +138,14 @@ export class SeoService {
     const audits = await this.prisma.seoAudit.findMany({
       where: { siteId: id },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 500,
     });
-    // Pick the latest per URL for the "current health" view.
+
     const latestByUrl = new Map<string, any>();
-    for (const a of audits) if (!latestByUrl.has(a.url)) latestByUrl.set(a.url, a);
+    for (const a of audits) {
+      if (!latestByUrl.has(a.url)) latestByUrl.set(a.url, a);
+    }
+
     return {
       site,
       pages: Array.from(latestByUrl.values()),
@@ -139,88 +153,399 @@ export class SeoService {
   }
 
   /**
-   * Run an audit across the site's homepage + configured paths. Each URL
-   * gets one HTTP fetch + one PageSpeed Insights call. If PSI errors or the
-   * page fetch fails, we still store an audit row with the errors captured
-   * so the operator sees what happened.
+   * Get all website pages ranked by composite Google Algorithm score.
+   * Merges manifest metadata, on-page audit results, and off-page signals.
+   */
+  async getPageRankings(siteId: string) {
+    const site = await this.findSite(siteId);
+    const manifestPages = this.loadManifestPages();
+
+    const [latestAudits, offPageRecords] = await Promise.all([
+      this.prisma.seoAudit.findMany({
+        where: { siteId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.seoOffPage.findMany({
+        where: { siteId },
+      }),
+    ]);
+
+    const latestAuditMap = new Map<string, any>();
+    for (const a of latestAudits) {
+      if (!latestAuditMap.has(a.url)) latestAuditMap.set(a.url, a);
+    }
+
+    const offPageMap = new Map<string, any>();
+    for (const op of offPageRecords) {
+      offPageMap.set(op.url, op);
+    }
+
+    // Build unified ranking list
+    // 1. Pages from manifest
+    // 2. Extra crawl paths or discovered audited pages
+    const seenUrls = new Set<string>();
+    const rankedList: any[] = [];
+
+    const getFullUrl = (pathOrUrl: string) => {
+      try {
+        return new URL(pathOrUrl, site.url).toString();
+      } catch {
+        return pathOrUrl;
+      }
+    };
+
+    // Add homepage
+    manifestPages.unshift({
+      url: '/',
+      title: 'Glitz Holidays — Srinagar Kashmir Tour Operator',
+      h1: 'Kashmir Tour Packages with Local Srinagar Experts',
+      tier: 0,
+      family: 'core-homepage',
+      primary: 'kashmir tour package',
+    });
+
+    for (const mp of manifestPages) {
+      const fullUrl = getFullUrl(mp.url);
+      if (seenUrls.has(fullUrl)) continue;
+      seenUrls.add(fullUrl);
+
+      const audit = latestAuditMap.get(fullUrl);
+      const offPage = offPageMap.get(fullUrl);
+
+      rankedList.push({
+        url: fullUrl,
+        path: mp.url,
+        title: mp.title || mp.h1 || mp.url,
+        h1: mp.h1,
+        tier: mp.tier,
+        family: mp.family,
+        targetKeyword: mp.primary,
+        auditId: audit?.id ?? null,
+        lastAuditedAt: audit?.createdAt ?? null,
+        score: audit?.score ?? null,
+        perfScore: audit?.perfScore ?? null,
+        seoScore: audit?.seoScore ?? null,
+        lcpMs: audit?.lcpMs ?? null,
+        clsX1k: audit?.clsX1k ?? null,
+        inpMs: audit?.inpMs ?? null,
+        checks: audit?.checks?.results ?? [],
+        tasks: audit?.tasks ?? [],
+        errors: audit?.errors ?? null,
+        offPage: offPage
+          ? {
+              backlinkCount: offPage.backlinkCount,
+              referringDomains: offPage.referringDomains,
+              pageAuthority: offPage.pageAuthority,
+              prMentions: offPage.prMentions,
+              socialShares: offPage.socialShares,
+              searchConsoleCtr: offPage.searchConsoleCtr,
+              notes: offPage.notes,
+              updatedAt: offPage.updatedAt,
+            }
+          : null,
+      });
+    }
+
+    // Add any audited URLs not in manifest
+    for (const [auditedUrl, audit] of latestAuditMap.entries()) {
+      if (seenUrls.has(auditedUrl)) continue;
+      seenUrls.add(auditedUrl);
+
+      const offPage = offPageMap.get(auditedUrl);
+      let parsedPath = auditedUrl;
+      try {
+        parsedPath = new URL(auditedUrl).pathname;
+      } catch {}
+
+      rankedList.push({
+        url: auditedUrl,
+        path: parsedPath,
+        title: parsedPath,
+        tier: 0,
+        family: 'custom-path',
+        targetKeyword: undefined,
+        auditId: audit.id,
+        lastAuditedAt: audit.createdAt,
+        score: audit.score,
+        perfScore: audit.perfScore,
+        seoScore: audit.seoScore,
+        lcpMs: audit.lcpMs,
+        clsX1k: audit.clsX1k,
+        inpMs: audit.inpMs,
+        checks: audit.checks?.results ?? [],
+        tasks: audit.tasks ?? [],
+        errors: audit.errors,
+        offPage: offPage
+          ? {
+              backlinkCount: offPage.backlinkCount,
+              referringDomains: offPage.referringDomains,
+              pageAuthority: offPage.pageAuthority,
+              prMentions: offPage.prMentions,
+              socialShares: offPage.socialShares,
+              searchConsoleCtr: offPage.searchConsoleCtr,
+              notes: offPage.notes,
+              updatedAt: offPage.updatedAt,
+            }
+          : null,
+      });
+    }
+
+    // Sort by score desc (pages with scores first, then un-audited)
+    rankedList.sort((a, b) => {
+      if (a.score === null && b.score === null) return 0;
+      if (a.score === null) return 1;
+      if (b.score === null) return -1;
+      return b.score - a.score;
+    });
+
+    const auditedCount = rankedList.filter((r) => r.score !== null).length;
+    const avgScore =
+      auditedCount > 0
+        ? Math.round(
+            rankedList.reduce((sum, r) => sum + (r.score || 0), 0) / auditedCount,
+          )
+        : null;
+
+    const highTier = rankedList.filter((r) => (r.score ?? 0) >= 80).length;
+    const medTier = rankedList.filter(
+      (r) => (r.score ?? 0) >= 60 && (r.score ?? 0) < 80,
+    ).length;
+    const lowTier = rankedList.filter(
+      (r) => r.score !== null && (r.score ?? 0) < 60,
+    ).length;
+
+    return {
+      site,
+      stats: {
+        totalPages: rankedList.length,
+        auditedPages: auditedCount,
+        averageScore: avgScore,
+        highScoreCount: highTier,
+        medScoreCount: medTier,
+        lowScoreCount: lowTier,
+      },
+      rankings: rankedList,
+    };
+  }
+
+  /**
+   * Update off-page metrics for a specific page URL.
+   * Recalculates the latest audit score if an audit exists.
+   */
+  async updateOffPage(siteId: string, dto: UpdateOffPageDto) {
+    const site = await this.findSite(siteId);
+    let targetUrl = dto.url;
+    try {
+      targetUrl = new URL(dto.url, site.url).toString();
+    } catch {}
+
+    const offPage = await this.prisma.seoOffPage.upsert({
+      where: {
+        siteId_url: { siteId, url: targetUrl },
+      },
+      create: {
+        siteId,
+        url: targetUrl,
+        backlinkCount: dto.backlinkCount ?? 0,
+        referringDomains: dto.referringDomains ?? 0,
+        pageAuthority: dto.pageAuthority ?? null,
+        prMentions: dto.prMentions ?? 0,
+        socialShares: dto.socialShares ?? 0,
+        searchConsoleCtr: dto.searchConsoleCtr ?? null,
+        notes: dto.notes ?? null,
+      },
+      update: {
+        backlinkCount: dto.backlinkCount !== undefined ? dto.backlinkCount : undefined,
+        referringDomains:
+          dto.referringDomains !== undefined ? dto.referringDomains : undefined,
+        pageAuthority: dto.pageAuthority !== undefined ? dto.pageAuthority : undefined,
+        prMentions: dto.prMentions !== undefined ? dto.prMentions : undefined,
+        socialShares: dto.socialShares !== undefined ? dto.socialShares : undefined,
+        searchConsoleCtr:
+          dto.searchConsoleCtr !== undefined ? dto.searchConsoleCtr : undefined,
+        notes: dto.notes !== undefined ? dto.notes : undefined,
+      },
+    });
+
+    // Recalculate latest audit score if exists
+    const latestAudit = await this.prisma.seoAudit.findFirst({
+      where: { siteId, url: targetUrl },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (latestAudit && latestAudit.checks) {
+      const checks = (latestAudit.checks as any).results as CheckResult[];
+      const pagespeed = {
+        perf: latestAudit.perfScore ?? undefined,
+        a11y: latestAudit.a11yScore ?? undefined,
+        bp: latestAudit.bpScore ?? undefined,
+        seo: latestAudit.seoScore ?? undefined,
+      };
+      const composite = calculateCompositeScore(checks, offPage, pagespeed);
+      await this.prisma.seoAudit.update({
+        where: { id: latestAudit.id },
+        data: { score: composite.finalScore },
+      });
+    }
+
+    return offPage;
+  }
+
+  /**
+   * Run an audit across the site's homepage + manifest/configured paths.
    */
   async runAudit(id: string) {
     const site = await this.findSite(id);
     const runId = randomUUID();
-    const urls = new Set<string>([site.url]);
+    const manifest = this.loadManifestPages();
+
+    const urlsToAudit: { url: string; keyword?: string }[] = [
+      { url: site.url, keyword: 'kashmir tour package' },
+    ];
+
     for (const p of site.crawlPaths ?? []) {
       try {
-        urls.add(new URL(p, site.url).toString());
-      } catch { /* skip malformed path */ }
+        urlsToAudit.push({ url: new URL(p, site.url).toString() });
+      } catch {}
     }
 
-    const results: Awaited<ReturnType<SeoService['auditOne']>>[] = [];
-    for (const url of urls) {
-      results.push(await this.auditOne(site.id, runId, url));
+    // Include top high-intent manifest pages in the audit
+    for (const m of manifest.slice(0, 30)) {
+      try {
+        urlsToAudit.push({
+          url: new URL(m.url, site.url).toString(),
+          keyword: m.primary,
+        });
+      } catch {}
     }
+
+    // Deduplicate
+    const uniqueMap = new Map<string, string | undefined>();
+    for (const item of urlsToAudit) {
+      if (!uniqueMap.has(item.url)) {
+        uniqueMap.set(item.url, item.keyword);
+      }
+    }
+
+    const results: any[] = [];
+    for (const [url, keyword] of uniqueMap.entries()) {
+      results.push(await this.auditOne(site.id, runId, url, keyword));
+    }
+
     return { runId, pages: results };
   }
 
-  private async auditOne(siteId: string, runId: string, urlStr: string) {
+  /**
+   * Audit a single page URL on-demand
+   */
+  async auditSinglePage(siteId: string, urlStr: string, keyword?: string) {
+    const site = await this.findSite(siteId);
+    let fullUrl = urlStr;
+    try {
+      fullUrl = new URL(urlStr, site.url).toString();
+    } catch {}
+
+    const runId = randomUUID();
+    return this.auditOne(site.id, runId, fullUrl, keyword);
+  }
+
+  private async auditOne(
+    siteId: string,
+    runId: string,
+    urlStr: string,
+    targetKeyword?: string,
+  ) {
     let checks: CheckResult[] = [];
     let ps: PagespeedScores = {};
     const errors: string[] = [];
     let url: URL;
+
     try {
       url = new URL(urlStr);
     } catch (e) {
-      // Store an errored audit row so the failure surfaces on the dashboard.
       return this.prisma.seoAudit.create({
         data: {
-          siteId, runId, url: urlStr, score: 0,
+          siteId,
+          runId,
+          url: urlStr,
+          score: 0,
           errors: `Invalid URL: ${(e as Error).message}`,
         },
       });
     }
 
-    // 1) Fetch + on-page checks
+    // 1) Fetch + enhanced on-page checks
     try {
       const html = await fetchHtml(urlStr);
       const meta = parseMeta(html, url);
-      checks = runChecks(meta, url);
+      checks = runChecks(meta, url, targetKeyword);
     } catch (e) {
       errors.push(`Page fetch failed: ${(e as Error).message}`);
     }
 
-    // 2) PageSpeed Insights — free, no key, generous quota for internal use.
-    // If it fails we still commit the on-page score.
+    // 2) PageSpeed Insights
     try {
       ps = await fetchPagespeed(urlStr);
     } catch (e) {
       errors.push(`PageSpeed skipped: ${(e as Error).message}`);
     }
 
-    const score = aggregateScore(checks, ps);
+    // 3) Off-page signals
+    const offPage = await this.prisma.seoOffPage.findUnique({
+      where: { siteId_url: { siteId, url: urlStr } },
+    });
+
+    const composite = calculateCompositeScore(checks, offPage, ps);
+
     const tasks = checks
       .filter((c) => c.task)
       .map((c) => ({
         id: c.id,
         severity: c.severity,
         label: c.label,
+        category: c.category,
         task: c.task,
       }));
 
     return this.prisma.seoAudit.create({
       data: {
-        siteId, runId, url: urlStr,
-        score,
+        siteId,
+        runId,
+        url: urlStr,
+        score: composite.finalScore,
         perfScore: ps.perf ?? null,
         a11yScore: ps.a11y ?? null,
-        bpScore:   ps.bp   ?? null,
-        seoScore:  ps.seo  ?? null,
-        lcpMs:  ps.lcpMs  ?? null,
+        bpScore: ps.bp ?? null,
+        seoScore: ps.seo ?? null,
+        lcpMs: ps.lcpMs ?? null,
         clsX1k: ps.clsX1k ?? null,
-        inpMs:  ps.inpMs  ?? null,
+        inpMs: ps.inpMs ?? null,
         checks: { results: checks } as any,
-        tasks:  tasks as any,
+        tasks: tasks as any,
         errors: errors.length ? errors.join(' | ') : null,
       },
     });
+  }
+
+  private loadManifestPages(): any[] {
+    const paths = [
+      path.resolve(process.cwd(), '../seo/page-manifest.json'),
+      path.resolve(process.cwd(), 'seo/page-manifest.json'),
+      path.resolve(__dirname, '../../../../seo/page-manifest.json'),
+      'c:\\Users\\user\\Desktop\\glitz\\seo\\page-manifest.json',
+    ];
+
+    for (const p of paths) {
+      if (fs.existsSync(p)) {
+        try {
+          const raw = fs.readFileSync(p, 'utf-8');
+          return JSON.parse(raw);
+        } catch (e) {
+          this.logger.warn(`Could not parse manifest at ${p}: ${e}`);
+        }
+      }
+    }
+    return [];
   }
 }
 
@@ -228,10 +553,7 @@ export class SeoService {
 
 async function fetchHtml(url: string): Promise<string> {
   const res = await fetch(url, {
-    // A UA is important — some hosts block empty UA requests, and we want
-    // to look like a real crawler (not a browser).
     headers: { 'User-Agent': 'GlitzSEOBot/1.0 (+https://glitzholidays.in)' },
-    // 20s cap — Windows / DNS oddities can hang forever without a signal.
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new HttpException(`upstream ${res.status}`, res.status);
@@ -242,16 +564,6 @@ async function fetchHtml(url: string): Promise<string> {
   return await res.text();
 }
 
-/**
- * Google's PageSpeed Insights v5 API. Works keyless at low volume, but a
- * single site with 4-5 landing pages burns the free per-IP quota fast and
- * starts returning 429. Setting PAGESPEED_API_KEY in the env lifts that.
- * Grab a key from https://developers.google.com/speed/docs/insights/v5/get-started
- * — it's free.
- *
- * Category=performance, accessibility, best-practices, seo — one call, four
- * scores. Mobile strategy because Kashmir traffic skews mobile.
- */
 async function fetchPagespeed(url: string): Promise<PagespeedScores> {
   const endpoint = new URL('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');
   endpoint.searchParams.set('url', url);
@@ -277,10 +589,10 @@ async function fetchPagespeed(url: string): Promise<PagespeedScores> {
   return {
     perf: to100(cats.performance?.score),
     a11y: to100(cats.accessibility?.score),
-    bp:   to100(cats['best-practices']?.score),
-    seo:  to100(cats.seo?.score),
-    lcpMs:  Math.round(audits['largest-contentful-paint']?.numericValue ?? 0) || undefined,
+    bp: to100(cats['best-practices']?.score),
+    seo: to100(cats.seo?.score),
+    lcpMs: Math.round(audits['largest-contentful-paint']?.numericValue ?? 0) || undefined,
     clsX1k: Math.round((audits['cumulative-layout-shift']?.numericValue ?? 0) * 1000) || undefined,
-    inpMs:  Math.round(audits['interaction-to-next-paint']?.numericValue ?? 0) || undefined,
+    inpMs: Math.round(audits['interaction-to-next-paint']?.numericValue ?? 0) || undefined,
   };
 }

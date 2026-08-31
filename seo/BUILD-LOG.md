@@ -28,6 +28,25 @@ until measured, and a page nothing links to cannot rank however good it is.
 
 ---
 
+## 027 — CRM Website Media Manager & SEO Algorithm Scoring Framework
+**31 Aug 2026 · CRM Dashboard Integration (Image Management + Google Algorithm Scoring Leaderboard)**
+
+Implemented full CRM integration for website photography management and Google search algorithm scoring across all 270+ website pages:
+
+1. **Website Media Library (`/seo/media` & SEO tab)**:
+   - Supabase S3 bucket upload integration via NestJS `MediaModule`.
+   - Ability to tag, caption, and assign original operator photos directly to website page URLs (`/media/pages`).
+   - One-click CDN URL copy for updating TS data files.
+   - Enforces alt text for image search ranking.
+
+2. **Google Algorithm SEO Scoring Framework**:
+   - **Leaderboard Rankings (`GET /seo/sites/:id/rankings`)**: Evaluates all 270+ manifest pages with a composite 0–100 score.
+   - **18 Automated On-Page Rules (70% weight)**: Primary keyword in title/h1, meta description, heading hierarchy, content depth & word count, direct answer in lead, honesty moat ("What to Skip" negative advice), local operational context, Schema.org JSON-LD + FAQPage rich snippets, internal linking equity, image alt text & original imagery, and search engine indexability.
+   - **Off-Page Authority Signals (30% weight)**: `SeoOffPage` model tracking backlinks, referring domains, Page Authority (PA), PR & media mentions, social shares, and GSC CTR with real-time recalculation.
+   - **Interactive Modals**: Detailed Algorithm Checklist modal and Off-Page Signal Editor dialog in CRM frontend.
+
+---
+
 ## 026 — /hi/* (Tier 6 completed: all 10 high-intent Hindi guides & collections — 100% MANIFEST COMPLETE)
 **31 Aug 2026 · Tier 6 · 10 Hindi pages + /hi hub (270 of 270 completed)**
 

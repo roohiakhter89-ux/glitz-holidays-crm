@@ -100,9 +100,42 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(body ?? {}) }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const token = tokenStore.get();
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+    } catch {
+      throw new ApiError('Cannot reach server. Check that backend is running.', 0);
+    }
+    if (res.status === 401) {
+      tokenStore.clear();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+      throw new ApiError('Session expired.', 401);
+    }
+    if (!res.ok) {
+      let msg = `Upload failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.message) msg = body.message;
+      } catch {}
+      throw new ApiError(msg, res.status);
+    }
+    return (await res.json()) as T;
+  },
 };
 
 /**
@@ -863,8 +896,10 @@ export interface SeoSiteRow {
 export interface SeoCheck {
   id: string;
   label: string;
+  category?: 'on-page' | 'content' | 'technical' | 'trust-moat';
   severity: 'pass' | 'warn' | 'fail';
   weight: number;
+  score?: number;
   detail?: string;
   task?: string;
 }
@@ -891,6 +926,80 @@ export interface SeoAuditRow {
 export interface SeoAuditResponse {
   site: SeoSiteRow;
   pages: SeoAuditRow[];
+}
+
+export interface SeoOffPageData {
+  backlinkCount: number;
+  referringDomains: number;
+  pageAuthority: number | null;
+  prMentions: number;
+  socialShares: number;
+  searchConsoleCtr: number | null;
+  notes: string | null;
+  updatedAt?: string;
+}
+
+export interface SeoRankedPage {
+  url: string;
+  path: string;
+  title: string;
+  h1?: string;
+  tier?: number;
+  family?: string;
+  targetKeyword?: string;
+  auditId: string | null;
+  lastAuditedAt: string | null;
+  score: number | null;
+  perfScore: number | null;
+  seoScore: number | null;
+  lcpMs: number | null;
+  clsX1k: number | null;
+  inpMs: number | null;
+  checks: SeoCheck[];
+  tasks: { id: string; severity: 'pass' | 'warn' | 'fail'; label: string; task: string; category?: string }[];
+  errors: string | null;
+  offPage: SeoOffPageData | null;
+}
+
+export interface SeoRankingsResponse {
+  site: SeoSiteRow;
+  stats: {
+    totalPages: number;
+    auditedPages: number;
+    averageScore: number | null;
+    highScoreCount: number;
+    medScoreCount: number;
+    lowScoreCount: number;
+  };
+  rankings: SeoRankedPage[];
+}
+
+export interface MediaAssetRow {
+  id: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
+  altText: string;
+  caption?: string | null;
+  tags: string[];
+  pageSlug?: string | null;
+  folder: string;
+  uploadedById: string;
+  uploadedBy?: { id: string; name: string; email: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageManifestItem {
+  url: string;
+  title: string;
+  h1?: string;
+  tier?: number;
+  family?: string;
+  primary?: string;
 }
 
 export interface BookingDetail {

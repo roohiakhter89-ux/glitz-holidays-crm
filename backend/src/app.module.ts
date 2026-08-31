@@ -23,6 +23,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { StorageModule } from './storage/storage.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { SocialModule } from './social/social.module';
+import { MediaModule } from './media/media.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -53,6 +54,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     B2bPartnersModule,
     MarketingModule,
     SocialModule,
+    MediaModule,
   ],
   providers: [
     // Order: rate limit -> authenticate -> authorize.

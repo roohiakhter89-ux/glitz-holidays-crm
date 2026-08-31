@@ -448,6 +448,7 @@ model SeoSite {
   updatedAt DateTime @updatedAt
 
   audits SeoAudit[]
+  offPageScores SeoOffPage[]
 
   @@index([isActive])
 }
@@ -547,6 +548,7 @@ model User {
   createdCampaigns   Campaign[]            @relation("CreatedCampaigns")
   createdSocialPosts  SocialPost[]          @relation("CreatedSocialPosts")
   attachments        Attachment[]          @relation("UploadedAttachments")
+  mediaAssets        MediaAsset[]          @relation("UploadedMediaAssets")
   requestedApprovals LeadApprovalRequest[] @relation("RequestedApprovals")
   reviewedApprovals  LeadApprovalRequest[] @relation("ReviewedApprovals")
   id                 String                @id @default(cuid())
@@ -1488,3 +1490,43 @@ model ContentIdea {
   updatedAt         DateTime    @updatedAt
 }
 
+model SeoOffPage {
+  id               String   @id @default(cuid())
+  siteId           String
+  site             SeoSite  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  url              String
+  backlinkCount    Int      @default(0)
+  referringDomains Int      @default(0)
+  pageAuthority    Int?     // 0-100
+  prMentions       Int      @default(0)
+  socialShares     Int      @default(0)
+  searchConsoleCtr Float?
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([siteId, url])
+  @@index([siteId])
+}
+
+model MediaAsset {
+  id           String   @id @default(cuid())
+  url          String
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  altText      String   @default("")
+  caption      String?
+  tags         String[] @default([])
+  pageSlug     String?
+  folder       String   @default("website")
+  uploadedById String
+  uploadedBy   User     @relation("UploadedMediaAssets", fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([pageSlug])
+  @@index([uploadedById])
+}

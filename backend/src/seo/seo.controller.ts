@@ -5,18 +5,16 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { SeoService } from './seo.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
+import { UpdateOffPageDto } from './dto/update-offpage.dto';
 import { Roles } from '../common/decorators/roles.decorator';
+import { INTERNAL_STAFF } from '../common/access';
 
-/**
- * SEO controls the numbers that decide where marketing budget goes, so gate
- * mutations to OWNER + SUPER_ADMIN + MARKETING. Reads are open to any staff
- * role so a sales exec can check the health of the page a lead landed on.
- */
 const SEO_WRITE: Role[] = [Role.SUPER_ADMIN, Role.OWNER, Role.MARKETING];
 
 @Controller('seo')
@@ -29,6 +27,7 @@ export class SeoController {
     return this.seo.refreshAll();
   }
 
+  @Roles(...INTERNAL_STAFF)
   @Get('sites')
   listSites() {
     return this.seo.listSites();
@@ -46,11 +45,34 @@ export class SeoController {
     return this.seo.updateSite(id, dto);
   }
 
+  @Roles(...INTERNAL_STAFF)
   @Get('sites/:id/audit')
   latestAudit(@Param('id') id: string) {
     return this.seo.latestAudit(id);
   }
 
+  @Roles(...INTERNAL_STAFF)
+  @Get('sites/:id/rankings')
+  getPageRankings(@Param('id') id: string) {
+    return this.seo.getPageRankings(id);
+  }
+
+  @Roles(...SEO_WRITE)
+  @Put('sites/:id/off-page')
+  updateOffPage(@Param('id') id: string, @Body() dto: UpdateOffPageDto) {
+    return this.seo.updateOffPage(id, dto);
+  }
+
+  @Roles(...SEO_WRITE)
+  @Post('sites/:id/audit-page')
+  auditSinglePage(
+    @Param('id') id: string,
+    @Body() body: { url: string; keyword?: string },
+  ) {
+    return this.seo.auditSinglePage(id, body.url, body.keyword);
+  }
+
+  @Roles(...INTERNAL_STAFF)
   @Get('sites/:id/history')
   history(@Param('id') id: string) {
     return this.seo.getHistory(id);
