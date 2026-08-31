@@ -451,6 +451,35 @@ export class LeadsService {
   }
 
   /**
+   * Permanent deletion of a lead record (e.g. test lead, spam submission).
+   * Blocked if the lead has active bookings or invoices (use deactivate/LOST instead).
+   */
+  async deleteLead(id: string, actor: Actor) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: {
+        bookings: { select: { id: true } },
+        invoices: { select: { id: true } },
+      },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const isAdminOrOwner = ['SUPER_ADMIN', 'OWNER', 'SALES_MANAGER'].includes(actor.role);
+    if (!isAdminOrOwner && lead.assignedToId !== actor.id) {
+      throw new ForbiddenException('You can only delete leads assigned to yourself.');
+    }
+
+    if (lead.bookings.length > 0 || lead.invoices.length > 0) {
+      throw new BadRequestException(
+        'Cannot permanently delete a lead with linked bookings or invoices. Mark as Lost instead.'
+      );
+    }
+
+    await this.prisma.lead.delete({ where: { id } });
+    return { id, deleted: true };
+  }
+
+  /**
    * Soft-close a lead — status → LOST with a system reason. We never destroy
    * the row: it may have bookings, activities and attribution attached that
    * accountants and marketing still need.

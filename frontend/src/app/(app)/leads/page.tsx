@@ -14,6 +14,7 @@ import { RowActions } from '@/components/ui/row-actions';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { AddLeadDialog } from '@/components/add-lead-dialog';
 import { CloseLeadDialog } from '@/components/close-lead-dialog';
+import { DeleteLeadDialog } from '@/components/delete-lead-dialog';
 import { ApprovalsDialog } from '@/components/approvals-dialog';
 import { ImportLeadsDialog } from '@/components/import-leads-dialog';
 import { DateRangePicker, defaultRange, type DateRange } from '@/components/ui/date-range-picker';
@@ -367,17 +368,11 @@ export default function LeadsPage() {
                   <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
                     {relativeDate(lead.createdAt)}
                   </td>
-                  <td className="px-2 py-3">
-                    <CloseLeadDialog leadId={lead.id} leadName={lead.name} onClosed={load}>
-                      <button
-                        type="button"
-                        aria-label={`Close ${lead.name}`}
-                        title={`Close ${lead.name}`}
-                        className="inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-loss-500/12 hover:text-loss-500 disabled:pointer-events-none disabled:opacity-40"
-                      >
-                        <Trash2 className="size-3.5" strokeWidth={1.75} />
-                      </button>
-                    </CloseLeadDialog>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <CloseLeadDialog leadId={lead.id} leadName={lead.name} onClosed={load} />
+                      <DeleteLeadDialog leadId={lead.id} leadName={lead.name} onDeleted={load} />
+                    </div>
                   </td>
                 </tr>
               ))}

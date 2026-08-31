@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageCircle, Phone as PhoneIcon, Mail, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Phone as PhoneIcon, Mail, Trash2, UserX } from 'lucide-react';
 import {
   api,
   ApiError,
@@ -14,6 +14,7 @@ import {
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { CloseLeadDialog } from '@/components/close-lead-dialog';
+import { DeleteLeadDialog } from '@/components/delete-lead-dialog';
 import { Select, Textarea } from '@/components/ui/select';
 import { Label } from '@/components/ui/input';
 import { Chip } from '@/components/ui/badge';
@@ -241,19 +242,36 @@ export default function LeadDetailPage() {
             leadId={lead.id}
             leadName={lead.name}
             onClosed={() => {
-              router.push('/leads');
+              load();
             }}
           >
             <button
               type="button"
               disabled={saving || lead.status === 'LOST'}
-              title="Close lead"
-              className="inline-flex h-8 items-center gap-2 rounded-md border border-ink-700 bg-transparent px-3 text-xs font-medium text-ink-400 transition-colors hover:border-loss-500/60 hover:bg-loss-500/8 hover:text-loss-500 disabled:pointer-events-none disabled:opacity-45"
+              title="Mark as Lost"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-ink-700 bg-transparent px-3 text-xs font-medium text-ink-400 transition-colors hover:border-loss-500/60 hover:bg-loss-500/8 hover:text-loss-500 disabled:pointer-events-none disabled:opacity-45"
             >
-              <Trash2 className="size-3.5" strokeWidth={1.75} />
-              Close lead
+              <UserX className="size-3.5" strokeWidth={1.75} />
+              Mark as Lost
             </button>
           </CloseLeadDialog>
+          <DeleteLeadDialog
+            leadId={lead.id}
+            leadName={lead.name}
+            onDeleted={() => {
+              router.push('/leads');
+            }}
+          >
+            <button
+              type="button"
+              disabled={saving}
+              title="Permanently delete lead"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-ink-700 bg-transparent px-3 text-xs font-medium text-ink-400 transition-colors hover:border-loss-500 hover:bg-loss-500/10 hover:text-loss-400 disabled:pointer-events-none disabled:opacity-45"
+            >
+              <Trash2 className="size-3.5 text-loss-500" strokeWidth={1.75} />
+              Delete
+            </button>
+          </DeleteLeadDialog>
         </div>
       </header>
 

@@ -10,7 +10,18 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/select';
+import { Select, Textarea } from '@/components/ui/select';
+import { UserX } from 'lucide-react';
+
+const PRESET_REASONS = [
+  'Booked with a competitor',
+  'Budget mismatch / price too high',
+  'Postponed or cancelled trip plans',
+  'Changed travel destination',
+  'No response after multiple follow-ups',
+  'Test enquiry or invalid contact details',
+  'Other reason',
+];
 
 export function CloseLeadDialog({
   leadId,
@@ -21,36 +32,38 @@ export function CloseLeadDialog({
   leadId: string;
   leadName: string;
   onClosed: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reason, setReason] = useState('');
+  const [category, setCategory] = useState(PRESET_REASONS[0]);
+  const [notes, setNotes] = useState('');
 
   const user = tokenStore.user();
   const isManager = user?.role === 'SALES_MANAGER';
 
   function reset() {
-    setReason('');
+    setCategory(PRESET_REASONS[0]);
+    setNotes('');
     setError(null);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (reason.trim().length < 10) {
-      setError('Please provide a more detailed reason (at least 10 characters).');
-      return;
-    }
+    const finalReason = notes.trim()
+      ? `${category}: ${notes.trim()}`
+      : category;
+
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/leads/${leadId}/${isManager ? 'close-request' : 'close'}`, { reason: reason.trim() });
+      await api.post(`/leads/${leadId}/${isManager ? 'close-request' : 'close'}`, { reason: finalReason });
       setOpen(false);
       reset();
       onClosed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not close the lead.');
+      setError(err instanceof ApiError ? err.message : 'Could not mark lead as lost.');
     } finally {
       setBusy(false);
     }
@@ -65,48 +78,77 @@ export function CloseLeadDialog({
       }}
     >
       <DialogTrigger asChild>
-        {children}
+        {children ?? (
+          <button
+            type="button"
+            aria-label={`Mark ${leadName} as Lost`}
+            title={`Mark ${leadName} as Lost`}
+            className="inline-flex size-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-loss-500/12 hover:text-loss-500 disabled:pointer-events-none disabled:opacity-40"
+          >
+            <UserX className="size-3.5" strokeWidth={1.75} />
+          </button>
+        )}
       </DialogTrigger>
 
       <DialogContent
-        title={isManager ? `Request to close ${leadName}` : `Close ${leadName}`}
-        description={isManager ? "This will send a close request to the owner. Please explain why this lead should be closed." : "This will mark the lead as LOST. Please explain why this lead didn't convert."}
+        title={isManager ? `Request to Mark "${leadName}" as Lost` : `Mark "${leadName}" as Lost`}
+        description={
+          isManager
+            ? "Submit a request to the owner to close this enquiry as lost while keeping reporting data."
+            : "Update this enquiry to LOST. Your selection will feed conversion analytics and pipeline reports."
+        }
       >
-        <form onSubmit={submit} className="p-5">
+        <form onSubmit={submit} className="p-5 space-y-4">
           <div className="space-y-1">
-            <Label htmlFor="close-reason">Reason for closing *</Label>
+            <Label htmlFor="lost-category">Primary Reason *</Label>
+            <Select
+              id="lost-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {PRESET_REASONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="lost-notes">Additional Context / Details</Label>
             <Textarea
-              id="close-reason"
-              autoFocus
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Client found a cheaper quote elsewhere, or stopped responding after 3 follow-ups."
-              rows={4}
-              required
+              id="lost-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Quoted ₹48,000 for 5N; customer booked with local agency at ₹42,000."
+              rows={3}
             />
           </div>
 
           {error && (
             <p
               role="alert"
-              className="mt-4 rounded-md border border-loss-500/40 bg-loss-500/10 px-3 py-2 text-[13px] text-loss-400"
+              className="rounded-md border border-loss-500/40 bg-loss-500/10 px-3 py-2 text-[13px] text-loss-400"
             >
               {error}
             </p>
           )}
 
-          <div className="mt-5 flex items-center justify-end gap-2 border-t border-ink-800 pt-4">
+          <div className="flex items-center justify-end gap-2 border-t border-ink-800 pt-4">
             <DialogClose asChild>
-              <Button type="button" variant="ghost" size="sm">
+              <Button type="button" variant="ghost" size="sm" disabled={busy}>
                 Cancel
               </Button>
             </DialogClose>
             <Button
               type="submit"
               variant="danger"
-              disabled={busy || reason.trim().length < 10}
+              size="sm"
+              disabled={busy}
             >
-              {busy ? (isManager ? 'Requesting...' : 'Closing...') : (isManager ? 'Request close' : 'Close lead')}
+              {busy
+                ? (isManager ? 'Submitting…' : 'Marking as lost…')
+                : (isManager ? 'Submit close request' : 'Mark as Lost')}
             </Button>
           </div>
         </form>
