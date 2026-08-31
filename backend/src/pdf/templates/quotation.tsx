@@ -92,7 +92,7 @@ export function QuotationDocument({ q }: { q: QuotationInput }) {
             </Text>
             <Text style={pdfStyles.small}>Srinagar, Kashmir</Text>
             <Text style={pdfStyles.small}>hello@glitzholidays.in</Text>
-            <Text style={pdfStyles.small}>www.glitzholidays.in</Text>
+            <Text style={pdfStyles.small}>www.glitz-holidays.in</Text>
           </View>
         </View>
 

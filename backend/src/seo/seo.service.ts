@@ -80,7 +80,7 @@ export class SeoService {
         const defaultSite = await this.prisma.seoSite.create({
           data: {
             name: 'Glitz Holidays Main Website',
-            url: 'https://glitzholidays.in',
+            url: 'https://glitz-holidays.in',
             crawlPaths: ['/', '/packages', '/destinations/gulmarg', '/destinations/pahalgam', '/destinations/sonmarg'],
             isActive: true,
           },
@@ -580,7 +580,7 @@ export class SeoService {
 
 async function fetchHtml(url: string): Promise<string> {
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'GlitzSEOBot/1.0 (+https://glitzholidays.in)' },
+    headers: { 'User-Agent': 'GlitzSEOBot/1.0 (+https://glitz-holidays.in)' },
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new HttpException(`upstream ${res.status}`, res.status);

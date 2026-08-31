@@ -80,7 +80,7 @@ export default function SeoPage() {
 
   // Default manifest pages list (guaranteed 270 pages even before DB audit)
   const defaultManifestPages: SeoRankedPage[] = useMemo(() => {
-    const baseSite = sites.find((s) => s.id === selectedSiteId)?.url || 'https://glitzholidays.in';
+    const baseSite = sites.find((s) => s.id === selectedSiteId)?.url || 'https://glitz-holidays.in';
     return (MANIFEST_DATA as any[]).map((m) => {
       let fullUrl = m.url;
       try {
@@ -199,7 +199,7 @@ export default function SeoPage() {
     try {
       const res = await api.post<{ id: string }>('/seo/sites', {
         name: 'Glitz Holidays Main Website',
-        url: 'https://glitzholidays.in',
+        url: 'https://glitz-holidays.in',
         crawlPaths: ['/', '/packages', '/destinations/gulmarg', '/destinations/pahalgam', '/destinations/sonmarg'],
       });
       await loadSites();
@@ -362,7 +362,7 @@ export default function SeoPage() {
             disabled={busy === 'quickRegister'}
             className="text-[12px] h-8"
           >
-            {busy === 'quickRegister' ? 'Registering…' : '⚡ Connect https://glitzholidays.in'}
+            {busy === 'quickRegister' ? 'Registering…' : '⚡ Connect https://glitz-holidays.in'}
           </Button>
         </div>
       )}
@@ -473,7 +473,7 @@ export default function SeoPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
           <div className="space-y-4">
             <SitePages
-              audit={audit || { site: sites[0] || ({ name: 'Glitz', url: 'https://glitzholidays.in' } as any), pages: [] }}
+              audit={audit || { site: sites[0] || ({ name: 'Glitz', url: 'https://glitz-holidays.in' } as any), pages: [] }}
               busy={busy === 'audit'}
               onAudit={runAudit}
             />
@@ -1583,7 +1583,7 @@ function AddSiteDialog({ onCreated }: { onCreated: (id: string) => void }) {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://glitzholidays.in"
+              placeholder="https://glitz-holidays.in"
             />
           </div>
           <div className="space-y-1">

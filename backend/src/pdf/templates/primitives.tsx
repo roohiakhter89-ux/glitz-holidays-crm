@@ -66,7 +66,7 @@ export function BrandFooter({
   return (
     <View style={pdfStyles.footer} fixed>
       <Text style={pdfStyles.footerText}>
-        Glitz Holidays  ·  Srinagar, Kashmir  ·  glitzholidays.in
+        Glitz Holidays  ·  Srinagar, Kashmir  ·  glitz-holidays.in
       </Text>
       {typeof page === 'number' && typeof totalPages === 'number' ? (
         <Text style={pdfStyles.footerText}>
