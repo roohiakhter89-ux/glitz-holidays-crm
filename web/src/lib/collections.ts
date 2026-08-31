@@ -34,6 +34,7 @@ export type Collection = {
   compare?: { heading: string; note: string };
   faqs: { q: string; a: string }[];
   tone: Tone;
+  basePath?: string;
 };
 
 export const COLLECTIONS: Collection[] = [

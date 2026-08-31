@@ -5,6 +5,7 @@ import { Check, ArrowUpRight, AlertTriangle, Equal, Sparkles } from 'lucide-reac
 import { TRAVEL_STYLES, getTravelStyle } from '@/lib/travel-styles';
 import { packagesForStyle } from '@/lib/packages';
 import { COLLECTIONS } from '@/lib/collections';
+import { HONEYMOON_COLLECTIONS } from '@/lib/honeymoon-collections';
 import { PackageCard, SectionHead, Faq, JsonLd } from '@/components/cards';
 import { PageHero } from '@/components/page-hero';
 import { EnquiryForm } from '@/components/enquiry-form';
@@ -51,7 +52,10 @@ export default async function TravelStylePage({ params }: { params: Params }) {
   const url = `${SITE.domain}/travel-styles/${s.slug}`;
 
   /** Collections whose slug names this style — honeymoon pages feed honeymoon collections. */
-  const related = COLLECTIONS.filter((c) => c.slug.includes(s.slug));
+  const related = [
+    ...COLLECTIONS.filter((c) => c.slug.includes(s.slug)),
+    ...(s.slug === 'honeymoon' ? HONEYMOON_COLLECTIONS : []),
+  ];
 
   const jsonLd = [
     ...(s.author
@@ -413,7 +417,7 @@ export default async function TravelStylePage({ params }: { params: Params }) {
               {related.map((c) => (
                 <Link
                   key={c.slug}
-                  href={`/packages/${c.slug}`}
+                  href={`${c.basePath ?? '/packages'}/${c.slug}`}
                   className="lift group rounded-xl border border-paper-300 bg-paper-50 p-5 transition-colors hover:border-gold-400 hover:bg-white"
                 >
                   <h3 className="display text-[18px] leading-snug text-ink-900">{c.h1}</h3>

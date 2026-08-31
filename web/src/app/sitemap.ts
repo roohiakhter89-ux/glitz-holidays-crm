@@ -8,6 +8,7 @@ import { COLLECTIONS } from '@/lib/collections';
 import { ORIGIN_CITIES } from '@/lib/origin-cities';
 import { ROUTES } from '@/lib/routes';
 import { MONTH_HUBS } from '@/lib/month-hubs';
+import { HONEYMOON_COLLECTIONS } from '@/lib/honeymoon-collections';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -93,11 +94,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
+  const honeymoonCollections: MetadataRoute.Sitemap = HONEYMOON_COLLECTIONS.map((c) => ({
+    url: `${SITE.domain}/packages/honeymoon/${c.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
   return [
     ...statics,
     ...destinations,
     ...packages,
     ...collections,
+    ...honeymoonCollections,
     ...originCities,
     ...styles,
     ...guides,

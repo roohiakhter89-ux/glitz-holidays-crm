@@ -24,7 +24,12 @@ export function CollectionPage({ c }: { c: Collection }) {
     (min, p) => (p.priceFrom < min ? p.priceFrom : min),
     Infinity,
   );
-  const url = `${SITE.domain}/packages/${c.slug}`;
+  const basePath = c.basePath ?? '/packages';
+  const url = `${SITE.domain}${basePath}/${c.slug}`;
+
+  const parentCrumb = basePath.includes('honeymoon')
+    ? { label: 'Honeymoon', href: '/travel-styles/honeymoon' }
+    : { label: 'Packages', href: '/packages' };
 
   const jsonLd = [
     {
@@ -70,7 +75,7 @@ export function CollectionPage({ c }: { c: Collection }) {
       '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: SITE.domain },
-        { '@type': 'ListItem', position: 2, name: 'Packages', item: `${SITE.domain}/packages` },
+        { '@type': 'ListItem', position: 2, name: parentCrumb.label, item: `${SITE.domain}${parentCrumb.href}` },
         { '@type': 'ListItem', position: 3, name: c.crumbLabel, item: url },
       ],
     },
@@ -86,7 +91,7 @@ export function CollectionPage({ c }: { c: Collection }) {
         lede={c.lede}
         crumbs={[
           { label: 'Home', href: '/' },
-          { label: 'Packages', href: '/packages' },
+          parentCrumb,
           { label: c.crumbLabel },
         ]}
         background={TONE_HERO[c.tone]}

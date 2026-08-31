@@ -8,13 +8,13 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 157 of 270**
+**Progress: 175 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
 | 0 · Proven converters | 7 | 7 |
 | 1 · Origin city | 47 | 47 |
-| 2 · Honeymoon & family | 4 | 22 |
+| 2 · Honeymoon & family | 22 | 22 |
 | 3 · Transport routes | 88 | 88 |
 | 4 · Place × intent | 1 | 86 |
 | 5 · Month hubs | 10 | 10 |
@@ -25,6 +25,36 @@ consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 024 — /packages/honeymoon/* (Tier 2 completed: all 22 honeymoon & family collections)
+**31 Aug 2026 · Tier 2 · 18 new honeymoon sub-collections (22 of 22 completed)**
+
+Completes the entire Tier 2 Honeymoon & Family Collections cluster (49,584 Google Ads impressions, 178 conversions total).
+
+**Collections deployed:**
+1. **Origin-Specific Honeymoon Collections:**
+   - `/packages/honeymoon/from-mumbai` (997 impr, 2.0 conv) — BOM to SXR direct 2h 45m flights, luxury heated houseboats on Nigeen Lake, couple photography spots.
+   - `/packages/honeymoon/from-bangalore` (805 impr, 4.0 conv) — Kempegowda direct flights (3h 15m), relaxed Day 1 acclimatization, Gondola tickets included.
+   - `/packages/honeymoon/from-chennai` (654 impr, 3.0 conv) — Winter heating guarantees, romantic Lidder riverside suites, private sedan transfers.
+   - `/packages/honeymoon/from-pune` (783 impr, 2.0 conv) — Direct/1-stop flight logistics, Nigeen Lake cedar houseboats, Baisaran pony trails.
+   - `/packages/honeymoon/from-ahmedabad` (580 impr, 2.0 conv) — Direct 2h 15m flights, verified pure-vegetarian and Jain meal arrangements.
+   - `/packages/honeymoon/from-jaipur` (387 impr, 2.0 conv), `/packages/honeymoon/from-kolkata` (362 impr, 1.0 conv), `/packages/honeymoon/from-nagpur` (227 impr, 2.0 conv), `/packages/honeymoon/from-chandigarh` (138 impr, 1.0 conv), `/packages/honeymoon/from-dehradun` (91 impr), `/packages/honeymoon/from-lucknow` (70 impr, 1.0 conv), `/packages/honeymoon/from-vadodara` (26 impr, 1.0 conv).
+
+2. **Destination-Specific Honeymoon Collections:**
+   - `/packages/honeymoon/srinagar` (756 impr, 4.0 conv) — Quiet Nigeen Lake cedar houseboats, sunset Shikara cruises, Mughal gardens.
+   - `/packages/honeymoon/pahalgam` (27 impr) — Riverside pine resorts, Betaab & Aru valley excursions, Lidder dining.
+
+3. **Duration-Specific Honeymoon Collections:**
+   - `/packages/honeymoon/4-nights` (33 impr, 1.0 conv) — Short romantic getaway covering Srinagar, Gulmarg, and Pahalgam from ₹19,500/couple.
+   - `/packages/honeymoon/5-nights` (15 impr) — Most popular 5N/6D itinerary with 2 full nights in Pahalgam.
+   - `/packages/honeymoon/7-nights` (22 impr) — Grand 5-valley romantic honeymoon including Sonmarg and Doodhpathri.
+
+**Linkgraph verification:**
+- Total site routes increased from 195 to 212 static pages.
+- Linked contextually from `/travel-styles/honeymoon` pillar and indexed in XML sitemap.
+- 0 non-utility orphans sitewide.
 
 ---
 
