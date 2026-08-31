@@ -8,7 +8,7 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 260 of 270**
+**Progress: 270 of 270 (100% complete)**
 
 | Tier | Built | Total |
 |---|---|---|
@@ -18,13 +18,41 @@ Queue: `seo/page-manifest.json`.
 | 3 · Transport routes | 88 | 88 |
 | 4 · Place × intent | 86 | 86 |
 | 5 · Month hubs | 10 | 10 |
-| 6 · Hindi | 0 | 10 |
+| 6 · Hindi | 10 | 10 |
 
 Manifest rebuilt from 472 to 270 on 31 Aug 2026. Not scope reduction —
 consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 026 — /hi/* (Tier 6 completed: all 10 high-intent Hindi guides & collections — 100% MANIFEST COMPLETE)
+**31 Aug 2026 · Tier 6 · 10 Hindi pages + /hi hub (270 of 270 completed)**
+
+Completes the entire Tier 6 Hindi cluster (122,863 Google Ads impressions, 98 conversions total) and achieves **100% completion across all 270 manifest pages**.
+
+**Hindi pages deployed:**
+1. **Core Informational & Pricing Guides:**
+   - `/hi/kashmir-ghumne-ki-jagah` (10,652 impr, 1.0 conv) — कश्मीर में घूमने की 10 सबसे बेहतरीन जगहें (श्रीनगर, गुलमर्ग, पहलगाम, सोनमर्ग, दूधपथरी).
+   - `/hi/kashmir-kaise-jaye` (11,892 impr, 4.0 conv) — कश्मीर कैसे जाएं (हवाई जहाज, ट्रेन, NH44 हाईवे).
+   - `/hi/kashmir-trip-kharcha` (399 impr) — कश्मीर ट्रिप का कुल खर्च (बजट, डीलक्स व लग्जरी पैकेज रेट्स).
+   - `/hi/kashmir-jane-ka-best-time` (922 impr) — कश्मीर जाने का सबसे अच्छा समय (4 मौसमों की पूरी तुलना).
+   - `/hi/vaishno-devi-yatra-guide` (10,498 impr, 3.0 conv) — वैष्णो देवी यात्रा 2026 (कटरा से भवन, पर्ची, हेलीकॉप्टर व दर्शन गाइड).
+
+2. **Hindi Commercial Packages & Seasonal Guides:**
+   - `/hi/packages/from/delhi` (23,233 impr, 41.5 conv) — दिल्ली से कश्मीर टूर पैकेज (फ्लाइट ऑफर, 3/4-स्टार होटल, हाउसबोट स्टे).
+   - `/hi/guides/kashmir-by-month` (20,584 impr, 11.0 conv) — कश्मीर हर महीने (जनवरी से दिसंबर तक मौसम और बर्फबारी).
+   - `/hi/guides/places-to-visit-in-kashmir` (19,978 impr, 17.3 conv) — कश्मीर में प्रमुख दर्शनीय स्थल गाइड.
+   - `/hi/guides/best-time-to-visit-kashmir` (13,792 impr, 16.0 conv) — कश्मीर घूमने का सबसे अच्छा महीना कौन सा है?
+   - `/hi/guides/how-to-reach-srinagar` (9,484 impr, 5.0 conv) — श्रीनगर कैसे पहुंचें (शेख उल-आलम एयरपोर्ट व रेल मार्ग).
+   - `/hi` — Central Hindi Hub Index linking all 10 Hindi resources with author credibility and destination badges.
+
+**Linkgraph verification:**
+- Total site routes: **303 static pages** (including 270 programmatic manifest pages + utility/category hubs).
+- `crawled 303 pages`, 0 non-utility orphans sitewide.
+- Hindi hub `/hi` receives sitewide footer equity (299 inlinks at depth 1); all 10 Hindi pages sit at depth 2 with 7 balanced inlinks.
 
 ---
 

@@ -9,6 +9,7 @@ import { ORIGIN_CITIES } from '@/lib/origin-cities';
 import { ROUTES } from '@/lib/routes';
 import { MONTH_HUBS } from '@/lib/month-hubs';
 import { HONEYMOON_COLLECTIONS } from '@/lib/honeymoon-collections';
+import { HINDI_PAGES } from '@/lib/hindi-pages';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -19,6 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE.domain}/packages`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${SITE.domain}/plan-my-trip`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${SITE.domain}/guides`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${SITE.domain}/hi`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE.domain}/routes`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${SITE.domain}/partner-with-us`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${SITE.domain}/reviews`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
@@ -101,6 +103,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
+  const hindiPages: MetadataRoute.Sitemap = HINDI_PAGES.map((h) => ({
+    url: `${SITE.domain}${h.urlPath}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
   return [
     ...statics,
     ...destinations,
@@ -112,5 +121,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...guides,
     ...monthHubs,
     ...routes,
+    ...hindiPages,
   ];
 }
