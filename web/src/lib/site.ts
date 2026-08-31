@@ -56,7 +56,7 @@ export const SITE = {
     guests: '5,000+',
     rating: '4.8',
     reviewCount: 604,
-    years: '12',
+    years: String(Math.max(13, new Date().getFullYear() - 2013)),
     hotels: '120+',
   },
 

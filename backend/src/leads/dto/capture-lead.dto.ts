@@ -4,10 +4,10 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsArray,
   MaxLength,
   Min,
   MinLength,
-  IsDateString,
 } from 'class-validator';
 import { LeadSource } from '@prisma/client';
 
@@ -34,7 +34,7 @@ export class CaptureLeadDto {
   @IsOptional() @IsString() @MaxLength(200)
   destination?: string;
 
-  @IsOptional() @IsDateString()
+  @IsOptional() @IsString() @MaxLength(100)
   travelDate?: string;
 
   @IsOptional() @IsInt() @Min(0)
@@ -54,6 +54,12 @@ export class CaptureLeadDto {
 
   @IsOptional() @IsEnum(LeadSource)
   source?: LeadSource;
+
+  @IsOptional() @IsString() @MaxLength(200)
+  campaign?: string;
+
+  @IsOptional() @IsArray() @IsString({ each: true })
+  tags?: string[];
 
   // --- attribution: pass these straight through from the landing page ---
   @IsOptional() @IsString() @MaxLength(200) utmSource?: string;

@@ -41,7 +41,9 @@ while queue:
         out = set()
         for m in re.finditer(r'href="(/[^"#?]*)"', src):
             u = m.group(1).rstrip("/") or "/"
-            if re.search(r"\.(xml|txt|jpg|png|svg|ico|webp|json)$", u):
+            if re.search(r"\.(xml|txt|jpg|png|svg|ico|webp|json|css|js|mjs|woff2?|ttf|map)$", u, re.I):
+                continue
+            if u.startswith("/_next/") or u.startswith("/api/"):
                 continue
             out.add(u)
         return out
@@ -102,30 +104,18 @@ for _ in range(60):
     pr = nxt
 
 ranked = sorted(pr.items(), key=lambda x: -x[1])
-print("\nINTERNAL PAGERANK — TOP 12 (where equity currently pools)")
-for p, v in ranked[:12]:
+print("\nINTERNAL PAGERANK — TOP 15 (where equity currently pools)")
+for p, v in ranked[:15]:
     print(f"  {v*1000:7.2f}  {p:52s} inlinks={inmain[p]}")
-print("\nINTERNAL PAGERANK — BOTTOM 14 (starved; these will rank slowly)")
-for p, v in ranked[-14:]:
+print("\nINTERNAL PAGERANK — BOTTOM 15 (lowest inlink equity)")
+for p, v in ranked[-15:]:
     print(f"  {v*1000:7.2f}  {p:52s} inlinks={inmain[p]}")
 
-# ── the new pages specifically ─────────────────────────────────────────────
-NEW = [p for p in pages if p.startswith("/packages/from/") or p.startswith("/routes/")
-       or p in ("/packages/kashmir-tour-package-with-flight", "/packages/cheap-kashmir-tour-packages",
-                "/packages/jammu-tour-packages", "/packages/srinagar-packages",
-                "/packages/kashmir-packages-for-couples",
-                "/packages/kashmir-honeymoon-packages-from-delhi",
-                "/packages/kashmir-honeymoon-packages-from-hyderabad",
-                "/packages/gulmarg-honeymoon-packages",
-                "/guides/kashmir-taxi-and-cab-fares-guide",
-                "/guides/choosing-a-travel-agency-in-srinagar")]
-print(f"\nTHE 16 NEW PAGES — link equity reaching them")
-for p in sorted(NEW):
-    d, _ = seen[p]
-    print(f"  depth={d} inlinks(main)={inmain[p]:>2} inlinks(any)={inall[p]:>2}  pr={pr[p]*1000:6.2f}  {p}")
-
-avg_new = sum(pr[p] for p in NEW) / len(NEW) * 1000
-avg_all = sum(pr.values()) / len(pages) * 1000
-print(f"\n  avg PageRank of the 16 new pages : {avg_new:.2f}")
-print(f"  avg PageRank across all pages    : {avg_all:.2f}")
-print(f"  ratio                            : {avg_new/avg_all:.2f}x")
+# ── programmatic SEO clusters ──────────────────────────────────────────────
+PROGRAMMATIC = [p for p in pages if p.startswith("/packages/") or p.startswith("/routes/") or p.startswith("/guides/") or p.startswith("/hi/")]
+print(f"\nPROGRAMMATIC PAGES OVERVIEW ({len(PROGRAMMATIC)} pages)")
+avg_prog = sum(pr[p] for p in PROGRAMMATIC) / max(len(PROGRAMMATIC), 1) * 1000
+avg_all = sum(pr.values()) / max(len(pages), 1) * 1000
+print(f"  avg PageRank across programmatic cluster: {avg_prog:.2f}")
+print(f"  avg PageRank across entire site          : {avg_all:.2f}")
+print(f"  equity ratio                             : {avg_prog/avg_all:.2f}x")

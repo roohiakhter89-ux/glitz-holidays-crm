@@ -26,7 +26,7 @@ export class CreateAdSpendDto {
   @IsOptional() @IsString()
   landingPageId?: string;
 
-  /** Amount in the smallest currency unit (paise for INR). */
+  /** Amount in whole INR rupees (₹). 12500 = ₹12,500. */
   @IsInt() @Min(0)
   amount: number;
 

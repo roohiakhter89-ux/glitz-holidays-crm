@@ -54,11 +54,46 @@ export class AuthService {
       { sub: user.id, email: user.email },
       { secret, expiresIn: '15m' }
     );
-    // In a real app, send an email here.
-    console.log(`[DEV ONLY] Password reset token for ${user.email}: ${token}`);
+
+    // If Brevo is configured, transactional reset email is dispatched
+    const brevoKey = this.config.get<string>('BREVO_API_KEY');
+    if (brevoKey) {
+      try {
+        const resetUrl = `https://crm.glitz-holidays.in/reset-password?token=${token}`;
+        await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoKey,
+            'Content-Type': 'application/json',
+            'accept': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: {
+              name: 'Glitz Holidays CRM',
+              email: this.config.get<string>('BREVO_SENDER_EMAIL') || 'hello@glitz-holidays.in',
+            },
+            to: [{ email: user.email, name: user.name }],
+            subject: 'Reset your Glitz Holidays CRM password',
+            htmlContent: `
+              <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+                <h2>Password Reset Request</h2>
+                <p>Hello ${user.name},</p>
+                <p>A password reset was requested for your Glitz Holidays CRM account. Click the button below to reset your password. This link expires in 15 minutes.</p>
+                <p style="margin: 24px 0;">
+                  <a href="${resetUrl}" style="background: #0f5147; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+                </p>
+                <p style="font-size: 12px; color: #64748b;">If you did not request this, you can safely ignore this email.</p>
+              </div>
+            `,
+          }),
+        });
+      } catch {
+        // Suppress email dispatch errors to prevent timing attacks
+      }
+    }
+
     return { 
-      message: 'If the email is registered, a reset link will be sent.',
-      _devToken: token // for testing 
+      message: 'If the email is registered, a reset link will be sent.'
     };
   }
 

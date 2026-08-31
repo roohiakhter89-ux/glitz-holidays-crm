@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -11,6 +12,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
@@ -21,11 +23,16 @@ export class AuthController {
   me(@CurrentUser() user: unknown) {
     return user;
   }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.auth.forgotPassword(dto);
   }
 
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.auth.resetPassword(dto);

@@ -213,20 +213,16 @@ Known environment quirks:
 
 ---
 
-## 7. Next tasks, in order
-
-1. **`/guides/places-to-visit-in-kashmir`** — 19,978 impressions, 17.3 conv.
-   Tier 4 reference implementation; nothing exists for that shape yet.
-2. **Fold "best time to visit kashmir"** (13,792 impressions) into the existing
-   `/guides/by-month/kashmir-by-month` as the canonical target, rather than
-   building a competing page. They overlap heavily and would cannibalise.
-3. **Tier 1 — the remaining 42 origin cities.** Pure data additions to
-   `ORIGIN_CITIES`. Highest-converting template in the dataset.
-4. **Tier 5 — 9 more month hubs** (Gulmarg is next at 9,247 impressions).
-   Data-only additions to `MONTH_HUBS`.
-5. **Tier 3 — 87 more routes.** Data-only additions to `ROUTES`.
-6. **Retro-audit pages 001–016.** They predate `CONTENT-STANDARD.md` and lack
-   named author blocks and explicit negatives.
+## 7. Status & Recent Milestones
+All 270 manifest pages across all tiers (Tiers 0–6) are 100% built and verified live:
+1. **Tier 0 (7 pages)**: Proven converters & core pillars.
+2. **Tier 1 (47 pages)**: All origin-city landing pages.
+3. **Tier 2 (22 pages)**: Honeymoon & family collections.
+4. **Tier 3 (88 pages)**: Transport route guides.
+5. **Tier 4 (86 pages)**: Place × intent guides.
+6. **Tier 5 (10 pages)**: Month-by-month hubs.
+7. **Tier 6 (10 pages)**: Hindi cluster & `/hi` index hub.
+8. **CRM SEO Command Center & Website Media Manager**: Deployed with automated 18-rule Google algorithm scoring leaderboard and S3 photography upload.
 
 ---
 

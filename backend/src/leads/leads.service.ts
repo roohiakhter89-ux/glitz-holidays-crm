@@ -171,12 +171,18 @@ export class LeadsService {
     }
 
     // --- new lead
+    const parsedTravelDate = toDateOrNull(dto.travelDate);
+    let leadMessage = dto.message ?? null;
+    if (dto.travelDate && !parsedTravelDate) {
+      leadMessage = leadMessage ? `${leadMessage} | Preferred Time: ${dto.travelDate}` : `Preferred Time: ${dto.travelDate}`;
+    }
+
     const { score, notes } = scoreLead({
       source: dto.source,
       email: dto.email,
-      message: dto.message,
+      message: leadMessage ?? undefined,
       destination: dto.destination,
-      travelDate: dto.travelDate ? new Date(dto.travelDate) : null,
+      travelDate: parsedTravelDate,
       budget: dto.budget,
       adults: dto.adults,
       gclid: dto.gclid,
@@ -192,12 +198,13 @@ export class LeadsService {
         city: dto.city ?? null,
         country: dto.country ?? null,
         destination: dto.destination ?? null,
-        travelDate: dto.travelDate ? new Date(dto.travelDate) : null,
+        travelDate: parsedTravelDate,
         nights: dto.nights ?? null,
         adults: dto.adults ?? null,
         children: dto.children ?? null,
         budget: dto.budget ?? null,
-        message: dto.message ?? null,
+        message: leadMessage,
+        tags: dto.tags ?? [],
         source: dto.source ?? LeadSource.OTHER,
         status: LeadStatus.NEW,
         score,
@@ -206,7 +213,7 @@ export class LeadsService {
         nextFollowUp: computeNextFollowUp(LeadStatus.NEW, new Date()),
         utmSource: pick('utmSource') ?? null,
         utmMedium: pick('utmMedium') ?? null,
-        utmCampaign: pick('utmCampaign') ?? null,
+        utmCampaign: pick('utmCampaign') ?? dto.campaign ?? null,
         utmTerm: pick('utmTerm') ?? null,
         utmContent: pick('utmContent') ?? null,
         gclid: pick('gclid') ?? null,

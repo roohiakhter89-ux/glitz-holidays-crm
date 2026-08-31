@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { Actor } from '../common/access';
 import { InvoiceStatus } from '@prisma/client';
+import { gstBreakdown } from '../common/pricing';
 
 @Injectable()
 export class InvoicesService {
@@ -22,27 +23,33 @@ export class InvoicesService {
       throw new NotFoundException('Lead not found');
     }
 
-    let subtotal = 0;
+    const settings = await this.prisma.pricingSettings.findFirst();
+    const effectiveGstRate = dto.gstRate !== undefined ? dto.gstRate : (settings?.gstPercent ?? 5.0);
+
+    let grossTotal = 0;
     const items = dto.lineItems.map(item => {
-      const total = item.quantity * item.unitPrice;
-      subtotal += total;
+      const lineTotal = item.quantity * item.unitPrice;
+      grossTotal += lineTotal;
       return {
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        total,
+        total: lineTotal,
       };
     });
 
-    const gstAmount = subtotal * (dto.gstRate / 100);
-    const total = subtotal + gstAmount;
+    // Tour totals are tax-inclusive: split total into base subtotal and GST portion
+    const split = gstBreakdown(grossTotal, effectiveGstRate);
+    const subtotal = split.baseAmount;
+    const gstAmount = split.gstAmount;
+    const total = split.total;
 
     return this.prisma.invoice.create({
       data: {
         invoiceNumber: this.generateInvoiceNumber(),
         leadId: dto.leadId,
         subtotal,
-        gstRate: dto.gstRate,
+        gstRate: effectiveGstRate,
         gstAmount,
         total,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,

@@ -784,8 +784,8 @@ model AdSpend {
   landingPageId String?
   landingPage   LandingPage? @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
 
-  /// Amount in the smallest currency unit (paise for INR) to match the rest
-  /// of the schema. 12345 = ₹123.45.
+  /// Amount in whole INR rupees (₹) to match the rest of the schema.
+  /// 12500 = ₹12,500.
   amount   Int
   currency String @default("INR")
 
