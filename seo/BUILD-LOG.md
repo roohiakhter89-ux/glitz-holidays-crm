@@ -8,7 +8,7 @@ Standard: `seo/CONTENT-STANDARD.md` (content quality).
 Architecture: `seo/RANKING-SYSTEMS.md` (how the ranking systems shape the build).
 Queue: `seo/page-manifest.json`.
 
-**Progress: 175 of 270**
+**Progress: 260 of 270**
 
 | Tier | Built | Total |
 |---|---|---|
@@ -16,7 +16,7 @@ Queue: `seo/page-manifest.json`.
 | 1 · Origin city | 47 | 47 |
 | 2 · Honeymoon & family | 22 | 22 |
 | 3 · Transport routes | 88 | 88 |
-| 4 · Place × intent | 1 | 86 |
+| 4 · Place × intent | 86 | 86 |
 | 5 · Month hubs | 10 | 10 |
 | 6 · Hindi | 0 | 10 |
 
@@ -25,6 +25,37 @@ consolidation. See entry 018 and `RANKING-SYSTEMS.md` §3.
 
 **Run `python seo/linkgraph.py` after every batch.** Orphans are invisible
 until measured, and a page nothing links to cannot rank however good it is.
+
+---
+
+## 025 — /guides/* (Tier 4 completed: all 86 Place × Intent Guides)
+**31 Aug 2026 · Tier 4 · 85 new place × intent guides (86 of 86 completed)**
+
+Completes the entire Tier 4 Place × Intent Guides cluster (137,284 Google Ads impressions, 114 conversions total).
+
+**Key guide clusters deployed:**
+1. **Places to Visit (`/guides/places-to-visit-in-*`):**
+   - High-demand hubs: `/guides/places-to-visit-in-kashmir` (19,978 impr, 17.3 conv), `/guides/places-to-visit-in-srinagar` (7,764 impr, 5.5 conv), `/guides/places-to-visit-in-jammu` (6,200 impr, 1.0 conv), `/guides/places-to-visit-in-katra` (2,117 impr), `/guides/places-to-visit-in-pahalgam` (1,173 impr, 1.0 conv), `/guides/places-to-visit-in-gulmarg` (1,106 impr).
+   - Regional & offbeat valleys: Sonmarg, Patnitop, Ladakh, Leh, Kargil, Udhampur, Bhaderwah, Doodhpathri, Gurez, Yusmarg, Nubra, Amarnath, Tangmarg, Dal Lake.
+
+2. **Transit & Access (`/guides/how-to-reach-*`):**
+   - Major hubs: `/guides/how-to-reach-srinagar` (9,484 impr, 5.0 conv), `/guides/how-to-reach-kashmir` (7,586 impr, 6.0 conv), `/guides/how-to-reach-gulmarg` (3,354 impr, 4.0 conv), `/guides/how-to-reach-pahalgam` (1,475 impr), `/guides/how-to-reach-patnitop` (851 impr), `/guides/how-to-reach-vaishno-devi` (811 impr), `/guides/how-to-reach-katra` (556 impr).
+   - Mountain routes: Sonmarg (Z-Morh tunnel), Ladakh, Gurez (Razdan pass), Kargil, Betaab Valley, Leh, Doodhpathri, Tulip Garden.
+
+3. **Accommodation Selection (`/guides/where-to-stay-in-*`):**
+   - Kashmir & Srinagar: `/guides/where-to-stay-in-kashmir` (4,817 impr, 11.0 conv), `/guides/where-to-stay-in-srinagar` (4,147 impr, 7.0 conv), `/guides/where-to-stay-in-gulmarg` (1,317 impr, 1.0 conv), `/guides/where-to-stay-in-pahalgam` (1,247 impr).
+   - Valleys & pilgrim centers: Jammu, Dal Lake, Sonmarg, Patnitop, Katra, Ladakh, Gurez, Doodhpathri, Vaishno Devi, Yusmarg, Leh, Bhaderwah, Pangong, Aru Valley.
+
+4. **Seasonal Timing (`/guides/best-time-to-visit-*`):**
+   - High-volume seasonal guides: `/guides/best-time-to-visit-kashmir` (13,792 impr, 16.0 conv), `/guides/best-time-to-visit-gulmarg` (2,597 impr), `/guides/best-time-to-visit-srinagar` (1,513 impr, 3.0 conv), `/guides/best-time-to-visit-vaishno-devi` (598 impr, 1.0 conv), `/guides/best-time-to-visit-ladakh` (598 impr), `/guides/best-time-to-visit-sonmarg` (265 impr), `/guides/best-time-to-visit-pahalgam` (167 impr), `/guides/best-time-to-visit-tulip-garden` (124 impr).
+
+5. **Package Pricing & Transparency (`/guides/*-tour-packages-prices`):**
+   - Commercial price guides: `/guides/srinagar-tour-packages-prices` (4,627 impr, 27.0 conv), `/guides/vaishno-devi-tour-packages-prices` (3,137 impr, 8.0 conv), `/guides/ladakh-tour-packages-prices` (2,068 impr, 9.0 conv), `/guides/gulmarg-tour-packages-prices` (1,624 impr, 10.0 conv), `/guides/amarnath-tour-packages-prices` (847 impr, 3.0 conv), `/guides/jammu-tour-packages-prices` (503 impr, 7.3 conv), `/guides/pahalgam-tour-packages-prices` (225 impr, 1.0 conv).
+
+**Linkgraph verification:**
+- Total site routes increased from 212 to 292 static pages.
+- `crawled 292 pages`, 0 non-utility orphans sitewide.
+- Internal link equity distributed across all guide topics from `/guides` hub index and package cards.
 
 ---
 
