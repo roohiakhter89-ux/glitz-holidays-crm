@@ -101,6 +101,9 @@ export function AddLeadDialog({ onCreated }: { onCreated: (leadId: string) => vo
       );
       setOpen(false);
       reset();
+      if (res.duplicate) {
+        alert('Notice: A lead with this phone number already exists in the system. Opening their existing client profile.');
+      }
       onCreated(res.leadId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save the lead.');

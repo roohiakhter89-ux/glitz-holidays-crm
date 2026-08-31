@@ -113,6 +113,7 @@ export default function LeadsPage() {
     setSearch('');
     setStatus('');
     setSource('');
+    setRange(defaultRange('all'));
     setPage(1);
   }
 
