@@ -730,6 +730,10 @@ export interface LandingPageRow {
 
 export interface AdSpendRow {
   id: string;
+  /** 'google_ads' when the row came from a platform sync; null when typed by hand. */
+  externalSource?: string | null;
+  externalId?: string | null;
+  syncedAt?: string | null;
   spendDate: string;
   channel: string;
   campaign: string | null;

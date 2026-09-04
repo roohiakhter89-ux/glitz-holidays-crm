@@ -7,6 +7,9 @@ import { TrackVisitDto } from './dto/track-visit.dto';
 import { CreateAdSpendDto } from './dto/create-ad-spend.dto';
 import { UpdateAdSpendDto } from './dto/update-ad-spend.dto';
 import { toDateOrNull } from '../common/dates';
+import { SyncGoogleAdsDto } from './dto/sync-google-ads.dto';
+import { GoogleAdsService, SyncResult } from './google-ads.service';
+import { isoDay, lookbackWindow } from './google-ads-mapping';
 
 /** Extra request context the controller extracts (never client-supplied). */
 export interface VisitContext {
@@ -24,7 +27,21 @@ function dayKey(input: Date | string): Date {
 
 @Injectable()
 export class AttributionService {
-  constructor(private readonly prisma: PrismaService) {}
+  /**
+   * How many days back the scheduled sync re-pulls.
+   *
+   * Google restates cost and conversion figures for several days after the
+   * fact, so pulling only yesterday would freeze in numbers that are still
+   * moving. Seven days is comfortably past the restatement window and, because
+   * the sync is keyed on (externalSource, externalId), re-pulling is an update
+   * rather than a duplicate.
+   */
+  static readonly SYNC_LOOKBACK_DAYS = 7;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly googleAds: GoogleAdsService,
+  ) {}
 
   // ==========================================================================
   // Landing pages
@@ -117,6 +134,36 @@ export class AttributionService {
         notes: dto.notes ?? null,
       },
     });
+  }
+
+  /**
+   * Pull Google Ads spend into AdSpend.
+   *
+   * Defaults to the standard lookback so the common case is a bare POST. With
+   * no customerId, every reachable account is synced — matching what the
+   * scheduled job does.
+   */
+  async syncGoogleAds(dto: SyncGoogleAdsDto): Promise<SyncResult[]> {
+    const fallback = lookbackWindow(AttributionService.SYNC_LOOKBACK_DAYS);
+    const from = dto.from ?? fallback.from;
+    const to = dto.to ?? isoDay(new Date());
+
+    if (dto.customerId) {
+      return [await this.googleAds.syncCampaignSpend(dto.customerId, from, to)];
+    }
+
+    const { customerIds } = await this.googleAds.listAccessibleCustomers();
+    const results: SyncResult[] = [];
+    for (const customerId of customerIds) {
+      // One unreachable account must not abort the others — a manager account
+      // routinely lists children these credentials cannot report on.
+      try {
+        results.push(await this.googleAds.syncCampaignSpend(customerId, from, to));
+      } catch {
+        continue;
+      }
+    }
+    return results;
   }
 
   listAdSpend(params: { from?: string; to?: string; channel?: AdChannel }) {

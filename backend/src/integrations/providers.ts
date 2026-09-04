@@ -203,8 +203,9 @@ const ads: ProviderSpec[] = [
       { key: 'clientId', label: 'OAuth Client ID', type: 'text', required: true },
       { key: 'clientSecret', label: 'OAuth Client Secret', type: 'password', required: true },
       { key: 'refreshToken', label: 'Refresh Token', type: 'password', required: true },
-      { key: 'loginCustomerId', label: 'Manager Customer ID', type: 'text', placeholder: '123-456-7890' },
+      { key: 'loginCustomerId', label: 'Manager Customer ID', type: 'text', placeholder: '123-456-7890', help: 'Only needed when the credentials belong to a manager (MCC) account.' },
     ],
+    hasTest: true,
   },
   {
     id: 'meta_ads', label: 'Meta Ads', category: 'ADS',

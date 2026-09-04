@@ -273,6 +273,71 @@ async function probeBrevo(c: any): Promise<ProbeResult> {
   return { ok: false, message: `HTTP ${r.status}: ${await readTextSafe(r)}` };
 }
 
+
+async function probeGoogleAds(c: any): Promise<ProbeResult> {
+  for (const k of ['developerToken', 'clientId', 'clientSecret', 'refreshToken']) {
+    if (!c[k]) return { ok: false, message: `${k} is required.` };
+  }
+
+  // Step 1 — can the refresh token still mint an access token? This is what
+  // breaks in practice: tokens are revoked when the OAuth consent screen is
+  // edited or the Google account password changes.
+  const tokenRes = await safeFetch('https://www.googleapis.com/oauth2/v3/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: c.clientId,
+      client_secret: c.clientSecret,
+      refresh_token: c.refreshToken,
+    }).toString(),
+  });
+  if (!isResponse(tokenRes)) return { ok: false, message: `Network: ${tokenRes.error}` };
+  if (!tokenRes.ok) {
+    return { ok: false, message: `OAuth refused the refresh token: ${await readTextSafe(tokenRes)}` };
+  }
+
+  let accessToken = '';
+  try {
+    accessToken = (await tokenRes.json()).access_token ?? '';
+  } catch {
+    return { ok: false, message: 'OAuth response was not JSON.' };
+  }
+  if (!accessToken) return { ok: false, message: 'OAuth response carried no access_token.' };
+
+  // Step 2 — is the developer token approved and does it reach any account?
+  // listAccessibleCustomers is the cheapest authenticated Ads call there is.
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    'developer-token': c.developerToken,
+  };
+  const login = String(c.loginCustomerId ?? '').replace(/\D/g, '');
+  if (login) headers['login-customer-id'] = login;
+
+  const r = await safeFetch(
+    'https://googleads.googleapis.com/v25/customers:listAccessibleCustomers',
+    { headers },
+    12000,
+  );
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (!r.ok) {
+    return { ok: false, message: `Google Ads API HTTP ${r.status}: ${await readTextSafe(r)}` };
+  }
+
+  try {
+    const data = await r.json();
+    const ids: string[] = (data.resourceNames ?? []).map((n: string) => n.split('/').pop());
+    return {
+      ok: true,
+      message: ids.length
+        ? `Google Ads verified — ${ids.length} account(s) reachable: ${ids.slice(0, 3).join(', ')}${ids.length > 3 ? '…' : ''}`
+        : 'Credentials valid, but no Ads accounts are reachable. Check the account has access.',
+    };
+  } catch {
+    return { ok: true, message: 'Google Ads credentials verified.' };
+  }
+}
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 type Probe = (creds: any) => Promise<ProbeResult>;
@@ -295,6 +360,7 @@ const PROBES: Record<string, Probe> = {
   xai_grok: probeXai,
   huggingface: probeHuggingFace,
 
+  google_ads: probeGoogleAds,
   meta_ads: probeMeta,
   meta_page: probeMeta,
   whatsapp_cloud: probeWhatsAppCloud,

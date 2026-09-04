@@ -17,6 +17,8 @@ import { UpdateLandingPageDto } from './dto/update-landing-page.dto';
 import { TrackVisitDto } from './dto/track-visit.dto';
 import { CreateAdSpendDto } from './dto/create-ad-spend.dto';
 import { UpdateAdSpendDto } from './dto/update-ad-spend.dto';
+import { SyncGoogleAdsDto } from './dto/sync-google-ads.dto';
+import { GoogleAdsService } from './google-ads.service';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 
@@ -41,7 +43,10 @@ function detectDevice(ua: string): string {
 
 @Controller()
 export class AttributionController {
-  constructor(private readonly svc: AttributionService) {}
+  constructor(
+    private readonly svc: AttributionService,
+    private readonly googleAds: GoogleAdsService,
+  ) {}
 
   // ---- Visits — public beacon --------------------------------------------
 
@@ -121,6 +126,33 @@ export class AttributionController {
   @Delete('ad-spend/:id')
   removeSpend(@Param('id') id: string) {
     return this.svc.removeAdSpend(id);
+  }
+
+  // ---- Google Ads sync ----------------------------------------------------
+
+  /**
+   * Accounts the stored credentials can reach, so the operator picks an
+   * account instead of typing a ten-digit customer ID.
+   */
+  @Roles(...ATTRIBUTION_WRITE)
+  @Get('ad-spend/google-ads/accounts')
+  googleAdsAccounts() {
+    return this.googleAds.listAccessibleCustomers();
+  }
+
+  /**
+   * Pull campaign spend into AdSpend. Idempotent — re-running a window updates
+   * the rows it already wrote, which is required because Google restates
+   * recent cost data.
+   *
+   * Throttled hard: this fans out to a paid third-party API, and a jumpy
+   * operator clicking Sync repeatedly should not multiply the request volume.
+   */
+  @Roles(...ATTRIBUTION_WRITE)
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
+  @Post('ad-spend/sync/google-ads')
+  syncGoogleAds(@Body() dto: SyncGoogleAdsDto) {
+    return this.svc.syncGoogleAds(dto);
   }
 
   // ---- Reports ------------------------------------------------------------

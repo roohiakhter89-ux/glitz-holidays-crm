@@ -6,6 +6,7 @@ import {
   TrendingUp,
   Trash2,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import {
   api,
@@ -64,6 +65,8 @@ export default function AttributionPage() {
   const [landingPages, setLandingPages] = useState<LandingPageRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -88,6 +91,46 @@ export default function AttributionPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * Pull spend straight from Google Ads for the range on screen.
+   *
+   * Safe to press repeatedly: the sync is keyed on the platform's own row id,
+   * so a second run over the same dates updates rather than duplicates. That
+   * is also why re-syncing recent days is worth doing — Google restates cost
+   * figures for several days after the fact.
+   */
+  async function syncGoogleAds() {
+    setSyncing(true);
+    setSyncNote(null);
+    setError(null);
+    try {
+      const r = toApiRange(range);
+      const results = await api.post<
+        { rowsFetched: number; created: number; updated: number; totalAmount: number; currency: string }[]
+      >('/ad-spend/sync/google-ads', { from: r.from, to: r.to });
+
+      const rows = results.reduce((a, x) => a + x.rowsFetched, 0);
+      const created = results.reduce((a, x) => a + x.created, 0);
+      const updated = results.reduce((a, x) => a + x.updated, 0);
+      const total = results.reduce((a, x) => a + x.totalAmount, 0);
+
+      setSyncNote(
+        rows === 0
+          ? 'Google Ads returned no spend for this range.'
+          : `Synced ${rows} campaign-days from ${results.length} account(s) — ${created} new, ${updated} updated, ${money(total)} total.`,
+      );
+      await load();
+    } catch (e) {
+      setError(
+        e instanceof ApiError
+          ? e.message
+          : 'Could not reach Google Ads. Check the integration under Settings.',
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function mutate(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -147,8 +190,31 @@ export default function AttributionPage() {
               className="h-8 w-[140px]"
             />
           </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={syncGoogleAds}
+            disabled={syncing}
+            className="h-8"
+            title="Pull campaign spend from Google Ads for the selected range"
+          >
+            <RefreshCw
+              className={`size-4 ${syncing ? 'animate-spin' : ''}`}
+              strokeWidth={1.75}
+            />
+            {syncing ? 'Syncing…' : 'Sync Google Ads'}
+          </Button>
         </div>
       </header>
+
+      {syncNote && (
+        <p
+          role="status"
+          className="mb-4 rounded-md border border-healthy-500/40 bg-healthy-500/10 px-3 py-2 text-[13px] text-healthy-400"
+        >
+          {syncNote}
+        </p>
+      )}
 
       {error && (
         <p
@@ -551,6 +617,16 @@ function SpendPanel({
                   <span className="ml-2 text-[11px] uppercase tracking-[0.08em] text-ink-500">
                     {humanise(r.channel)}
                   </span>
+                  {/* Synced rows are owned by the integration and get
+                      overwritten on the next pull; manual rows never do. */}
+                  {r.externalSource && (
+                    <span
+                      className="ml-2 rounded border border-ink-700 px-1 py-px text-[10px] uppercase tracking-[0.08em] text-ink-400"
+                      title="Pulled from Google Ads — will be refreshed on the next sync"
+                    >
+                      synced
+                    </span>
+                  )}
                 </p>
                 <p className="tabular mt-0.5 text-[11px] text-ink-500">
                   {shortDate(r.spendDate)}

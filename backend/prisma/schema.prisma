@@ -795,13 +795,31 @@ model AdSpend {
 
   notes String?
 
+  // --- platform sync linkage -------------------------------------------------
+  /// Which integration owns this row: 'google_ads', or null for a manual entry.
+  /// Sync only ever touches rows carrying its own source, so a number an
+  /// operator typed by hand is never overwritten by a later pull.
+  externalSource String?
+  /// The platform's natural key for the row — for Google Ads,
+  /// `customerId:campaignId:YYYY-MM-DD`.
+  ///
+  /// AdSpend_natural_key cannot serve this purpose: it spans nullable columns
+  /// and Postgres treats NULLs as distinct in a unique index, so an upsert
+  /// against it inserts a duplicate every run instead of updating. Google
+  /// restates the last few days of cost, so a sync MUST be re-runnable.
+  externalId     String?
+  /// When this row was last written by a platform sync.
+  syncedAt       DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([spendDate, channel, campaign, landingPageId], map: "AdSpend_natural_key")
+  @@unique([externalSource, externalId], map: "AdSpend_external_natural_key")
   @@index([spendDate])
   @@index([channel])
   @@index([landingPageId])
+  @@index([externalSource])
 }
 
 model Activity {
