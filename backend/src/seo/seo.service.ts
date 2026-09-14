@@ -1,59 +1,24 @@
-import {
-  Injectable,
-  NotFoundException,
-  HttpException,
-  Logger,
-} from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, SeoAudit } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
 import { UpdateOffPageDto } from './dto/update-offpage.dto';
 import { UpdateDomainSignalsDto } from './dto/update-domain-signals.dto';
-import {
-  calculateCompositeScore,
-  CheckResult,
-  DomainSignals,
-  OffPageSignals,
-  parseMeta,
-  runChecks,
-} from './seo-checks';
-import { randomUUID } from 'crypto';
-import * as fs from 'fs';
-import * as path from 'path';
 import { SITE_DOMAIN } from '../common/site';
 import { normalizePageUrl } from './search-console-mapping';
+import { DomainSignals, OffPageSignals, computeHealthScore, computeLocalScore } from './seo-scoring';
+import { CURRENT_AUDITS, StoredAuditChecks, readStoredChecks } from './seo-audit-storage';
+import { HOMEPAGE_ENTRY, MANIFEST, ManifestPage } from './seo-manifest';
 
-interface PagespeedScores {
-  perf?: number;
-  a11y?: number;
-  bp?: number;
-  seo?: number;
-  lcpMs?: number;
-  clsX1k?: number;
-  inpMs?: number;
+/** A page the health score should describe: it returned 200 at its own URL. */
+function isLivePage(stored: StoredAuditChecks): boolean {
+  return stored.breakdown.blockedBy?.id !== 'http-status';
 }
 
 @Injectable()
 export class SeoService {
-  private readonly logger = new Logger(SeoService.name);
-
   constructor(private readonly prisma: PrismaService) {}
-
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async refreshAll() {
-    this.logger.log('Running daily SEO audits for active sites...');
-    const sites = await this.prisma.seoSite.findMany({ where: { isActive: true } });
-    for (const site of sites) {
-      try {
-        await this.runAudit(site.id);
-        this.logger.log(`Audit completed for site ${site.id}`);
-      } catch (err) {
-        this.logger.error(`Audit failed for site ${site.id}`, err);
-      }
-    }
-    return { message: `Queued/ran audit for ${sites.length} sites` };
-  }
 
   // ---- sites ----
 
@@ -71,55 +36,53 @@ export class SeoService {
   async listSites() {
     let sites = await this.prisma.seoSite.findMany({
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
-      include: {
-        audits: {
-          orderBy: { createdAt: 'desc' },
-          take: 300,
-        },
-      },
     });
 
     if (sites.length === 0) {
       try {
-        const defaultSite = await this.prisma.seoSite.create({
-          data: {
-            name: 'Glitz Holidays Main Website',
-            url: SITE_DOMAIN,
-            crawlPaths: ['/', '/packages', '/destinations/gulmarg', '/destinations/pahalgam', '/destinations/sonmarg'],
-            isActive: true,
-          },
-        });
-        sites = [{
-          ...defaultSite,
-          audits: [],
-        }] as any;
+        sites = [
+          await this.prisma.seoSite.create({
+            data: {
+              name: 'Glitz Holidays Main Website',
+              url: SITE_DOMAIN,
+              crawlPaths: ['/', '/packages'],
+              isActive: true,
+            },
+          }),
+        ];
       } catch {
-        // Ignored if already created concurrently
+        // Created concurrently by another request.
       }
     }
 
-    return sites.map((s: any) => {
-      const latestByUrl = new Map<string, any>();
-      for (const a of s.audits) {
-        if (!latestByUrl.has(a.url)) latestByUrl.set(a.url, a);
-      }
-      const latest = Array.from(latestByUrl.values());
-      const avgScore =
-        latest.length > 0
-          ? Math.round(latest.reduce((a, b) => a + b.score, 0) / latest.length)
-          : null;
-
-      return {
-        id: s.id,
-        name: s.name,
-        url: s.url,
-        crawlPaths: s.crawlPaths,
-        isActive: s.isActive,
-        lastRunAt: s.audits[0]?.createdAt ?? null,
-        avgScore,
-        pageCount: latest.length,
-      };
-    });
+    return Promise.all(
+      sites.map(async (s) => {
+        const [latest, lastRun] = await Promise.all([
+          this.latestAudits(s.id),
+          this.prisma.seoAudit.findFirst({
+            where: { siteId: s.id },
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true },
+          }),
+        ]);
+        const scores = [...latest.values()]
+          .filter((a) => {
+            const stored = readStoredChecks(a.checks);
+            return stored && isLivePage(stored);
+          })
+          .map((a) => a.score);
+        return {
+          id: s.id,
+          name: s.name,
+          url: s.url,
+          crawlPaths: s.crawlPaths,
+          isActive: s.isActive,
+          lastRunAt: lastRun?.createdAt ?? null,
+          avgScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+          pageCount: scores.length,
+        };
+      }),
+    );
   }
 
   async findSite(id: string) {
@@ -141,9 +104,10 @@ export class SeoService {
 
   // ---- audits & rankings ----
 
+  /** Score history. Only audits from the current framework, so the trend compares like with like. */
   async getHistory(id: string) {
     return this.prisma.seoAudit.findMany({
-      where: { siteId: id },
+      where: { siteId: id, ...CURRENT_AUDITS },
       orderBy: { createdAt: 'asc' },
       select: {
         createdAt: true,
@@ -158,110 +122,79 @@ export class SeoService {
 
   async latestAudit(id: string) {
     const site = await this.findSite(id);
-    const audits = await this.prisma.seoAudit.findMany({
-      where: { siteId: id },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
+    const latest = await this.latestAudits(id);
+    const pages = [...latest.values()]
+      .filter((a) => readStoredChecks(a.checks))
+      .sort((a, b) => a.url.localeCompare(b.url));
+    return { site, pages };
+  }
+
+  /** Newest audit per URL, keyed by normalised URL. */
+  private async latestAudits(siteId: string): Promise<Map<string, SeoAudit>> {
+    const rows = await this.prisma.seoAudit.findMany({
+      where: { siteId },
+      orderBy: [{ url: 'asc' }, { createdAt: 'desc' }],
+      distinct: ['url'],
     });
-
-    const latestByUrl = new Map<string, any>();
-    for (const a of audits) {
-      if (!latestByUrl.has(a.url)) latestByUrl.set(a.url, a);
+    const out = new Map<string, SeoAudit>();
+    for (const r of rows) {
+      const key = normalizePageUrl(r.url);
+      const current = out.get(key);
+      if (!current || r.createdAt > current.createdAt) out.set(key, r);
     }
-
-    return {
-      site,
-      pages: Array.from(latestByUrl.values()),
-    };
+    return out;
   }
 
   /**
-   * Get all website pages ranked by composite Google Algorithm score.
-   * Merges manifest metadata, on-page audit results, and off-page signals.
+   * Every manifest page with its latest page health audit, plus audited pages
+   * outside the manifest. Audits from the previous framework are not scored
+   * here (needsReaudit) so old and new scores are never ranked together.
    */
   async getPageRankings(siteId: string) {
     const site = await this.findSite(siteId);
-    const manifestPages = this.loadManifestPages();
-
-    const [latestAudits, offPageRecords] = await Promise.all([
-      this.prisma.seoAudit.findMany({
-        where: { siteId },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.seoOffPage.findMany({
-        where: { siteId },
-      }),
+    const [latest, offPageRecords, domain] = await Promise.all([
+      this.latestAudits(siteId),
+      this.prisma.seoOffPage.findMany({ where: { siteId } }),
+      this.getDomainSignals(siteId),
     ]);
 
-    const latestAuditMap = new Map<string, any>();
-    for (const a of latestAudits) {
-      if (!latestAuditMap.has(a.url)) latestAuditMap.set(a.url, a);
-    }
+    const offPageMap = new Map<string, (typeof offPageRecords)[number]>();
+    for (const op of offPageRecords) offPageMap.set(normalizePageUrl(op.url), op);
 
-    const offPageMap = new Map<string, any>();
-    for (const op of offPageRecords) {
-      offPageMap.set(op.url, op);
-      const norm = normalizePageUrl(op.url);
-      if (norm && norm !== op.url) {
-        offPageMap.set(norm, op);
-      }
-    }
-
-    // Build unified ranking list
-    // 1. Pages from manifest
-    // 2. Extra crawl paths or discovered audited pages
-    const seenUrls = new Set<string>();
-    const rankedList: any[] = [];
-
-    const getFullUrl = (pathOrUrl: string) => {
-      try {
-        return new URL(pathOrUrl, site.url).toString();
-      } catch {
-        return pathOrUrl;
-      }
-    };
-
-    // Add homepage
-    manifestPages.unshift({
-      url: '/',
-      title: 'Glitz Holidays — Srinagar Kashmir Tour Operator',
-      h1: 'Kashmir Tour Packages with Local Srinagar Experts',
-      tier: 0,
-      family: 'core-homepage',
-      primary: 'kashmir tour package',
-    });
-
-    for (const mp of manifestPages) {
-      const fullUrl = getFullUrl(mp.url);
-      if (seenUrls.has(fullUrl)) continue;
-      seenUrls.add(fullUrl);
-
-      const audit = latestAuditMap.get(fullUrl);
-      const offPage = offPageMap.get(fullUrl) ?? offPageMap.get(normalizePageUrl(fullUrl));
-
-      rankedList.push({
-        url: fullUrl,
-        path: mp.url,
-        title: mp.title || mp.h1 || mp.url,
-        h1: mp.h1,
-        tier: mp.tier,
-        family: mp.family,
-        targetKeyword: mp.primary,
-        impr: mp.impr ?? null,
-        clicks: mp.clicks ?? null,
-        conv: mp.conv ?? null,
-        words: mp.words ?? null,
+    const row = (
+      base: { url: string; path: string; title: string; h1?: string; tier?: number; family?: string; targetKeyword?: string } & Partial<Pick<ManifestPage, 'impr' | 'clicks' | 'conv' | 'words'>>,
+      key: string,
+      audit: SeoAudit | undefined,
+    ) => {
+      const stored = audit ? readStoredChecks(audit.checks) : null;
+      const offPage = offPageMap.get(key);
+      return {
+        ...base,
+        impr: base.impr ?? null,
+        clicks: base.clicks ?? null,
+        conv: base.conv ?? null,
+        words: base.words ?? null,
         auditId: audit?.id ?? null,
         lastAuditedAt: audit?.createdAt ?? null,
-        score: audit?.score ?? null,
-        perfScore: audit?.perfScore ?? null,
-        seoScore: audit?.seoScore ?? null,
-        lcpMs: audit?.lcpMs ?? null,
-        clsX1k: audit?.clsX1k ?? null,
-        inpMs: audit?.inpMs ?? null,
-        checks: audit?.checks?.results ?? [],
-        tasks: audit?.tasks ?? [],
-        errors: audit?.errors ?? null,
+        needsReaudit: !!audit && !stored,
+        score: stored ? audit!.score : null,
+        perfScore: stored ? audit!.perfScore : null,
+        seoScore: null,
+        lcpMs: stored ? audit!.lcpMs : null,
+        clsX1k: stored ? audit!.clsX1k : null,
+        inpMs: stored ? audit!.inpMs : null,
+        checks: stored?.results ?? [],
+        tasks: stored ? (audit!.tasks ?? []) : [],
+        errors: stored ? audit!.errors : null,
+        health: stored
+          ? {
+              breakdown: stored.breakdown,
+              vitals: stored.vitals,
+              pageType: stored.page.pageType,
+              analysis: stored.page.analysis,
+              analysedAt: stored.page.analysedAt,
+            }
+          : null,
         offPage: offPage
           ? {
               backlinkCount: offPage.backlinkCount,
@@ -274,54 +207,58 @@ export class SeoService {
               updatedAt: offPage.updatedAt,
             }
           : null,
-      });
-    }
+      };
+    };
 
-    // Add any audited URLs not in manifest
-    for (const [auditedUrl, audit] of latestAuditMap.entries()) {
-      if (seenUrls.has(auditedUrl)) continue;
-      seenUrls.add(auditedUrl);
+    const seen = new Set<string>();
+    const rankedList: Array<ReturnType<typeof row>> = [];
 
-      const offPage = offPageMap.get(auditedUrl) ?? offPageMap.get(normalizePageUrl(auditedUrl));
-      let parsedPath = auditedUrl;
+    for (const mp of [HOMEPAGE_ENTRY, ...MANIFEST]) {
+      let fullUrl: string;
       try {
-        parsedPath = new URL(auditedUrl).pathname;
-      } catch {}
-
-      rankedList.push({
-        url: auditedUrl,
-        path: parsedPath,
-        title: parsedPath,
-        tier: 0,
-        family: 'custom-path',
-        targetKeyword: undefined,
-        auditId: audit.id,
-        lastAuditedAt: audit.createdAt,
-        score: audit.score,
-        perfScore: audit.perfScore,
-        seoScore: audit.seoScore,
-        lcpMs: audit.lcpMs,
-        clsX1k: audit.clsX1k,
-        inpMs: audit.inpMs,
-        checks: audit.checks?.results ?? [],
-        tasks: audit.tasks ?? [],
-        errors: audit.errors,
-        offPage: offPage
-          ? {
-              backlinkCount: offPage.backlinkCount,
-              referringDomains: offPage.referringDomains,
-              pageAuthority: offPage.pageAuthority,
-              prMentions: offPage.prMentions,
-              socialShares: offPage.socialShares,
-              searchConsoleCtr: offPage.searchConsoleCtr,
-              notes: offPage.notes,
-              updatedAt: offPage.updatedAt,
-            }
-          : null,
-      });
+        fullUrl = new URL(mp.url, site.url).toString();
+      } catch {
+        continue;
+      }
+      const key = normalizePageUrl(fullUrl);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rankedList.push(
+        row(
+          {
+            url: fullUrl,
+            path: mp.url,
+            title: mp.title || mp.h1 || mp.url,
+            h1: mp.h1,
+            tier: mp.tier,
+            family: mp.family,
+            targetKeyword: mp.primary,
+            impr: mp.impr,
+            clicks: mp.clicks,
+            conv: mp.conv,
+            words: mp.words,
+          },
+          key,
+          latest.get(key),
+        ),
+      );
     }
 
-    // Sort by score desc (pages with scores first, then un-audited)
+    // Audited pages outside the manifest: sitemap-only pages and configured paths.
+    for (const [key, audit] of latest) {
+      if (seen.has(key)) continue;
+      const stored = readStoredChecks(audit.checks);
+      if (!stored) continue;
+      seen.add(key);
+      let path = audit.url;
+      try {
+        path = new URL(audit.url).pathname;
+      } catch {
+        // Keep the raw URL.
+      }
+      rankedList.push(row({ url: audit.url, path, title: path, family: stored.page.family ?? 'custom-path' }, key, audit));
+    }
+
     rankedList.sort((a, b) => {
       if (a.score === null && b.score === null) return 0;
       if (a.score === null) return 1;
@@ -329,34 +266,65 @@ export class SeoService {
       return b.score - a.score;
     });
 
-    const auditedCount = rankedList.filter((r) => r.score !== null).length;
-    const avgScore =
-      auditedCount > 0
-        ? Math.round(
-            rankedList.reduce((sum, r) => sum + (r.score || 0), 0) / auditedCount,
-          )
-        : null;
-
-    const highTier = rankedList.filter((r) => (r.score ?? 0) >= 80).length;
-    const medTier = rankedList.filter(
-      (r) => (r.score ?? 0) >= 60 && (r.score ?? 0) < 80,
-    ).length;
-    const lowTier = rankedList.filter(
-      (r) => r.score !== null && (r.score ?? 0) < 60,
-    ).length;
+    const scored = rankedList.filter((r) => r.score !== null);
+    const live = scored.filter((r) => r.health && r.health.breakdown.blockedBy?.id !== 'http-status');
+    const checkFails = (id: string) => scored.filter((r) => r.checks.some((c) => c.id === id && c.severity === 'fail')).length;
 
     return {
       site,
       stats: {
         totalPages: rankedList.length,
-        auditedPages: auditedCount,
-        averageScore: avgScore,
-        highScoreCount: highTier,
-        medScoreCount: medTier,
-        lowScoreCount: lowTier,
+        auditedPages: scored.length,
+        averageScore: live.length ? Math.round(live.reduce((sum, r) => sum + (r.score ?? 0), 0) / live.length) : null,
+        highScoreCount: scored.filter((r) => (r.score ?? 0) >= 80).length,
+        medScoreCount: scored.filter((r) => (r.score ?? 0) >= 60 && (r.score ?? 0) < 80).length,
+        lowScoreCount: scored.filter((r) => (r.score ?? 0) < 60).length,
+        blockedCount: scored.filter((r) => r.health?.breakdown.blockedBy).length,
+        nearDuplicateCount: checkFails('unique-content'),
+        needsReauditCount: rankedList.filter((r) => r.needsReaudit).length,
+        vitalsMeasuredCount: scored.filter((r) => r.health?.vitals && (r.health.vitals.lcpMs || r.health.vitals.cls)).length,
       },
+      familyHealth: this.familyHealth(rankedList),
+      local: computeLocalScore(domain),
       rankings: rankedList,
     };
+  }
+
+  /**
+   * How distinct each manifest family's pages are from each other. This is the
+   * doorway-page view: a family whose pages share most of their text is the
+   * first thing to rewrite.
+   */
+  private familyHealth(
+    rows: Array<{ family?: string; health: { analysis: { uniqueShare: number | null } | null } | null; checks: Array<{ id: string; severity: string }> }>,
+  ) {
+    const groups = new Map<string, { pages: number; audited: number; shares: number[]; fail: number; warn: number }>();
+    for (const r of rows) {
+      const family = r.family ?? 'other';
+      const g = groups.get(family) ?? { pages: 0, audited: 0, shares: [], fail: 0, warn: 0 };
+      g.pages++;
+      if (r.health) {
+        g.audited++;
+        const share = r.health.analysis?.uniqueShare;
+        if (share !== null && share !== undefined) g.shares.push(share);
+        const unique = r.checks.find((c) => c.id === 'unique-content');
+        if (unique?.severity === 'fail') g.fail++;
+        if (unique?.severity === 'warn') g.warn++;
+      }
+      groups.set(family, g);
+    }
+    return [...groups.entries()]
+      .map(([family, g]) => ({
+        family,
+        pages: g.pages,
+        audited: g.audited,
+        averageUniqueShare: g.shares.length
+          ? Math.round((g.shares.reduce((a, b) => a + b, 0) / g.shares.length) * 1000) / 1000
+          : null,
+        nearDuplicates: g.fail,
+        partlyShared: g.warn,
+      }))
+      .sort((a, b) => (a.averageUniqueShare ?? 2) - (b.averageUniqueShare ?? 2));
   }
 
   // ==========================================================================
@@ -369,11 +337,8 @@ export class SeoService {
   }
 
   /**
-   * Upsert the site-wide signals, then rescore every audited page.
-   *
-   * Domain signals are identical for all pages, so a change here moves the
-   * whole site at once. Rescoring in a transaction keeps the leaderboard from
-   * showing a mix of old and new numbers mid-write.
+   * Upsert the site-wide signals, then rescore. Only referring domains move page
+   * scores; Business Profile, reviews and citations feed the local score.
    */
   async updateDomainSignals(siteId: string, dto: UpdateDomainSignalsDto) {
     await this.findSite(siteId);
@@ -400,87 +365,56 @@ export class SeoService {
     });
 
     const rescored = await this.rescoreAllPages(siteId, signals);
-    return { ...signals, rescoredPages: rescored };
+    return { ...signals, rescoredPages: rescored, local: computeLocalScore(signals) };
   }
 
   /**
-   * Recompute the stored score on the latest audit of every page.
-   *
-   * Called after a domain-signal change or Search Console sync. Only the newest audit
-   * per URL is touched: historic rows are a record of what the score was at the
-   * time and rewriting them would erase the trend the dashboard plots.
+   * Recompute the stored score on the latest audit of every page after link
+   * data changes. Older audits are left as the record of what the score was.
    */
-  async rescoreAllPages(
-    siteId: string,
-    domain?: DomainSignals | null,
-  ): Promise<number> {
-    if (domain === undefined) {
-      domain = await this.getDomainSignals(siteId);
-    }
+  async rescoreAllPages(siteId: string, domain?: DomainSignals | null): Promise<number> {
+    if (domain === undefined) domain = await this.getDomainSignals(siteId);
 
-    const audits = await this.prisma.seoAudit.findMany({
-      where: { siteId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const seen = new Set<string>();
-    const offPageRows = await this.prisma.seoOffPage.findMany({ where: { siteId } });
-    const offPageByUrl = new Map<string, any>();
-    for (const r of offPageRows) {
-      offPageByUrl.set(r.url, r);
-      const norm = normalizePageUrl(r.url);
-      if (norm && norm !== r.url) {
-        offPageByUrl.set(norm, r);
-      }
-    }
+    const [latest, offPageRows] = await Promise.all([
+      this.latestAudits(siteId),
+      this.prisma.seoOffPage.findMany({ where: { siteId } }),
+    ]);
+    const offPage = new Map<string, OffPageSignals>();
+    for (const r of offPageRows) offPage.set(normalizePageUrl(r.url), r);
 
     let updated = 0;
-    for (const audit of audits) {
-      if (seen.has(audit.url)) continue;
-      seen.add(audit.url);
-      if (!audit.checks) continue;
-
-      const checks = (audit.checks as any).results as CheckResult[];
-      if (!Array.isArray(checks)) continue;
-
-      const offPage =
-        offPageByUrl.get(audit.url) ??
-        offPageByUrl.get(normalizePageUrl(audit.url)) ??
-        null;
-
-      const composite = calculateCompositeScore(
-        checks,
-        offPage,
-        {
-          perf: audit.perfScore ?? undefined,
-          a11y: audit.a11yScore ?? undefined,
-          bp: audit.bpScore ?? undefined,
-          seo: audit.seoScore ?? undefined,
-        },
-        domain,
-      );
-
-      if (composite.finalScore !== audit.score) {
-        await this.prisma.seoAudit.update({
-          where: { id: audit.id },
-          data: { score: composite.finalScore },
-        });
-        updated++;
-      }
+    for (const [key, audit] of latest) {
+      if (await this.rescore(audit, offPage.get(key) ?? null, domain)) updated++;
     }
     return updated;
   }
 
-  /**
-   * Update off-page metrics for a specific page URL.
-   * Recalculates the latest audit score if an audit exists.
-   */
+  private async rescore(audit: SeoAudit, offPage: OffPageSignals | null, domain: DomainSignals | null): Promise<boolean> {
+    const stored = readStoredChecks(audit.checks);
+    if (!stored?.results) return false;
+    const breakdown = computeHealthScore(stored.results, offPage, domain);
+    if (breakdown.finalScore === audit.score && breakdown.authorityPoints === stored.breakdown.authorityPoints) {
+      return false;
+    }
+    await this.prisma.seoAudit.update({
+      where: { id: audit.id },
+      data: {
+        score: breakdown.finalScore,
+        checks: { ...stored, breakdown } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return true;
+  }
+
+  /** Update link data for one page and rescore its latest audit. */
   async updateOffPage(siteId: string, dto: UpdateOffPageDto) {
     const site = await this.findSite(siteId);
     let targetUrl = normalizePageUrl(dto.url);
     try {
       targetUrl = normalizePageUrl(new URL(dto.url, site.url).toString());
-    } catch {}
+    } catch {
+      // Keep the normalised input.
+    }
 
     const offPage = await this.prisma.seoOffPage.upsert({
       where: {
@@ -499,249 +433,18 @@ export class SeoService {
       },
       update: {
         backlinkCount: dto.backlinkCount !== undefined ? dto.backlinkCount : undefined,
-        referringDomains:
-          dto.referringDomains !== undefined ? dto.referringDomains : undefined,
+        referringDomains: dto.referringDomains !== undefined ? dto.referringDomains : undefined,
         pageAuthority: dto.pageAuthority !== undefined ? dto.pageAuthority : undefined,
         prMentions: dto.prMentions !== undefined ? dto.prMentions : undefined,
         socialShares: dto.socialShares !== undefined ? dto.socialShares : undefined,
-        searchConsoleCtr:
-          dto.searchConsoleCtr !== undefined ? dto.searchConsoleCtr : undefined,
+        searchConsoleCtr: dto.searchConsoleCtr !== undefined ? dto.searchConsoleCtr : undefined,
         notes: dto.notes !== undefined ? dto.notes : undefined,
       },
     });
 
-    // Recalculate latest audit score if exists
-    const latestAudit = await this.prisma.seoAudit.findFirst({
-      where: { siteId, url: targetUrl },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (latestAudit && latestAudit.checks) {
-      const checks = (latestAudit.checks as any).results as CheckResult[];
-      const pagespeed = {
-        perf: latestAudit.perfScore ?? undefined,
-        a11y: latestAudit.a11yScore ?? undefined,
-        bp: latestAudit.bpScore ?? undefined,
-        seo: latestAudit.seoScore ?? undefined,
-      };
-      const domain = await this.getDomainSignals(siteId);
-      const composite = calculateCompositeScore(checks, offPage, pagespeed, domain);
-      await this.prisma.seoAudit.update({
-        where: { id: latestAudit.id },
-        data: { score: composite.finalScore },
-      });
-    }
+    const audit = (await this.latestAudits(siteId)).get(targetUrl);
+    if (audit) await this.rescore(audit, offPage, await this.getDomainSignals(siteId));
 
     return offPage;
   }
-
-  /**
-   * Run an audit across the site's homepage + manifest/configured paths.
-   */
-  async runAudit(id: string) {
-    const site = await this.findSite(id);
-    const runId = randomUUID();
-    const manifest = this.loadManifestPages();
-
-    const urlsToAudit: { url: string; keyword?: string }[] = [
-      { url: site.url, keyword: 'kashmir tour package' },
-    ];
-
-    for (const p of site.crawlPaths ?? []) {
-      try {
-        urlsToAudit.push({ url: new URL(p, site.url).toString() });
-      } catch {}
-    }
-
-    // Include top high-intent manifest pages in the audit
-    for (const m of manifest.slice(0, 30)) {
-      try {
-        urlsToAudit.push({
-          url: new URL(m.url, site.url).toString(),
-          keyword: m.primary,
-        });
-      } catch {}
-    }
-
-    // Deduplicate
-    const uniqueMap = new Map<string, string | undefined>();
-    for (const item of urlsToAudit) {
-      if (!uniqueMap.has(item.url)) {
-        uniqueMap.set(item.url, item.keyword);
-      }
-    }
-
-    const results: any[] = [];
-    for (const [url, keyword] of uniqueMap.entries()) {
-      results.push(await this.auditOne(site.id, runId, url, keyword));
-    }
-
-    return { runId, pages: results };
-  }
-
-  /**
-   * Audit a single page URL on-demand
-   */
-  async auditSinglePage(siteId: string, urlStr: string, keyword?: string) {
-    const site = await this.findSite(siteId);
-    let fullUrl = urlStr;
-    try {
-      fullUrl = new URL(urlStr, site.url).toString();
-    } catch {}
-
-    const runId = randomUUID();
-    return this.auditOne(site.id, runId, fullUrl, keyword);
-  }
-
-  private async auditOne(
-    siteId: string,
-    runId: string,
-    urlStr: string,
-    targetKeyword?: string,
-  ) {
-    let checks: CheckResult[] = [];
-    let ps: PagespeedScores = {};
-    const errors: string[] = [];
-    let url: URL;
-
-    try {
-      url = new URL(urlStr);
-    } catch (e) {
-      return this.prisma.seoAudit.create({
-        data: {
-          siteId,
-          runId,
-          url: urlStr,
-          score: 0,
-          errors: `Invalid URL: ${(e as Error).message}`,
-        },
-      });
-    }
-
-    // 1) Fetch + enhanced on-page checks
-    try {
-      const html = await fetchHtml(urlStr);
-      const meta = parseMeta(html, url);
-      checks = runChecks(meta, url, targetKeyword);
-    } catch (e) {
-      errors.push(`Page fetch failed: ${(e as Error).message}`);
-    }
-
-    // 2) PageSpeed Insights
-    try {
-      ps = await fetchPagespeed(urlStr);
-    } catch (e) {
-      errors.push(`PageSpeed skipped: ${(e as Error).message}`);
-    }
-
-    // 3) Off-page signals
-    const offPage = await this.prisma.seoOffPage.findUnique({
-      where: { siteId_url: { siteId, url: urlStr } },
-    });
-
-    const domainSignals = await this.getDomainSignals(siteId);
-    const composite = calculateCompositeScore(checks, offPage, ps, domainSignals);
-
-    const tasks = checks
-      .filter((c) => c.task)
-      .map((c) => ({
-        id: c.id,
-        severity: c.severity,
-        label: c.label,
-        category: c.category,
-        task: c.task,
-      }));
-
-    return this.prisma.seoAudit.create({
-      data: {
-        siteId,
-        runId,
-        url: urlStr,
-        score: composite.finalScore,
-        perfScore: ps.perf ?? null,
-        a11yScore: ps.a11y ?? null,
-        bpScore: ps.bp ?? null,
-        seoScore: ps.seo ?? null,
-        lcpMs: ps.lcpMs ?? null,
-        clsX1k: ps.clsX1k ?? null,
-        inpMs: ps.inpMs ?? null,
-        checks: { results: checks } as any,
-        tasks: tasks as any,
-        errors: errors.length ? errors.join(' | ') : null,
-      },
-    });
-  }
-
-  private loadManifestPages(): any[] {
-    const paths = [
-      path.resolve(__dirname, './page-manifest.json'),
-      path.resolve(__dirname, '../seo/page-manifest.json'),
-      path.resolve(process.cwd(), 'src/seo/page-manifest.json'),
-      path.resolve(process.cwd(), 'dist/seo/page-manifest.json'),
-      path.resolve(process.cwd(), 'seo/page-manifest.json'),
-      path.resolve(process.cwd(), '../seo/page-manifest.json'),
-      path.resolve(__dirname, '../../../../seo/page-manifest.json'),
-      'c:\\Users\\user\\Desktop\\glitz\\seo\\page-manifest.json',
-    ];
-
-    for (const p of paths) {
-      if (fs.existsSync(p)) {
-        try {
-          const raw = fs.readFileSync(p, 'utf-8');
-          return JSON.parse(raw);
-        } catch (e) {
-          this.logger.warn(`Could not parse manifest at ${p}: ${e}`);
-        }
-      }
-    }
-    return [];
-  }
-}
-
-// ---- helpers -------------------------------------------------------------
-
-async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': `GlitzSEOBot/1.0 (+${SITE_DOMAIN})` },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) throw new HttpException(`upstream ${res.status}`, res.status);
-  const ct = res.headers.get('content-type') ?? '';
-  if (!/text\/html|application\/xhtml/.test(ct)) {
-    throw new Error(`unexpected content-type ${ct}`);
-  }
-  return await res.text();
-}
-
-async function fetchPagespeed(url: string): Promise<PagespeedScores> {
-  const endpoint = new URL('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');
-  endpoint.searchParams.set('url', url);
-  for (const c of ['performance', 'accessibility', 'best-practices', 'seo']) {
-    endpoint.searchParams.append('category', c);
-  }
-  endpoint.searchParams.set('strategy', 'mobile');
-  if (process.env.PAGESPEED_API_KEY) {
-    endpoint.searchParams.set('key', process.env.PAGESPEED_API_KEY);
-  }
-
-  const res = await fetch(endpoint.toString(), {
-    signal: AbortSignal.timeout(45_000),
-  });
-  if (!res.ok) throw new Error(`PSI ${res.status}`);
-  const j: any = await res.json();
-
-  const cats = j.lighthouseResult?.categories ?? {};
-  const audits = j.lighthouseResult?.audits ?? {};
-  const to100 = (n: unknown): number | undefined =>
-    typeof n === 'number' ? Math.round(n * 100) : undefined;
-
-  return {
-    perf: to100(cats.performance?.score),
-    a11y: to100(cats.accessibility?.score),
-    bp: to100(cats['best-practices']?.score),
-    seo: to100(cats.seo?.score),
-    lcpMs: Math.round(audits['largest-contentful-paint']?.numericValue ?? 0) || undefined,
-    clsX1k: Math.round((audits['cumulative-layout-shift']?.numericValue ?? 0) * 1000) || undefined,
-    inpMs: Math.round(audits['interaction-to-next-paint']?.numericValue ?? 0) || undefined,
-  };
 }

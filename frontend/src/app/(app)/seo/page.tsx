@@ -309,7 +309,7 @@ export default function SeoPage() {
             </span>
           </div>
           <p className="mt-1 text-[13px] text-ink-400 max-w-2xl">
-            Google Algorithm quality metrics, on-page information gain checks,
+            Page health and quality metrics, on-page information gain checks,
             off-page authority tracking, and website media management.
           </p>
         </div>
@@ -418,7 +418,7 @@ export default function SeoPage() {
             }`}
           >
             <Trophy className="size-4" />
-            Algorithm Leaderboard & All Pages
+            Health Leaderboard & All Pages
             <span className="ml-1 rounded-full bg-ink-800 px-2 py-0.5 text-[11px] text-ink-300">
               {effectiveStats.totalPages}
             </span>
@@ -774,7 +774,7 @@ function RankingsLeaderboard({
           <div className="col-span-1">Rank / Tier</div>
           <div className="col-span-4">Page Title & URL</div>
           <div className="col-span-3">Target Query & Google Ads Demand</div>
-          <div className="col-span-2 text-center">Algorithm Score</div>
+          <div className="col-span-2 text-center">Health Score</div>
           <div className="col-span-2 text-right">Actions</div>
         </div>
 
@@ -919,7 +919,7 @@ function PageRankRow({
         )}
       </div>
 
-      {/* Col 4: Algorithm Score */}
+      {/* Col 4: Health Score */}
       <div className="col-span-2 flex flex-col items-center justify-center">
         {p.score !== null ? (
           <div className="flex items-center gap-2">
@@ -1320,7 +1320,7 @@ function OffPageEditDialog({
       >
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="rounded-lg bg-ink-900 p-3 text-[12px] text-ink-300">
-            <span className="font-semibold text-ink-100">Formula Weight:</span> Off-page signals contribute up to 30 points to the Google Algorithm score (Backlinks: 8, Referring Domains: 7, PA: 5, PR: 5, Social: 3, CTR: 2).
+            <span className="font-semibold text-ink-100">Formula Weight:</span> Off-page authority contributes up to 10 points on top of the 90-point on-page health score (Referring Domains: up to 6 pts, Backlinks: up to 2 pts, Site Domains: up to 2 pts, log-scaled). Third-party metrics like PA and social shares are tracked for reference only.
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1431,7 +1431,7 @@ function OffPageEditDialog({
 }
 
 /* ==========================================================================
- * MODAL: PAGE ALGORITHM CHECKLIST
+ * MODAL: PAGE HEALTH CHECKLIST
  * ========================================================================== */
 
 function PageChecklistDialog({
@@ -1448,7 +1448,7 @@ function PageChecklistDialog({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        title={`SEO Algorithm Audit: ${page.title || page.path}`}
+        title={`SEO Health Audit: ${page.title || page.path}`}
         description={`Target Query: "${page.targetKeyword || 'kashmir tour package'}" · Total Score: ${page.score ?? '—'}/100`}
       >
         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -1458,7 +1458,7 @@ function PageChecklistDialog({
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Composite Score</p>
               <p className="text-3xl font-bold text-ink-100">{page.score ?? '—'}<span className="text-sm font-normal text-ink-500"> / 100</span></p>
               <p className="text-[11.5px] text-ink-400 mt-1">
-                {page.offPage ? 'Blended 70% On-Page + 30% Off-Page' : 'Normalized 100% On-Page'}
+                {page.offPage ? 'On-Page Health + Off-Page Authority' : 'On-Page Health (90 pts max)'}
               </p>
             </div>
             <ScoreRing score={page.score ?? 0} size={56} stroke={5} />
@@ -1485,12 +1485,12 @@ function PageChecklistDialog({
           {checks.length === 0 ? (
             <div className="py-8 text-center text-ink-500 text-[13px] bg-ink-950 rounded-lg border border-ink-800 p-4">
               <p>This page has not been crawled live yet.</p>
-              <p className="text-xs text-ink-400 mt-1">Click &quot;Re-audit This Page Now&quot; below to fetch HTML and run all 18 Google ranking factor checks.</p>
+              <p className="text-xs text-ink-400 mt-1">Click &quot;Re-audit This Page Now&quot; below to fetch HTML and run all 24 SEO health factor checks.</p>
             </div>
           ) : (
             <div className="space-y-3">
               <h3 className="text-[12.5px] font-semibold text-ink-200 uppercase tracking-wider">
-                Google Algorithm Signals ({checks.length} Checks)
+                SEO Health Signals ({checks.length} Checks)
               </h3>
               <ul className="divide-y divide-ink-800/60 border border-ink-800 rounded-lg overflow-hidden bg-ink-950">
                 {checks.map((c, i) => (
@@ -1635,7 +1635,7 @@ function AddSiteDialog({ onCreated }: { onCreated: (id: string) => void }) {
       </DialogTrigger>
       <DialogContent
         title="Register Site for SEO Audit"
-        description="The homepage and manifest pages are crawled and audited against Google's search algorithms."
+        description="The homepage and manifest pages are crawled and audited against Google's published search quality and health guidelines."
       >
         <form onSubmit={submit} className="p-5 space-y-4">
           <div className="space-y-1">

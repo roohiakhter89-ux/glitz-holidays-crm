@@ -1,234 +1,145 @@
+import { CheckResult } from './audit-types';
 import {
-  DOMAIN_SIGNAL_MAX,
+  AUTHORITY_MAX,
+  BASE_MAX,
+  BLOCKED_CAP,
   DomainSignals,
-  OFF_PAGE_MAX,
-  ON_PAGE_BASE_MAX,
   OffPageSignals,
-  PAGE_SIGNAL_MAX,
-  calculateCompositeScore,
-  calculateDomainSignalPoints,
-  calculatePageSignalPoints,
-  CheckResult,
-} from './seo-checks';
+  authorityPoints,
+  computeHealthScore,
+  computeLocalScore,
+} from './seo-scoring';
 
-/** A checks array that yields a given on-page percentage. */
-function checksFor(pct: number): CheckResult[] {
-  return [
-    { id: 'x', label: 'x', category: 'on-page', severity: 'pass', weight: 100, score: pct },
-  ];
-}
+const check = (over: Partial<CheckResult> = {}): CheckResult => ({
+  id: 'x',
+  label: 'x',
+  category: 'content',
+  severity: 'pass',
+  weight: 10,
+  score: 10,
+  basis: 'google',
+  scope: 'page',
+  ...over,
+});
 
-const score = (
-  pct: number,
-  offPage?: OffPageSignals | null,
-  domain?: DomainSignals | null,
-) => calculateCompositeScore(checksFor(pct), offPage, undefined, domain).finalScore;
+describe('page health score', () => {
+  it('puts a page that passes everything at the base maximum', () => {
+    expect(computeHealthScore([check(), check({ category: 'indexing' })]).finalScore).toBe(BASE_MAX);
+  });
 
-describe('SEO composite scoring', () => {
-  /**
-   * The defect this scoring model exists to fix: the previous version rebased
-   * on-page to 70% as soon as any off-page row existed, so recording three
-   * honest backlinks dropped an 88 to 70 and you needed 27 of 30 off-page
-   * points merely to break even. Nobody entered data, and the table held zero
-   * rows. A measurement people are punished for entering does not get entered.
-   */
-  describe('monotonicity: entering off-page data can never lower a score', () => {
-    it('does not drop the score when modest real data is added', () => {
-      const before = score(88);
-      const after = score(88, {
-        backlinkCount: 3,
-        referringDomains: 2,
-        pageAuthority: 15,
-        socialShares: 5,
-        searchConsoleCtr: 1.2,
-      });
-      expect(after).toBeGreaterThanOrEqual(before);
-    });
+  it('scores warn as half and fail as nothing', () => {
+    expect(computeHealthScore([check(), check({ severity: 'fail' })]).finalScore).toBe(45);
+    expect(computeHealthScore([check({ severity: 'warn' })]).finalScore).toBe(45);
+  });
 
-    it('holds across the full on-page range and a spread of off-page data', () => {
-      const offPageCases: (OffPageSignals | null)[] = [
-        null,
-        {},
-        { backlinkCount: 1 },
-        { backlinkCount: 3, referringDomains: 2, pageAuthority: 15 },
-        { backlinkCount: 25, referringDomains: 12, pageAuthority: 45, prMentions: 2 },
-        {
-          backlinkCount: 500,
-          referringDomains: 200,
-          pageAuthority: 100,
-          prMentions: 20,
-          socialShares: 5000,
-          searchConsoleCtr: 20,
-        },
-      ];
+  it('leaves unmeasured and inapplicable checks out of the score', () => {
+    const r = computeHealthScore([
+      check(),
+      check({ severity: 'na', na: 'not-applicable' }),
+      check({ severity: 'na', na: 'not-measured', category: 'experience' }),
+    ]);
+    expect(r.finalScore).toBe(BASE_MAX);
+    // Half the applicable weight had no data.
+    expect(r.coverage).toBe(0.5);
+    expect(r.categories.experience).toEqual({ earned: 0, possible: 0, notMeasured: 10 });
+  });
 
-      for (let pct = 0; pct <= 100; pct += 5) {
-        const baseline = score(pct);
-        for (const op of offPageCases) {
-          expect(score(pct, op)).toBeGreaterThanOrEqual(baseline);
-        }
+  it('caps a page that fails an indexing gate', () => {
+    const r = computeHealthScore(
+      [check({ weight: 90, score: 90 }), check({ id: 'noindex', label: 'Allowed in the index', gate: true, severity: 'fail' })],
+      { referringDomains: 500 },
+    );
+    expect(r.finalScore).toBe(BLOCKED_CAP);
+    expect(r.blockedBy).toEqual({ id: 'noindex', label: 'Allowed in the index' });
+  });
+
+  it('ignores a gate that passed', () => {
+    expect(computeHealthScore([check({ gate: true })]).blockedBy).toBeNull();
+  });
+
+  it('never lowers a score when link data is entered', () => {
+    const cases: OffPageSignals[] = [
+      {},
+      { backlinkCount: 1 },
+      { referringDomains: 1 },
+      { backlinkCount: 3, referringDomains: 2 },
+      { backlinkCount: 1e6, referringDomains: 1e6 },
+    ];
+    for (const severity of ['pass', 'warn', 'fail'] as const) {
+      const checks = [check({ severity })];
+      const baseline = computeHealthScore(checks).finalScore;
+      for (const op of cases) {
+        expect(computeHealthScore(checks, op).finalScore).toBeGreaterThanOrEqual(baseline);
+        expect(computeHealthScore(checks, op, { referringDomainsTotal: 40 }).finalScore).toBeGreaterThanOrEqual(baseline);
       }
-    });
-
-    it('holds when domain signals are added, including a toxic profile', () => {
-      const domainCases: (DomainSignals | null)[] = [
-        null,
-        {},
-        { gbpReviewCount: 604, gbpAverageRating: 4.8 },
-        { referringDomainsTotal: 5, toxicDomainCount: 5 },
-        { referringDomainsTotal: 10, toxicDomainCount: 100 },
-      ];
-      for (let pct = 0; pct <= 100; pct += 10) {
-        const baseline = score(pct);
-        for (const d of domainCases) {
-          expect(score(pct, null, d)).toBeGreaterThanOrEqual(baseline);
-        }
-      }
-    });
-
-    it('is monotonic in each individual page signal', () => {
-      const grow = (k: keyof OffPageSignals, values: number[]) => {
-        let prev = -Infinity;
-        for (const v of values) {
-          const s = calculatePageSignalPoints({ [k]: v } as OffPageSignals);
-          expect(s).toBeGreaterThanOrEqual(prev);
-          prev = s;
-        }
-      };
-      grow('backlinkCount', [0, 1, 5, 6, 19, 20, 100]);
-      grow('referringDomains', [0, 1, 3, 4, 9, 10, 500]);
-      grow('pageAuthority', [0, 10, 50, 99, 100]);
-      grow('prMentions', [0, 1, 2, 3, 10]);
-      grow('socialShares', [0, 1, 9, 10, 49, 50, 1000]);
-      grow('searchConsoleCtr', [0, 1, 2, 4, 5, 30]);
-    });
+    }
   });
 
-  describe('bounds', () => {
-    it('never leaves 0-100', () => {
-      const maxed: OffPageSignals = {
-        backlinkCount: 1e6,
-        referringDomains: 1e6,
-        pageAuthority: 100,
-        prMentions: 1e6,
-        socialShares: 1e6,
-        searchConsoleCtr: 100,
-      };
-      const maxedDomain: DomainSignals = {
-        gbpCompleteness: 100,
-        gbpReviewCount: 1e6,
-        gbpAverageRating: 5,
-        gbpPostsLast30d: 1000,
-        citationsTotal: 1000,
-        citationsNapConsistent: 1000,
-        referringDomainsTotal: 1e6,
-      };
-      expect(score(100, maxed, maxedDomain)).toBe(100);
-      expect(score(0, null, null)).toBe(0);
-      expect(score(0, maxed, maxedDomain)).toBeLessThanOrEqual(100);
-    });
-
-    it('clamps out-of-range inputs rather than inflating the score', () => {
-      // Negative values must not subtract from the page signal pool.
-      expect(calculatePageSignalPoints({ pageAuthority: -50 })).toBeGreaterThanOrEqual(0);
-      expect(calculatePageSignalPoints({ prMentions: -10 })).toBeGreaterThanOrEqual(0);
-      expect(calculateDomainSignalPoints({ gbpCompleteness: 500 })).toBeLessThanOrEqual(
-        DOMAIN_SIGNAL_MAX,
-      );
-    });
-
-    it('respects the declared sub-score ceilings', () => {
-      expect(PAGE_SIGNAL_MAX + DOMAIN_SIGNAL_MAX).toBe(OFF_PAGE_MAX);
-      expect(ON_PAGE_BASE_MAX + OFF_PAGE_MAX).toBe(100);
-      expect(
-        calculatePageSignalPoints({
-          backlinkCount: 1e6,
-          referringDomains: 1e6,
-          pageAuthority: 100,
-          prMentions: 1e6,
-          socialShares: 1e6,
-          searchConsoleCtr: 100,
-        }),
-      ).toBeLessThanOrEqual(PAGE_SIGNAL_MAX);
-    });
+  it('values referring domains over raw backlinks and caps authority', () => {
+    expect(authorityPoints({ referringDomains: 10 })).toBeGreaterThan(authorityPoints({ backlinkCount: 10 }));
+    expect(authorityPoints({ referringDomains: 1e9, backlinkCount: 1e9 }, { referringDomainsTotal: 1e9 })).toBe(AUTHORITY_MAX);
+    expect(authorityPoints({ referringDomains: -5 })).toBe(0);
   });
 
-  describe('domain signals', () => {
-    it('rewards the assets this operator actually has', () => {
-      // Verified GBP: 4.8 stars from 604 reviews, Srinagar address since 2013.
-      const real: DomainSignals = {
-        gbpCompleteness: 90,
-        gbpReviewCount: 604,
-        gbpAverageRating: 4.8,
-        gbpPostsLast30d: 4,
-        citationsTotal: 30,
-        citationsNapConsistent: 28,
-        referringDomainsTotal: 25,
-      };
-      const pts = calculateDomainSignalPoints(real);
-      expect(pts).toBeGreaterThan(3);
-      expect(pts).toBeLessThanOrEqual(DOMAIN_SIGNAL_MAX);
-    });
-
-    it('values citation consistency as a ratio, not a raw count', () => {
-      const consistent = calculateDomainSignalPoints({
-        citationsTotal: 20,
-        citationsNapConsistent: 20,
-      });
-      const sloppy = calculateDomainSignalPoints({
-        citationsTotal: 100,
-        citationsNapConsistent: 20,
-      });
-      // 20 listings that agree beat 100 that contradict each other.
-      expect(consistent).toBeGreaterThan(sloppy);
-    });
-
-    it('weights review quality alongside volume', () => {
-      const good = calculateDomainSignalPoints({ gbpReviewCount: 300, gbpAverageRating: 4.8 });
-      const poor = calculateDomainSignalPoints({ gbpReviewCount: 300, gbpAverageRating: 3.1 });
-      expect(good).toBeGreaterThan(poor);
-    });
-
-    it('costs the bonus for a spammy profile without going negative', () => {
-      const clean = calculateDomainSignalPoints({ referringDomainsTotal: 50 });
-      const toxic = calculateDomainSignalPoints({
-        referringDomainsTotal: 50,
-        toxicDomainCount: 45,
-      });
-      expect(toxic).toBeLessThan(clean);
-      expect(toxic).toBeGreaterThanOrEqual(0);
-    });
-
-    it('applies equally to every page, so it lifts the whole site', () => {
-      const d: DomainSignals = { gbpReviewCount: 604, gbpAverageRating: 4.8 };
-      const liftA = score(88, null, d) - score(88);
-      const liftB = score(62, null, d) - score(62);
-      expect(liftA).toBe(liftB);
-    });
+  it('gives no points for metrics Google does not use', () => {
+    const tracked: OffPageSignals = { pageAuthority: 90, socialShares: 5000, prMentions: 20, searchConsoleCtr: 12 };
+    const domain: DomainSignals = { toxicDomainCount: 400, gbpReviewCount: 600, gbpAverageRating: 4.8 };
+    expect(authorityPoints(tracked, domain)).toBe(0);
   });
 
-  describe('reported breakdown', () => {
-    it('separates page and domain contributions', () => {
-      const r = calculateCompositeScore(
-        checksFor(88),
-        { backlinkCount: 25, referringDomains: 12, pageAuthority: 45 },
-        undefined,
-        { gbpReviewCount: 604, gbpAverageRating: 4.8, gbpCompleteness: 90 },
-      );
-      expect(r.pageSignalScore).toBeGreaterThan(0);
-      expect(r.domainSignalScore).toBeGreaterThan(0);
-      expect(r.hasOffPageData).toBe(true);
-      expect(r.hasDomainData).toBe(true);
-      expect(r.onPageScore).toBe(88);
-    });
+  it('stays within 0-100', () => {
+    const maxed = computeHealthScore([check()], { referringDomains: 1e9, backlinkCount: 1e9 }, { referringDomainsTotal: 1e9 });
+    expect(maxed.finalScore).toBe(100);
+    expect(computeHealthScore([check({ severity: 'fail' })]).finalScore).toBe(0);
+    expect(computeHealthScore([]).finalScore).toBe(0);
+  });
 
-    it('reports no off-page data when none is supplied', () => {
-      const r = calculateCompositeScore(checksFor(88));
-      expect(r.hasOffPageData).toBe(false);
-      expect(r.hasDomainData).toBe(false);
-      expect(r.offPageScore).toBe(0);
-      // 88% of the 85-point base.
-      expect(r.finalScore).toBe(Math.round(0.88 * ON_PAGE_BASE_MAX));
+  it('breaks points down by category', () => {
+    const r = computeHealthScore([
+      check({ category: 'indexing', weight: 8, severity: 'pass' }),
+      check({ category: 'links', weight: 4, severity: 'warn' }),
+    ]);
+    expect(r.categories.indexing).toEqual({ earned: 8, possible: 8, notMeasured: 0 });
+    expect(r.categories.links).toEqual({ earned: 2, possible: 4, notMeasured: 0 });
+    expect(r.basePercent).toBe(83);
+  });
+});
+
+describe('local score', () => {
+  it('is null until something is recorded', () => {
+    expect(computeLocalScore(null)).toEqual({ score: null, coverage: 0, components: [] });
+    expect(computeLocalScore({ referringDomainsTotal: 30 }).score).toBeNull();
+  });
+
+  it('rewards the profile this operator actually has', () => {
+    const r = computeLocalScore({
+      gbpReviewCount: 604,
+      gbpAverageRating: 4.8,
+      gbpCompleteness: 90,
+      gbpPostsLast30d: 4,
+      citationsTotal: 30,
+      citationsNapConsistent: 28,
     });
+    expect(r.coverage).toBe(1);
+    expect(r.score!).toBeGreaterThan(85);
+  });
+
+  it('scores only the components that have data', () => {
+    const r = computeLocalScore({ gbpAverageRating: 4.8 });
+    expect(r.components.map((c) => c.key)).toEqual(['rating']);
+    expect(r.score).toBe(100);
+    expect(r.coverage).toBe(0.2);
+  });
+
+  it('values citation consistency as a ratio, not a count', () => {
+    const consistent = computeLocalScore({ citationsTotal: 20, citationsNapConsistent: 20 }).score!;
+    const sloppy = computeLocalScore({ citationsTotal: 100, citationsNapConsistent: 20 }).score!;
+    expect(consistent).toBeGreaterThan(sloppy);
+  });
+
+  it('weights rating quality alongside volume', () => {
+    const good = computeLocalScore({ gbpReviewCount: 300, gbpAverageRating: 4.8 }).score!;
+    const poor = computeLocalScore({ gbpReviewCount: 300, gbpAverageRating: 3.1 }).score!;
+    expect(good).toBeGreaterThan(poor);
   });
 });

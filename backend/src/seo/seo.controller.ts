@@ -11,6 +11,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { SeoService } from './seo.service';
+import { SeoAuditService } from './seo-audit.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
 import { UpdateOffPageDto } from './dto/update-offpage.dto';
@@ -28,14 +29,16 @@ const SEO_WRITE: Role[] = [Role.SUPER_ADMIN, Role.OWNER, Role.MARKETING];
 export class SeoController {
   constructor(
     private readonly seo: SeoService,
+    private readonly audits: SeoAuditService,
     private readonly searchConsole: SearchConsoleService,
     private readonly insights: SearchInsightsService,
   ) {}
 
+  /** Start a full audit of every active site. Returns immediately; poll each site's status. */
   @Roles(...SEO_WRITE)
   @Post('refresh-all')
   refreshAll() {
-    return this.seo.refreshAll();
+    return this.audits.startAll();
   }
 
   @Roles(...INTERNAL_STAFF)
@@ -62,6 +65,13 @@ export class SeoController {
     return this.seo.latestAudit(id);
   }
 
+  /** Progress of the running or most recent full audit, or idle when none has run since start-up. */
+  @Roles(...INTERNAL_STAFF)
+  @Get('sites/:id/audit/status')
+  auditStatus(@Param('id') id: string) {
+    return this.audits.status(id) ?? { state: 'idle' };
+  }
+
   @Roles(...INTERNAL_STAFF)
   @Get('sites/:id/rankings')
   async getPageRankings(@Param('id') id: string) {
@@ -83,17 +93,14 @@ export class SeoController {
     return this.seo.updateOffPage(id, dto);
   }
 
-  /** Site-wide off-page signals: GBP, reviews, citations, referring domains. */
+  /** Site-wide signals: referring domains, Business Profile, reviews, citations. */
   @Roles(...INTERNAL_STAFF)
   @Get('sites/:id/domain-signals')
   getDomainSignals(@Param('id') id: string) {
     return this.seo.getDomainSignals(id);
   }
 
-  /**
-   * Update the site-wide signals. Rescores every audited page, since these
-   * apply to the whole domain rather than one URL.
-   */
+  /** Update the site-wide signals and rescore pages; referring domains feed page authority. */
   @Roles(...SEO_WRITE)
   @Put('sites/:id/domain-signals')
   updateDomainSignals(
@@ -109,7 +116,7 @@ export class SeoController {
     @Param('id') id: string,
     @Body() body: { url: string; keyword?: string },
   ) {
-    return this.seo.auditSinglePage(id, body.url, body.keyword);
+    return this.audits.auditPage(id, body.url, body.keyword);
   }
 
   @Roles(...INTERNAL_STAFF)
@@ -118,10 +125,11 @@ export class SeoController {
     return this.seo.getHistory(id);
   }
 
+  /** Start a full audit in the background. Returns the run status to poll. */
   @Roles(...SEO_WRITE)
   @Post('sites/:id/audit')
   runAudit(@Param('id') id: string) {
-    return this.seo.runAudit(id);
+    return this.audits.start(id);
   }
 
   // ---- Google Search Console ------------------------------------------------
@@ -135,7 +143,8 @@ export class SeoController {
 
   /**
    * Pull performance data into SeoSearchAnalytics and write page CTR back to
-   * SeoOffPage. Idempotent: re-running a window updates rather than duplicates.
+   * SeoOffPage for display. Idempotent: re-running a window updates rather than
+   * duplicates.
    *
    * Throttled because this fans out to a rate-limited third-party API with a
    * 50,000 row per day cap.

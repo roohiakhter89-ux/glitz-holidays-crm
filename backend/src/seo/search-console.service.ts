@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { searchconsole, type searchconsole_v1 } from '@googleapis/searchconsole';
 import { PrismaService } from '../prisma/prisma.service';
 import { decryptSecret } from '../common/crypto';
-import { SeoService } from './seo.service';
 import { SearchInsightsService } from './search-insights.service';
 import {
   MAX_ROW_LIMIT,
@@ -59,8 +58,6 @@ export interface SyncResult {
   totalImpressions: number;
   /** Page-level CTR rows written back to SeoOffPage for scoring. */
   offPageRowsUpdated: number;
-  /** Number of latest page audit scores recomputed and updated. */
-  rescoredAudits: number;
   /** Site, page, device and country totals stored (pulls without the query dimension). */
   dimensionRows: number;
 }
@@ -71,7 +68,6 @@ export class SearchConsoleService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly seo: SeoService,
     private readonly insights: SearchInsightsService,
   ) {}
 
@@ -209,12 +205,12 @@ export class SearchConsoleService {
 
   /**
    * Pull a window into SeoSearchAnalytics, then write page-level CTR back to
-   * SeoOffPage so the existing score picks it up.
+   * SeoOffPage so it shows beside each page.
    *
-   * That write-back is the point of the integration: searchConsoleCtr already
-   * feeds calculatePageSignalPoints, and until now it could only be typed in
-   * by hand. Only the CTR field is touched, so backlink counts an operator
-   * entered are left alone.
+   * CTR is reported, not scored: Google does not document it as a ranking
+   * signal, and the page health score only uses what Google does document.
+   * Only the CTR field is touched, so backlink counts an operator entered are
+   * left alone.
    */
   async sync(
     siteId: string,
@@ -325,16 +321,12 @@ export class SearchConsoleService {
     const rollups = rollupByPage(rows);
     const offPageRowsUpdated = await this.writeBackCtr(siteId, rollups);
 
-    // Rescore all page audits on this site so the newly synced CTR data
-    // immediately updates leaderboard scores.
-    const rescoredAudits = await this.seo.rescoreAllPages(siteId);
     this.insights.invalidate(siteId);
 
     this.logger.log(
       `Search Console sync ${from}..${to} property=${property}: ${rows.length} rows ` +
         `(${created} new, ${updated} updated), ${rollups.length} pages, ` +
-        `${totalClicks} clicks / ${totalImpressions} impressions, ` +
-        `${rescoredAudits} audits rescored`,
+        `${totalClicks} clicks / ${totalImpressions} impressions`,
     );
 
     return {
@@ -348,7 +340,6 @@ export class SearchConsoleService {
       totalClicks,
       totalImpressions,
       offPageRowsUpdated,
-      rescoredAudits,
       dimensionRows,
     };
   }
