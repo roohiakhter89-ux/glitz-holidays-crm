@@ -338,6 +338,73 @@ async function probeGoogleAds(c: any): Promise<ProbeResult> {
   }
 }
 
+
+async function probeSearchConsole(c: any): Promise<ProbeResult> {
+  for (const k of ['clientId', 'clientSecret', 'refreshToken']) {
+    if (!c[k]) return { ok: false, message: `${k} is required.` };
+  }
+
+  // Step 1 - can the refresh token still mint an access token?
+  const tokenRes = await safeFetch('https://www.googleapis.com/oauth2/v3/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: c.clientId,
+      client_secret: c.clientSecret,
+      refresh_token: c.refreshToken,
+    }).toString(),
+  });
+  if (!isResponse(tokenRes)) return { ok: false, message: `Network: ${tokenRes.error}` };
+  if (!tokenRes.ok) {
+    return { ok: false, message: `OAuth refused the refresh token: ${await readTextSafe(tokenRes)}` };
+  }
+
+  let accessToken = '';
+  try {
+    accessToken = (await tokenRes.json()).access_token ?? '';
+  } catch {
+    return { ok: false, message: 'OAuth response was not JSON.' };
+  }
+  if (!accessToken) return { ok: false, message: 'OAuth response carried no access_token.' };
+
+  // Step 2 - does the token actually reach a Search Console property? Listing
+  // sites is the cheapest authenticated call and it also catches the most
+  // common misconfiguration: correct credentials, wrong property string.
+  const r = await safeFetch('https://www.googleapis.com/webmasters/v3/sites', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }, 12000);
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (!r.ok) {
+    return { ok: false, message: `Search Console API HTTP ${r.status}: ${await readTextSafe(r)}` };
+  }
+
+  try {
+    const data = await r.json();
+    const entries: any[] = data.siteEntry ?? [];
+    const urls: string[] = entries.map((e) => e.siteUrl);
+    if (urls.length === 0) {
+      return {
+        ok: false,
+        message: 'Credentials valid, but this Google account has no Search Console properties.',
+      };
+    }
+    const wanted = String(c.siteUrl ?? '').trim();
+    if (wanted && !urls.includes(wanted)) {
+      return {
+        ok: false,
+        message: `Authenticated, but "${wanted}" is not in this account. Available: ${urls.slice(0, 4).join(', ')}`,
+      };
+    }
+    return {
+      ok: true,
+      message: `Search Console verified - ${urls.length} propertie(s): ${urls.slice(0, 3).join(', ')}${urls.length > 3 ? '...' : ''}`,
+    };
+  } catch {
+    return { ok: true, message: 'Search Console credentials verified.' };
+  }
+}
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 type Probe = (creds: any) => Promise<ProbeResult>;
@@ -361,6 +428,7 @@ const PROBES: Record<string, Probe> = {
   huggingface: probeHuggingFace,
 
   google_ads: probeGoogleAds,
+  google_search_console: probeSearchConsole,
   meta_ads: probeMeta,
   meta_page: probeMeta,
   whatsapp_cloud: probeWhatsAppCloud,

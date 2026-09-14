@@ -208,6 +208,17 @@ const ads: ProviderSpec[] = [
     hasTest: true,
   },
   {
+    id: 'google_search_console', label: 'Google Search Console', category: 'ADS',
+    docsUrl: 'https://developers.google.com/webmaster-tools/v1/prereqs',
+    fields: [
+      { key: 'clientId', label: 'OAuth Client ID', type: 'text', required: true },
+      { key: 'clientSecret', label: 'OAuth Client Secret', type: 'password', required: true },
+      { key: 'refreshToken', label: 'Refresh Token', type: 'password', required: true, help: 'Needs the webmasters.readonly scope.' },
+      { key: 'siteUrl', label: 'Property', type: 'text', required: true, placeholder: 'sc-domain:glitz-holidays.in', help: 'Domain property (sc-domain:example.com) or URL-prefix property (https://example.com/). These are different properties with different data.' },
+    ],
+    hasTest: true,
+  },
+  {
     id: 'meta_ads', label: 'Meta Ads', category: 'ADS',
     docsUrl: 'https://developers.facebook.com/docs/marketing-api/',
     fields: [

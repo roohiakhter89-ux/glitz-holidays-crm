@@ -968,6 +968,32 @@ export interface SeoDomainSignalsData {
   rescoredPages?: number;
 }
 
+/** One query ranking just off page one, from stored Search Console data. */
+export interface SeoStrikingDistanceRow {
+  page: string;
+  query: string;
+  clicks: number;
+  impressions: number;
+  /** PERCENT, 0-100. */
+  ctr: number;
+  /** Average position. Lower is better. */
+  position: number;
+}
+
+export interface SeoSearchConsoleSyncResult {
+  property: string;
+  from: string;
+  to: string;
+  rowsFetched: number;
+  created: number;
+  updated: number;
+  pagesTouched: number;
+  totalClicks: number;
+  totalImpressions: number;
+  /** Page CTR values written back into SeoOffPage for scoring. */
+  offPageRowsUpdated: number;
+}
+
 export interface SeoRankedPage {
   url: string;
   path: string;

@@ -450,9 +450,57 @@ model SeoSite {
   audits SeoAudit[]
   offPageScores SeoOffPage[]
   domainSignals SeoDomainSignals?
+  searchAnalytics SeoSearchAnalytics[]
 
   @@index([isActive])
 }
+
+/// Google Search Console performance data at date x page x query grain.
+///
+/// The Ads search-terms report told us what to BUILD. This tells us whether it
+/// worked: which of the 299 pages actually rank, for what, and how close to
+/// page one. Positions 11-20 with real impressions are the cheapest wins on the
+/// site, because the page already ranks and usually only needs a title rewrite
+/// or an internal link.
+///
+/// Rows are immutable facts about a past day, so a re-sync of the same window
+/// updates in place rather than appending. Search Console does restate recent
+/// days, which is why the sync deliberately re-pulls a window it has seen.
+model SeoSearchAnalytics {
+  id     String  @id @default(cuid())
+  siteId String
+  site   SeoSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  /// Midnight UTC of the reported day. Search Console reports in Pacific Time;
+  /// the date string is stored as given rather than shifted, so this is the
+  /// day as Google labelled it.
+  date  DateTime
+  /// Full page URL exactly as Search Console reports it.
+  page  String
+  /// The search query. Empty string for an anonymised query, which Google
+  /// withholds for rare terms; those rows still carry real impressions.
+  query String
+
+  clicks      Int   @default(0)
+  impressions Int   @default(0)
+  /// PERCENT, 0-100. The API returns a 0-1.0 fraction; storing that raw would
+  /// make an 8% CTR read as 0.08 and score zero in calculatePageSignalPoints.
+  ctr         Float @default(0)
+  /// Average position. Lower is better.
+  position    Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Natural key. All four columns are NOT NULL, so unlike AdSpend's key this
+  /// one actually dedupes: Postgres treats NULLs as distinct, and a nullable
+  /// component would make every re-sync insert duplicates.
+  @@unique([siteId, date, page, query], map: "SeoSearchAnalytics_natural_key")
+  @@index([siteId, date])
+  @@index([siteId, page])
+  @@index([siteId, position])
+}
+
 /// Site-wide off-page signals. One row per site.
 ///
 /// SeoOffPage is keyed (siteId, url) and holds PER-PAGE metrics. Google

@@ -42,6 +42,8 @@ import {
   type SeoRankingsResponse,
   type SeoOffPageData,
   type SeoDomainSignalsData,
+  type SeoStrikingDistanceRow,
+  type SeoSearchConsoleSyncResult,
   type MediaAssetRow,
   type PageManifestItem,
 } from '@/lib/api';
@@ -487,6 +489,13 @@ export default function SeoPage() {
             />
           </div>
           <div className="space-y-4">
+            <SearchConsolePanel
+              siteId={selectedSiteId || sites[0]?.id || ''}
+              onSynced={(summary) => {
+                if (selectedSiteId) loadRankings(selectedSiteId);
+                notifySuccess(summary);
+              }}
+            />
             <DomainSignalsPanel
               siteId={selectedSiteId || sites[0]?.id || ''}
               onSaved={(n) => {
@@ -1973,6 +1982,149 @@ function DomainSignalsPanel({
               </Button>
             </div>
           </div>
+        )}
+      </PanelBody>
+    </Panel>
+  );
+}
+
+/**
+ * Google Search Console: sync control plus the striking-distance list.
+ *
+ * The Ads search-terms report told us what to build. This shows whether it
+ * worked. Positions 11-20 with real impressions are the cheapest wins on the
+ * site: the page already ranks, so a title rewrite or one internal link often
+ * moves it, rather than needing a new page.
+ */
+function SearchConsolePanel({
+  siteId,
+  onSynced,
+}: {
+  siteId: string;
+  onSynced: (summary: string) => void;
+}) {
+  const [rows, setRows] = useState<SeoStrikingDistanceRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!siteId) return;
+    setLoading(true);
+    try {
+      const res = await api.get<SeoStrikingDistanceRow[]>(
+        `/seo/sites/${siteId}/search-console/striking-distance?limit=25`,
+      );
+      setRows(res);
+    } catch {
+      // Nothing synced yet is the normal first state, not an error.
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [siteId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function sync() {
+    if (!siteId) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      const r = await api.post<SeoSearchConsoleSyncResult>(
+        `/seo/sites/${siteId}/search-console/sync`,
+        {},
+      );
+      onSynced(
+        r.rowsFetched === 0
+          ? `No Search Console data for ${r.from} to ${r.to}.`
+          : `Synced ${r.rowsFetched.toLocaleString()} rows across ${r.pagesTouched} pages. ` +
+              `${r.totalClicks.toLocaleString()} clicks, ` +
+              `${r.totalImpressions.toLocaleString()} impressions. ` +
+              `${r.offPageRowsUpdated} CTR values written back to scoring.`,
+      );
+      await load();
+    } catch (e) {
+      setError(
+        e instanceof ApiError
+          ? e.message
+          : 'Could not reach Search Console. Check the integration under Settings.',
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <Panel>
+      <PanelHeader className="flex items-center justify-between">
+        <PanelTitle>Search Console</PanelTitle>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-7"
+          onClick={sync}
+          disabled={syncing || !siteId}
+        >
+          <RefreshCw
+            className={`size-3.5 ${syncing ? 'animate-spin' : ''}`}
+            strokeWidth={1.75}
+          />
+          {syncing ? 'Syncing...' : 'Sync'}
+        </Button>
+      </PanelHeader>
+
+      <PanelBody>
+        <p className="mb-3 text-[12px] leading-relaxed text-ink-400">
+          Queries ranking 11 to 20. Already ranking, one nudge off page one.
+        </p>
+
+        {error && (
+          <p role="alert" className="mb-3 text-[12px] text-loss-400">
+            {error}
+          </p>
+        )}
+
+        {loading && <p className="text-[13px] text-ink-500">Loading...</p>}
+
+        {!loading && rows.length === 0 && (
+          <p className="text-[13px] leading-relaxed text-ink-500">
+            Nothing synced yet. Connect Google Search Console under Settings, then
+            press Sync. Data lags about three days.
+          </p>
+        )}
+
+        {!loading && rows.length > 0 && (
+          <ul className="max-h-[320px] divide-y divide-ink-800/60 overflow-y-auto">
+            {rows.map((r) => (
+              <li key={`${r.page}|${r.query}`} className="py-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[13px] text-ink-100">{r.query}</span>
+                  <span
+                    className="tabular shrink-0 text-[12px] font-medium text-warn-400"
+                    title="Average position"
+                  >
+                    #{r.position.toFixed(1)}
+                  </span>
+                </div>
+                <div className="tabular mt-0.5 flex items-center gap-3 text-[11px] text-ink-500">
+                  <span>{r.impressions.toLocaleString()} impr</span>
+                  <span>{r.clicks} clicks</span>
+                  <span>{r.ctr.toFixed(2)}% CTR</span>
+                </div>
+                <a
+                  href={r.page}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 block truncate text-[11px] text-primary-400 hover:text-primary-300"
+                >
+                  {new URL(r.page).pathname}
+                </a>
+              </li>
+            ))}
+          </ul>
         )}
       </PanelBody>
     </Panel>
