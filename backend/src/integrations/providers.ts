@@ -233,6 +233,51 @@ const analytics: ProviderSpec[] = [
     ],
     hasTest: true,
   },
+  {
+    id: 'google_indexing', label: 'Google Indexing API', category: 'ANALYTICS',
+    docsUrl: 'https://developers.google.com/search/apis/indexing-api/v3/prereqs',
+    fields: [
+      { key: 'serviceAccountKey', label: 'Service Account JSON Key', type: 'textarea', required: true, placeholder: '{\n  "type": "service_account",\n  "client_email": "...",\n  "private_key": "..."\n}', help: 'Paste your Google Cloud Service Account key. Add its client_email as an Owner in Search Console to allow submitting URLs.' },
+    ],
+    hasTest: true,
+  },
+  {
+    id: 'google_pagespeed', label: 'Google PageSpeed Insights', category: 'ANALYTICS',
+    docsUrl: 'https://developers.google.com/speed/docs/insights/v5/get-started',
+    fields: [
+      { key: 'apiKey', label: 'PageSpeed API Key', type: 'password', required: true, placeholder: 'AIzaSy...', help: 'Free API key from Google Cloud Console to bypass anonymous rate limits (HTTP 429) during site audits.' },
+    ],
+    hasTest: true,
+  },
+  {
+    id: 'indexnow', label: 'IndexNow (Bing, Yandex, Seznam)', category: 'ANALYTICS',
+    docsUrl: 'https://www.indexnow.org/documentation',
+    fields: [
+      { key: 'host', label: 'Host Domain', type: 'text', required: true, placeholder: 'glitz-holidays.in', help: 'Your website domain name without protocol (e.g. glitz-holidays.in).' },
+      { key: 'apiKey', label: 'IndexNow API Key', type: 'text', required: true, placeholder: '8-128 hex characters', help: 'The key generated and placed at the root of your domain (e.g. https://glitz-holidays.in/<key>.txt).' },
+      { key: 'keyLocation', label: 'Key Location URL', type: 'text', placeholder: 'https://glitz-holidays.in/<key>.txt', help: 'Optional if stored at root. The public URL where search engines verify your key file.' },
+    ],
+    hasTest: true,
+  },
+  {
+    id: 'google_business_profile', label: 'Google Business Profile', category: 'ANALYTICS',
+    docsUrl: 'https://developers.google.com/my-business/content/basic-setup',
+    fields: [
+      { key: 'accountId', label: 'Account ID', type: 'text', required: true, placeholder: 'accounts/1234567890', help: 'Your Google Business Profile Account resource name.' },
+      { key: 'locationId', label: 'Location ID', type: 'text', required: true, placeholder: 'locations/9876543210', help: 'Your specific business location ID.' },
+      { key: 'accessToken', label: 'OAuth Access / Service Token', type: 'password', required: true, help: 'Access token with scope https://www.googleapis.com/auth/business.manage' },
+    ],
+    hasTest: true,
+  },
+  {
+    id: 'dataforseo', label: 'DataForSEO (SERP & Backlinks)', category: 'ANALYTICS',
+    docsUrl: 'https://dataforseo.com/apis',
+    fields: [
+      { key: 'login', label: 'API Login (Email)', type: 'text', required: true, placeholder: 'user@example.com', help: 'Your DataForSEO account login email.' },
+      { key: 'password', label: 'API Password / Key', type: 'password', required: true, help: 'Your DataForSEO API password or key.' },
+    ],
+    hasTest: true,
+  },
 ];
 
 // ── Social ──────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@
  * often the account/self lookup. We don't spend real tokens or money.
  */
 
+import { JWT } from 'google-auth-library';
 import { buildAuthClient, describeTokenError, resolveAuthConfig } from '../seo/search-console-auth';
 import { normalisePropertyUrl } from '../seo/search-console-mapping';
 
@@ -428,6 +429,107 @@ async function probeSearchConsole(c: any): Promise<ProbeResult> {
   };
 }
 
+async function probePageSpeed(c: any): Promise<ProbeResult> {
+  const key = String(c.apiKey ?? '').trim();
+  if (!key) return { ok: false, message: 'API key is required.' };
+  const r = await safeFetch(
+    `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=https://glitz-holidays.in&key=${encodeURIComponent(key)}&strategy=mobile&category=performance`,
+    { method: 'GET' },
+    15000,
+  );
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok) return { ok: true, message: 'Google PageSpeed Insights API key verified.' };
+  const text = await readTextSafe(r);
+  try {
+    const json = JSON.parse(text);
+    if (json?.error?.message) return { ok: false, message: `Google API error: ${json.error.message}` };
+  } catch {}
+  return { ok: false, message: `PageSpeed API HTTP ${r.status}: ${text}` };
+}
+
+async function probeGoogleIndexing(c: any): Promise<ProbeResult> {
+  const raw = String(c.serviceAccountKey ?? '').trim();
+  if (!raw) return { ok: false, message: 'Service account JSON key is empty.' };
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { ok: false, message: 'Service account key is not valid JSON.' };
+  }
+  if (!data?.client_email || !data?.private_key) {
+    return { ok: false, message: 'JSON key is missing client_email or private_key.' };
+  }
+  try {
+    const auth = new JWT({
+      email: data.client_email,
+      key: data.private_key,
+      scopes: ['https://www.googleapis.com/auth/indexing'],
+    });
+    const token = await auth.getAccessToken();
+    if (!token?.token) return { ok: false, message: 'Google returned no access token for Indexing API.' };
+    return {
+      ok: true,
+      message: `Google Indexing API authenticated as ${data.client_email}. Ready to submit URLs.`,
+    };
+  } catch (e: any) {
+    return { ok: false, message: `Authentication failed: ${e?.message ?? String(e)}` };
+  }
+}
+
+async function probeIndexNow(c: any): Promise<ProbeResult> {
+  const host = String(c.host ?? '').trim();
+  const apiKey = String(c.apiKey ?? '').trim();
+  if (!host) return { ok: false, message: 'Host domain is required.' };
+  if (!apiKey) return { ok: false, message: 'API key is required.' };
+  if (apiKey.length < 8 || apiKey.length > 128) {
+    return { ok: false, message: 'IndexNow key must be between 8 and 128 characters.' };
+  }
+  const r = await safeFetch(
+    'https://api.indexnow.org/indexnow',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        host,
+        key: apiKey,
+        keyLocation: c.keyLocation?.trim() || `https://${host}/${apiKey}.txt`,
+        urlList: [`https://${host}/`],
+      }),
+    },
+    10000,
+  );
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok || r.status === 202) {
+    return { ok: true, message: `IndexNow endpoint verified for host "${host}".` };
+  }
+  return { ok: false, message: `IndexNow HTTP ${r.status}: ${await readTextSafe(r)}` };
+}
+
+async function probeGoogleBusinessProfile(c: any): Promise<ProbeResult> {
+  const token = String(c.accessToken ?? '').trim();
+  if (!token) return { ok: false, message: 'Access token is required.' };
+  const r = await safeFetch(
+    'https://mybusinessbusinessinformation.googleapis.com/v1/accounts',
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok) return { ok: true, message: 'Google Business Profile access token verified.' };
+  return { ok: false, message: `Google Business Profile HTTP ${r.status}: ${await readTextSafe(r)}` };
+}
+
+async function probeDataForSEO(c: any): Promise<ProbeResult> {
+  const login = String(c.login ?? '').trim();
+  const password = String(c.password ?? '').trim();
+  if (!login || !password) return { ok: false, message: 'API login and password are required.' };
+  const auth = Buffer.from(`${login}:${password}`).toString('base64');
+  const r = await safeFetch('https://api.dataforseo.com/v3/appendix/user_data', {
+    headers: { Authorization: `Basic ${auth}` },
+  });
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok) return { ok: true, message: 'DataForSEO credentials verified successfully.' };
+  return { ok: false, message: `DataForSEO HTTP ${r.status}: ${await readTextSafe(r)}` };
+}
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 type Probe = (creds: any) => Promise<ProbeResult>;
@@ -452,6 +554,11 @@ const PROBES: Record<string, Probe> = {
 
   google_ads: probeGoogleAds,
   google_search_console: probeSearchConsole,
+  google_indexing: probeGoogleIndexing,
+  google_pagespeed: probePageSpeed,
+  indexnow: probeIndexNow,
+  google_business_profile: probeGoogleBusinessProfile,
+  dataforseo: probeDataForSEO,
   meta_ads: probeMeta,
   meta_page: probeMeta,
   whatsapp_cloud: probeWhatsAppCloud,

@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { decryptSecret } from '../common/crypto';
 import { AUDIT_VERSION, CheckResult } from './audit-types';
 import {
   CrawlTarget,
@@ -298,7 +299,7 @@ export class SeoAuditService {
     }
 
     const prev = previous.get(key) ?? null;
-    const apiKey = pageSpeedKey();
+    const apiKey = await this.resolvePageSpeedKey();
     let vitals: PageVitals | null = null;
     let vitalsNote: string | null = null;
     if (apiKey && facts) {
@@ -476,13 +477,32 @@ export class SeoAuditService {
     return !!v && hasAnyVital(v) && Date.now() - Date.parse(v.measuredAt) <= VITALS_MAX_AGE_MS;
   }
 
+  private async resolvePageSpeedKey(): Promise<string | null> {
+    const envKey = pageSpeedKey();
+    if (envKey) return envKey;
+    try {
+      const row = await this.prisma.integration.findFirst({
+        where: { provider: 'google_pagespeed', isActive: true },
+      });
+      if (row) {
+        const creds = JSON.parse(decryptSecret(row.credentials)) as Record<string, unknown>;
+        if (typeof creds.apiKey === 'string' && creds.apiKey.trim()) {
+          return creds.apiKey.trim();
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  }
+
   /**
    * PageSpeed Insights on the highest-priority pages. Every other page uses its
    * own reading from the last 28 days if there is one, then the origin's field
    * data. Stops early once the API reports its quota is used up.
    */
   private async measureVitals(pages: CrawledPage[], previous: Map<string, StoredAuditChecks>, status: AuditRunStatus) {
-    const apiKey = pageSpeedKey();
+    const apiKey = await this.resolvePageSpeedKey();
     const queue = psiPriority(pages, apiKey ? PSI_MAX_PAGES : 1);
     status.psiTotal = queue.length;
     status.psiDone = 0;
