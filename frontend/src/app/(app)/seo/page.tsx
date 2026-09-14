@@ -2088,7 +2088,9 @@ function SearchConsolePanel({
   }, [load]);
 
   async function sync() {
-    if (!siteId) return;
+    // Guarded here rather than by disabling the button, which fades it to 45%
+    // and reads as broken during a sync that can take a minute.
+    if (!siteId || syncing) return;
     setSyncing(true);
     setError(null);
     try {
@@ -2108,6 +2110,9 @@ function SearchConsolePanel({
               `${r.totalImpressions.toLocaleString()} impressions. ` +
               `${r.offPageRowsUpdated} CTR values written back to scoring${rescoredMsg}.`,
       );
+      // Release the button once the sync itself is done; the report reload
+      // below shows its own loading state.
+      setSyncing(false);
       await load();
     } catch (e) {
       setError(
@@ -2129,7 +2134,8 @@ function SearchConsolePanel({
           variant="secondary"
           className="h-7"
           onClick={sync}
-          disabled={syncing || !siteId}
+          disabled={!siteId}
+          aria-busy={syncing}
         >
           <RefreshCw
             className={`size-3.5 ${syncing ? 'animate-spin' : ''}`}

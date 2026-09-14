@@ -1034,6 +1034,8 @@ export interface SearchIssuePage {
   impressions: number;
   position: number;
   share: number;
+  tier?: number | null;
+  adsImpressions?: number | null;
 }
 
 export interface SearchIssue {
@@ -1068,6 +1070,8 @@ export interface SearchReport {
   windows: { current: { from: string; to: string }; previous: { from: string; to: string } };
   hasData: boolean;
   hasPrevious: boolean;
+  /** Earliest day in the loaded span with any impressions. */
+  dataFrom: string | null;
   lastSyncedAt?: string | null;
   overview: {
     current: SearchMetric;

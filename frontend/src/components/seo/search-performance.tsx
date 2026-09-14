@@ -8,6 +8,7 @@ import {
   ApiError,
   type SearchEntityRow,
   type SearchIssue,
+  type SearchIssuePage,
   type SearchIssueType,
   type SearchReport,
   type SearchSeverity,
@@ -131,6 +132,16 @@ export function SearchPerformance({
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<SearchIssueType | 'all'>('all');
   const [showAllIssues, setShowAllIssues] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  // Elapsed seconds while a sync runs, so a long sync visibly makes progress.
+  useEffect(() => {
+    if (!syncing) return;
+    const started = Date.now();
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [syncing]);
 
   const load = useCallback(async () => {
     if (!siteId) return;
@@ -150,7 +161,8 @@ export function SearchPerformance({
   }, [load]);
 
   async function sync() {
-    if (!siteId) return;
+    // Guarded here rather than by disabling the button during a sync.
+    if (!siteId || syncing) return;
     setSyncing(true);
     setError(null);
     try {
@@ -158,6 +170,9 @@ export function SearchPerformance({
       onSynced?.(
         `Synced ${fmtInt(r.rowsFetched)} query rows and ${fmtInt(r.dimensionRows ?? 0)} total rows for ${r.from} to ${r.to}.`,
       );
+      // Release the button once the sync itself is done; the report reload
+      // below shows its own loading state.
+      setSyncing(false);
       await load();
     } catch (e) {
       setError(
@@ -253,6 +268,8 @@ export function SearchPerformance({
               ? `${fmtDay(report.windows.current.from)} to ${fmtDay(report.windows.current.to)}, compared with the previous ${report.days} days`
               : 'Google Search Console'}
             {report && <span className="ml-2 text-ink-500">{syncedLabel(report.lastSyncedAt)}</span>}
+            {report?.dataFrom && <span className="ml-2 text-ink-500">data from {fmtDay(report.dataFrom)}</span>}
+            {!siteId && <span className="ml-2 text-warn-400">No site registered, so there is nothing to sync yet.</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -270,9 +287,21 @@ export function SearchPerformance({
               </button>
             ))}
           </div>
-          <Button size="sm" variant="secondary" onClick={sync} disabled={syncing || !siteId}>
+          {/*
+            Not disabled while syncing. The disabled style fades the button to
+            45% and blocks the pointer, which reads as a broken button during a
+            sync that can take a minute. Repeat clicks are ignored in sync().
+          */}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={sync}
+            disabled={!siteId}
+            aria-busy={syncing}
+            title={siteId ? 'Pull the latest Search Console data' : 'Register the site before syncing'}
+          >
             <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} strokeWidth={1.75} />
-            {syncing ? 'Syncing...' : 'Sync now'}
+            {syncing ? `Syncing ${elapsed}s` : 'Sync now'}
           </Button>
         </div>
       </div>
@@ -280,6 +309,24 @@ export function SearchPerformance({
       {error && (
         <p role="alert" className="rounded-md border border-loss-500/40 bg-loss-500/10 px-3 py-2 text-[13px] text-loss-400">
           {error}
+        </p>
+      )}
+
+      {syncing && (
+        <p
+          role="status"
+          className="rounded-md border border-signal-500/40 bg-signal-500/10 px-3 py-2 text-[13px] text-signal-500"
+        >
+          Pulling up to 56 days from Search Console and rebuilding the report ({elapsed}s). This can take a minute or
+          two; you can keep using the page.
+        </p>
+      )}
+
+      {report?.hasData && !report.hasPrevious && (
+        <p className="text-[12.5px] leading-relaxed text-ink-400">
+          Search Console has no data for the {report.days} days before this period
+          {report.dataFrom ? ` (data for this property starts ${fmtDay(report.dataFrom)})` : ''}, so changes against the
+          previous period are not shown yet. The 7d view compares sooner.
         </p>
       )}
 
@@ -472,7 +519,7 @@ function IssueItem({ issue }: { issue: SearchIssue }) {
         </a>
       )}
 
-      {issue.pages && issue.pages.length > 0 && (
+      {issue.pages && issue.pages.length > 0 && issue.type !== 'no_visibility' && (
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[420px] text-left text-[11.5px]">
             <thead>
@@ -507,6 +554,10 @@ function IssueItem({ issue }: { issue: SearchIssue }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {issue.type === 'no_visibility' && issue.pages && issue.pages.length > 0 && (
+        <VisibilityList pages={issue.pages} />
       )}
 
       <p className="mt-1.5 max-w-[80ch] text-[12.5px] leading-relaxed text-ink-300">{issue.action}</p>
@@ -688,5 +739,43 @@ function BrandSplit({ report }: { report: SearchReport }) {
         )}
       </PanelBody>
     </Panel>
+  );
+}
+
+/** Pages in the grouped visibility issue, highest tier and Ads demand first. */
+function VisibilityList({ pages }: { pages: SearchIssuePage[] }) {
+  const [limit, setLimit] = useState(12);
+  const remaining = pages.length - limit;
+
+  return (
+    <div className="mt-2">
+      <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        {pages.slice(0, limit).map((p) => (
+          <li key={p.path} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+            <a
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={p.path}
+              className="truncate text-primary-400 hover:text-primary-300"
+            >
+              {p.path}
+            </a>
+            <span className="tabular shrink-0 text-ink-500">
+              {p.tier !== null && p.tier !== undefined ? `T${p.tier}` : ''}
+              {p.adsImpressions ? ` · ${fmtInt(p.adsImpressions)} Ads impr` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {remaining > 0 && (
+        <button
+          onClick={() => setLimit((l) => l + 48)}
+          className="mt-1.5 text-[11.5px] font-medium text-primary-400 hover:text-primary-300"
+        >
+          Show {Math.min(48, remaining)} more ({remaining} left)
+        </button>
+      )}
+    </div>
   );
 }

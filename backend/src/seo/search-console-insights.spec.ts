@@ -130,6 +130,13 @@ describe('buildSearchReport: totals', () => {
     );
     expect(r.devices[0]).toMatchObject({ key: 'MOBILE', label: 'Mobile' });
   });
+
+  it('reports the first day that has data', () => {
+    const r = buildSearchReport(
+      input({ site: [d('2026-09-07', '', 0, 0, 0), d('2026-09-08', '', 1, 10, 5), d('2026-09-09', '', 2, 20, 5)] }),
+    );
+    expect(r.dataFrom).toBe('2026-09-08');
+  });
 });
 
 describe('buildSearchReport: issues', () => {
@@ -249,9 +256,20 @@ describe('buildSearchReport: issues', () => {
       }),
     );
     const nv = ofType(r, 'no_visibility');
-    expect(nv.map((i) => i.path).sort()).toEqual(['/guides/x', '/routes/dark']);
-    expect(nv.find((i) => i.path === '/routes/dark')?.severity).toBe('medium');
-    expect(nv.find((i) => i.path === '/guides/x')?.severity).toBe('low');
+    // One grouped issue, so a young domain's many unindexed pages don't bury everything else.
+    expect(nv).toHaveLength(1);
+    expect(nv[0].severity).toBe('medium');
+    expect(nv[0].pages?.map((p) => p.path)).toEqual(['/routes/dark', '/guides/x']);
+    expect(nv[0].impact).toBe(0);
+    // Each page still gets its own task, at its own severity.
+    expect(r.pageSummaries.find((x) => x.path === '/routes/dark')?.issues[0]).toMatchObject({
+      type: 'no_visibility',
+      severity: 'medium',
+    });
+    expect(r.pageSummaries.find((x) => x.path === '/guides/x')?.issues[0]).toMatchObject({
+      type: 'no_visibility',
+      severity: 'low',
+    });
   });
 
   it('does not judge visibility without the page-level pull', () => {
@@ -271,6 +289,19 @@ describe('buildSearchReport: issues', () => {
     const [issue] = ofType(r, 'off_target');
     expect(issue.path).toBe('/routes/delhi-to-srinagar');
     expect(issue.metrics.shownPath).toBe('/routes/delhi-to-kashmir');
+  });
+
+  it('keeps specific issues above the grouped visibility issue', () => {
+    const r = buildSearchReport(
+      input({
+        pages: [d(CUR, U('/routes/delhi-to-kashmir'), 3, 200, 7)],
+        queries: [q(CUR, '/routes/delhi-to-kashmir', 'delhi to srinagar', 3, 200, 7)],
+        manifest: [{ url: '/routes/delhi-to-srinagar', primary: 'Delhi to Srinagar', tier: 1 }],
+      }),
+    );
+    const types = r.issues.map((i) => i.type);
+    expect(types).toContain('no_visibility');
+    expect(types.indexOf('off_target')).toBeLessThan(types.indexOf('no_visibility'));
   });
 
   it('orders issues by severity, then impact', () => {

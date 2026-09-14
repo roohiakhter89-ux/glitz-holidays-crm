@@ -135,6 +135,10 @@ export interface IssuePage {
   position: number;
   /** PERCENT of the query's impressions that landed on this page. */
   share: number;
+  /** Planned-page tier, for the grouped visibility issue. */
+  tier?: number | null;
+  /** Google Ads impressions from the demand report, for prioritising. */
+  adsImpressions?: number | null;
 }
 
 export interface Issue {
@@ -188,6 +192,8 @@ export interface SearchReport {
   windows: { current: DateWindow; previous: DateWindow };
   hasData: boolean;
   hasPrevious: boolean;
+  /** Earliest day in the loaded span with any impressions, or null. */
+  dataFrom: string | null;
   lastSyncedAt?: string | null;
   overview: {
     current: Metric;
@@ -726,23 +732,41 @@ export function buildSearchReport(input: BuildInput): SearchReport {
   // ---- 7. planned pages with no visibility ---------------------------------
   // Needs the page-level pull: judged from query rows alone, a page that only
   // appears for anonymized queries would be wrongly reported as invisible.
+  //
+  // Reported as ONE grouped issue. On a young domain most planned pages have no
+  // impressions yet, and one issue per page buried every other finding under
+  // a hundred near-identical rows. Impact is 0 so specific issues of the same
+  // severity sort above it; each page still gets its own task in the rankings.
   if (pageCur.size > 0) {
-    for (const [path, mp] of manifestByPath) {
-      if ((pageCur.get(path)?.impressions ?? 0) > 0) continue;
-      const tier = mp.tier ?? 99;
+    const invisible = [...manifestByPath.entries()]
+      .filter(([path]) => (pageCur.get(path)?.impressions ?? 0) === 0)
+      .sort((a, b) => (a[1].tier ?? 99) - (b[1].tier ?? 99) || (b[1].impr ?? 0) - (a[1].impr ?? 0));
+    if (invisible.length > 0) {
+      const priority = invisible.filter(([, mp]) => (mp.tier ?? 99) <= 1).length;
       issues.push({
-        id: `no_visibility:${path}`,
+        id: 'no_visibility',
         type: 'no_visibility',
-        severity: tier <= 1 ? 'medium' : 'low',
-        title: `${path} has no search impressions`,
-        url: urlFor(path),
-        path,
-        query: mp.primary ?? null,
-        metrics: { tier: mp.tier ?? null, adsDemandImpressions: mp.impr ?? null },
+        severity: priority > 0 ? 'medium' : 'low',
+        title: `${invisible.length} of ${manifestByPath.size} planned pages have no search impressions`,
+        url: null,
+        path: null,
+        query: null,
+        pages: invisible.map(([path, mp]) => ({
+          url: urlFor(path),
+          path,
+          clicks: 0,
+          impressions: 0,
+          position: 0,
+          share: 0,
+          tier: mp.tier ?? null,
+          adsImpressions: mp.impr ?? null,
+        })),
+        metrics: { pages: invisible.length, plannedPages: manifestByPath.size, tier0or1: priority },
         action:
-          'Confirm the page is indexed with URL Inspection in Search Console and listed in the sitemap, ' +
-          'then add internal links to it from pages that already get search traffic.',
-        impact: mp.impr ?? 0,
+          'Work down the list from the top, which is ordered by tier and Ads demand: confirm each page is indexed ' +
+          'with URL Inspection in Search Console and listed in the sitemap, then add internal links to it from ' +
+          'pages that already get search traffic. On a new domain some of these simply have not been crawled yet.',
+        impact: 0,
       });
     }
   }
@@ -864,6 +888,15 @@ export function buildSearchReport(input: BuildInput): SearchReport {
           action: i.action,
         });
       }
+    } else if (i.type === 'no_visibility' && i.pages) {
+      for (const pg of i.pages) {
+        attach(pg.path, {
+          type: i.type,
+          severity: (pg.tier ?? 99) <= 1 ? 'medium' : 'low',
+          title: `${pg.path} has no search impressions`,
+          action: i.action,
+        });
+      }
     } else if (i.path) {
       attach(i.path, { type: i.type, severity: i.severity, title: i.title, action: i.action });
     }
@@ -888,12 +921,19 @@ export function buildSearchReport(input: BuildInput): SearchReport {
     };
   });
 
+  const dataFrom =
+    [...input.site, ...input.pages]
+      .filter((r) => r.impressions > 0)
+      .map((r) => r.date)
+      .sort()[0] ?? null;
+
   return {
     days,
     siteHost,
     windows,
     hasData,
     hasPrevious,
+    dataFrom,
     overview: {
       current: overviewCur,
       previous: overviewPrev,
