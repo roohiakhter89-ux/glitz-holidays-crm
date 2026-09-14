@@ -58,7 +58,7 @@ export default function B2bPartnersPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-ink-100">B2B Partners</h1>

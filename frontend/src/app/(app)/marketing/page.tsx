@@ -107,7 +107,7 @@ export default function MarketingDashboardPage() {
   }, [campaigns]);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

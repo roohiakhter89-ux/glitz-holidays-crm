@@ -118,7 +118,7 @@ export default function SocialStudioPage() {
   const monthName = new Date(calYear, calMonth - 1).toLocaleString('default', { month: 'long' });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -144,7 +144,7 @@ export default function NewSocialPostPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="text-ink-500 hover:text-ink-200 transition-colors">

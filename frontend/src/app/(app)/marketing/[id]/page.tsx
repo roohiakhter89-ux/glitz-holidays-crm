@@ -81,7 +81,7 @@ export default function CampaignDetailPage({
 
   if (loading && !campaign) {
     return (
-      <div className="py-24 text-center text-ink-500">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-24 text-center text-ink-500">
         <RefreshCw className="mx-auto size-6 animate-spin" />
         <p className="mt-2 text-[13px]">Loading campaign metrics...</p>
       </div>
@@ -90,7 +90,7 @@ export default function CampaignDetailPage({
 
   if (!campaign) {
     return (
-      <div className="py-24 text-center">
+      <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-24 text-center">
         <p className="text-ink-300">Campaign not found</p>
         <Link href="/marketing" className="mt-3 inline-block">
           <Button size="sm">Back to Marketing</Button>
@@ -123,7 +123,7 @@ export default function CampaignDetailPage({
   });
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 pb-12">
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">

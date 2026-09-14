@@ -24,7 +24,7 @@ export default function InvoicesDashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Invoices & Billing</h1>
         <p className="text-muted-foreground">Manage all GST invoices across leads.</p>
