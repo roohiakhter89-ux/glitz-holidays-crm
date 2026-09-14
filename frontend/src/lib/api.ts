@@ -945,6 +945,29 @@ export interface SeoOffPageData {
   updatedAt?: string;
 }
 
+/**
+ * Site-wide off-page signals. One row per site, unlike SeoOffPageData which is
+ * per-URL. GBP, reviews and citations belong to the domain, so these lift every
+ * page's score by the same amount.
+ */
+export interface SeoDomainSignalsData {
+  gbpCompleteness: number | null;
+  gbpReviewCount: number | null;
+  gbpAverageRating: number | null;
+  gbpPostsLast30d: number | null;
+  citationsTotal: number | null;
+  citationsNapConsistent: number | null;
+  brandMentionsLinked: number | null;
+  brandMentionsUnlinked: number | null;
+  referringDomainsTotal: number | null;
+  toxicDomainCount: number | null;
+  verifiedOn: string | null;
+  notes: string | null;
+  updatedAt?: string;
+  /** Returned by the update endpoint: how many page scores moved. */
+  rescoredPages?: number;
+}
+
 export interface SeoRankedPage {
   url: string;
   path: string;

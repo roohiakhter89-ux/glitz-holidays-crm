@@ -9,9 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
 import { UpdateOffPageDto } from './dto/update-offpage.dto';
+import { UpdateDomainSignalsDto } from './dto/update-domain-signals.dto';
 import {
   calculateCompositeScore,
   CheckResult,
+  DomainSignals,
   OffPageSignals,
   parseMeta,
   runChecks,
@@ -352,6 +354,102 @@ export class SeoService {
     };
   }
 
+  // ==========================================================================
+  // Site-wide domain signals
+  // ==========================================================================
+
+  /** One row per site, or null when nobody has filled it in yet. */
+  async getDomainSignals(siteId: string) {
+    return this.prisma.seoDomainSignals.findUnique({ where: { siteId } });
+  }
+
+  /**
+   * Upsert the site-wide signals, then rescore every audited page.
+   *
+   * Domain signals are identical for all pages, so a change here moves the
+   * whole site at once. Rescoring in a transaction keeps the leaderboard from
+   * showing a mix of old and new numbers mid-write.
+   */
+  async updateDomainSignals(siteId: string, dto: UpdateDomainSignalsDto) {
+    await this.findSite(siteId);
+
+    const data = {
+      gbpCompleteness: dto.gbpCompleteness,
+      gbpReviewCount: dto.gbpReviewCount,
+      gbpAverageRating: dto.gbpAverageRating,
+      gbpPostsLast30d: dto.gbpPostsLast30d,
+      citationsTotal: dto.citationsTotal,
+      citationsNapConsistent: dto.citationsNapConsistent,
+      brandMentionsLinked: dto.brandMentionsLinked,
+      brandMentionsUnlinked: dto.brandMentionsUnlinked,
+      referringDomainsTotal: dto.referringDomainsTotal,
+      toxicDomainCount: dto.toxicDomainCount,
+      verifiedOn: dto.verifiedOn ? new Date(dto.verifiedOn) : undefined,
+      notes: dto.notes,
+    };
+
+    const signals = await this.prisma.seoDomainSignals.upsert({
+      where: { siteId },
+      create: { siteId, ...data },
+      update: data,
+    });
+
+    const rescored = await this.rescoreAllPages(siteId, signals);
+    return { ...signals, rescoredPages: rescored };
+  }
+
+  /**
+   * Recompute the stored score on the latest audit of every page.
+   *
+   * Called after a domain-signal change. Only the newest audit per URL is
+   * touched: historic rows are a record of what the score was at the time and
+   * rewriting them would erase the trend the dashboard plots.
+   */
+  private async rescoreAllPages(
+    siteId: string,
+    domain: DomainSignals | null,
+  ): Promise<number> {
+    const audits = await this.prisma.seoAudit.findMany({
+      where: { siteId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const seen = new Set<string>();
+    const offPageRows = await this.prisma.seoOffPage.findMany({ where: { siteId } });
+    const offPageByUrl = new Map(offPageRows.map((r) => [r.url, r]));
+
+    let updated = 0;
+    for (const audit of audits) {
+      if (seen.has(audit.url)) continue;
+      seen.add(audit.url);
+      if (!audit.checks) continue;
+
+      const checks = (audit.checks as any).results as CheckResult[];
+      if (!Array.isArray(checks)) continue;
+
+      const composite = calculateCompositeScore(
+        checks,
+        offPageByUrl.get(audit.url) ?? null,
+        {
+          perf: audit.perfScore ?? undefined,
+          a11y: audit.a11yScore ?? undefined,
+          bp: audit.bpScore ?? undefined,
+          seo: audit.seoScore ?? undefined,
+        },
+        domain,
+      );
+
+      if (composite.finalScore !== audit.score) {
+        await this.prisma.seoAudit.update({
+          where: { id: audit.id },
+          data: { score: composite.finalScore },
+        });
+        updated++;
+      }
+    }
+    return updated;
+  }
+
   /**
    * Update off-page metrics for a specific page URL.
    * Recalculates the latest audit score if an audit exists.
@@ -405,7 +503,8 @@ export class SeoService {
         bp: latestAudit.bpScore ?? undefined,
         seo: latestAudit.seoScore ?? undefined,
       };
-      const composite = calculateCompositeScore(checks, offPage, pagespeed);
+      const domain = await this.getDomainSignals(siteId);
+      const composite = calculateCompositeScore(checks, offPage, pagespeed, domain);
       await this.prisma.seoAudit.update({
         where: { id: latestAudit.id },
         data: { score: composite.finalScore },
@@ -519,7 +618,8 @@ export class SeoService {
       where: { siteId_url: { siteId, url: urlStr } },
     });
 
-    const composite = calculateCompositeScore(checks, offPage, ps);
+    const domainSignals = await this.getDomainSignals(siteId);
+    const composite = calculateCompositeScore(checks, offPage, ps, domainSignals);
 
     const tasks = checks
       .filter((c) => c.task)

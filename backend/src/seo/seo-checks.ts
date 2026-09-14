@@ -27,6 +27,65 @@ export interface OffPageSignals {
   notes?: string | null;
 }
 
+/**
+ * Site-wide off-page signals. Distinct from OffPageSignals, which is per-URL.
+ *
+ * Google Business Profile completeness, review volume, citation consistency
+ * and site-level referring domains belong to the DOMAIN, not to any one page.
+ * Recording them per-URL would mean copying identical values across every page
+ * on the site, so they live on their own row keyed by site and lift every
+ * page's score equally, which is what a stronger domain actually does.
+ */
+export interface DomainSignals {
+  /** 0-100. How complete the GBP listing is (hours, categories, services, Q&A). */
+  gbpCompleteness?: number | null;
+  /** Total Google reviews on the profile. */
+  gbpReviewCount?: number | null;
+  /** 1.0 - 5.0. */
+  gbpAverageRating?: number | null;
+  /** GBP posts published in the trailing 30 days. Local prominence decays. */
+  gbpPostsLast30d?: number | null;
+  /** Directory and local listings carrying the business NAP. */
+  citationsTotal?: number | null;
+  /** Of those, how many match the GBP name/address/phone character for character. */
+  citationsNapConsistent?: number | null;
+  /** Brand mentions that already carry a link. */
+  brandMentionsLinked?: number | null;
+  /** Brand mentions with no link. These are the outreach queue. */
+  brandMentionsUnlinked?: number | null;
+  /** Unique referring domains across the whole site. */
+  referringDomainsTotal?: number | null;
+  /** Referring domains judged spammy. Costs part of the domain bonus. */
+  toxicDomainCount?: number | null;
+  /** When a human last checked these against the live sources. */
+  verifiedOn?: Date | string | null;
+  notes?: string | null;
+}
+
+// ============================================================================
+// Score composition
+// ============================================================================
+//
+// On-page is the base and off-page is HEADROOM ON TOP. The previous model
+// rebased on-page to 70% the moment any off-page row existed, so a page
+// scoring 88 on-page dropped to 70 when three honest backlinks were recorded,
+// and needed 27 of 30 off-page points merely to break even. Recording real
+// data made the number worse, which is why the table held zero rows.
+//
+// Under this split the base is fixed, every off-page component is clamped
+// non-negative, and the total is capped at 100. Entering data can therefore
+// only raise a score or leave it unchanged. That property is the whole point:
+// a measurement people are punished for entering does not get entered.
+
+/** On-page (blended with PageSpeed) scales into 0-85. */
+export const ON_PAGE_BASE_MAX = 85;
+/** Per-URL off-page signals add up to 9. */
+export const PAGE_SIGNAL_MAX = 9;
+/** Site-wide domain signals add up to 6. */
+export const DOMAIN_SIGNAL_MAX = 6;
+/** Combined off-page headroom. */
+export const OFF_PAGE_MAX = PAGE_SIGNAL_MAX + DOMAIN_SIGNAL_MAX;
+
 export interface ParsedMeta {
   title?: string;
   description?: string;
@@ -547,13 +606,136 @@ export function runChecks(
 }
 
 /**
- * Calculate full score breakdown blending On-Page (0-70 or 0-100 normalized)
- * and Off-Page signals (0-30).
+ * Per-URL off-page signals, scored out of PAGE_SIGNAL_MAX.
+ *
+ * The relative weighting between the six inputs is unchanged from the original
+ * 30-point scale; only the ceiling moved. Kept as a named export so the
+ * dashboard can show the sub-score on its own.
+ */
+export function calculatePageSignalPoints(offPage?: OffPageSignals | null): number {
+  if (!offPage) return 0;
+
+  // Same bands as before, on the original 0-30 scale.
+  let raw = 0;
+
+  const bl = offPage.backlinkCount ?? 0;
+  if (bl >= 20) raw += 8;
+  else if (bl >= 6) raw += 6;
+  else if (bl >= 1) raw += 3;
+
+  const rd = offPage.referringDomains ?? 0;
+  if (rd >= 10) raw += 7;
+  else if (rd >= 4) raw += 5;
+  else if (rd >= 1) raw += 3;
+
+  const pa = offPage.pageAuthority ?? 0;
+  raw += Math.min(5, (Math.max(0, pa) / 100) * 5);
+
+  const pr = offPage.prMentions ?? 0;
+  raw += Math.min(5, Math.max(0, pr) * 1.5);
+
+  const ss = offPage.socialShares ?? 0;
+  if (ss >= 50) raw += 3;
+  else if (ss >= 10) raw += 2;
+  else if (ss >= 1) raw += 1;
+
+  const ctr = offPage.searchConsoleCtr ?? 0;
+  if (ctr >= 5) raw += 2;
+  else if (ctr >= 2) raw += 1;
+
+  // Rescale 0-30 onto 0-PAGE_SIGNAL_MAX.
+  const scaled = (raw / 30) * PAGE_SIGNAL_MAX;
+  return Math.min(PAGE_SIGNAL_MAX, Math.max(0, scaled));
+}
+
+/**
+ * Site-wide domain signals, scored out of DOMAIN_SIGNAL_MAX.
+ *
+ * These are the components where an operator running trips from Srinagar since
+ * 2013 genuinely outranks a reseller: a real verified listing, real reviews,
+ * consistent citations. Identical for every page, so this lifts the whole site
+ * at once.
+ *
+ * Toxic domains subtract from the bonus but the result is clamped at zero, so
+ * filling this in can never drag a page below its no-data score. Spam should
+ * cost you the reward, not punish you for measuring it.
+ */
+export function calculateDomainSignalPoints(domain?: DomainSignals | null): number {
+  if (!domain) return 0;
+
+  let pts = 0;
+
+  // 1. GBP completeness and freshness (1.5). Local prominence decays without
+  //    activity, so a complete profile that has not posted in a month is worth
+  //    less than one that has.
+  const completeness = clamp01((domain.gbpCompleteness ?? 0) / 100);
+  pts += completeness * 1.0;
+  const posts = domain.gbpPostsLast30d ?? 0;
+  if (posts >= 4) pts += 0.5;
+  else if (posts >= 1) pts += 0.25;
+
+  // 2. Reviews (1.5). Volume and rating together: 500 reviews at 3.1 stars is
+  //    not the asset 500 at 4.8 is.
+  const reviews = domain.gbpReviewCount ?? 0;
+  const rating = domain.gbpAverageRating ?? 0;
+  let reviewPts = 0;
+  if (reviews >= 250) reviewPts = 1.0;
+  else if (reviews >= 50) reviewPts = 0.7;
+  else if (reviews >= 10) reviewPts = 0.4;
+  else if (reviews >= 1) reviewPts = 0.2;
+  if (rating >= 4.5) reviewPts += 0.5;
+  else if (rating >= 4.0) reviewPts += 0.3;
+  else if (rating >= 3.5) reviewPts += 0.1;
+  pts += Math.min(1.5, reviewPts);
+
+  // 3. Citation NAP consistency (1.5). The ratio matters more than the count:
+  //    inconsistent citations actively confuse local ranking, so 20 listings
+  //    that all agree beat 100 that do not.
+  const cTotal = domain.citationsTotal ?? 0;
+  const cConsistent = domain.citationsNapConsistent ?? 0;
+  if (cTotal > 0) {
+    const ratio = clamp01(cConsistent / cTotal);
+    const volume = cTotal >= 30 ? 1 : cTotal >= 10 ? 0.7 : 0.4;
+    pts += ratio * volume * 1.5;
+  }
+
+  // 4. Site-wide referring domains (1.5), log-scaled. The 10th referring
+  //    domain matters far more than the 200th.
+  const rd = Math.max(0, domain.referringDomainsTotal ?? 0);
+  if (rd > 0) {
+    pts += Math.min(1.5, (Math.log10(1 + rd) / Math.log10(101)) * 1.5);
+  }
+
+  // 5. Toxic domain drag, up to -1.5. Proportional to the share of the
+  //    backlink profile that is spam, not the raw count.
+  const toxic = Math.max(0, domain.toxicDomainCount ?? 0);
+  if (toxic > 0 && rd > 0) {
+    pts -= clamp01(toxic / rd) * 1.5;
+  } else if (toxic > 0) {
+    pts -= 0.5;
+  }
+
+  return Math.min(DOMAIN_SIGNAL_MAX, Math.max(0, pts));
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
+}
+
+/**
+ * Full score: on-page base out of ON_PAGE_BASE_MAX, plus off-page headroom.
+ *
+ *   final = onPage% * 0.85  +  pageSignals (0-9)  +  domainSignals (0-6)
+ *
+ * Capped at 100. Both off-page terms are non-negative, so the score is
+ * monotonic in the off-page data: adding a signal never lowers the total.
  */
 export function calculateCompositeScore(
   checks: CheckResult[],
   offPage?: OffPageSignals | null,
   pagespeed?: { perf?: number; a11y?: number; bp?: number; seo?: number },
+  domain?: DomainSignals | null,
 ) {
   // On-page points earned vs total possible weight
   const totalWeight = checks.reduce((sum, c) => sum + c.weight, 0);
@@ -572,59 +754,21 @@ export function calculateCompositeScore(
     }
   }
 
-  // Off-page signals (max 30 points)
-  let offPagePoints = 0;
-  let hasOffPageData = false;
+  const pageSignalScore = calculatePageSignalPoints(offPage);
+  const domainSignalScore = calculateDomainSignalPoints(domain);
+  const offPagePoints = pageSignalScore + domainSignalScore;
 
-  if (offPage) {
-    hasOffPageData = true;
-    // 1. Backlinks (8 pts): 0 backlinks = 0, 1-5 = 3, 6-20 = 6, 20+ = 8
-    const bl = offPage.backlinkCount ?? 0;
-    if (bl >= 20) offPagePoints += 8;
-    else if (bl >= 6) offPagePoints += 6;
-    else if (bl >= 1) offPagePoints += 3;
-
-    // 2. Referring Domains (7 pts): 0 = 0, 1-3 = 3, 4-10 = 5, 10+ = 7
-    const rd = offPage.referringDomains ?? 0;
-    if (rd >= 10) offPagePoints += 7;
-    else if (rd >= 4) offPagePoints += 5;
-    else if (rd >= 1) offPagePoints += 3;
-
-    // 3. Page Authority / URL Rating (5 pts): out of 100
-    const pa = offPage.pageAuthority ?? 0;
-    offPagePoints += Math.min(5, Math.round((pa / 100) * 5));
-
-    // 4. Press Releases & Media Mentions (5 pts): 1 pt per PR mention up to 5
-    const pr = offPage.prMentions ?? 0;
-    offPagePoints += Math.min(5, pr * 1.5);
-
-    // 5. Social Shares / Brand Signals (3 pts)
-    const ss = offPage.socialShares ?? 0;
-    if (ss >= 50) offPagePoints += 3;
-    else if (ss >= 10) offPagePoints += 2;
-    else if (ss >= 1) offPagePoints += 1;
-
-    // 6. GSC CTR (2 pts)
-    const ctr = offPage.searchConsoleCtr ?? 0;
-    if (ctr >= 5) offPagePoints += 2;
-    else if (ctr >= 2) offPagePoints += 1;
-  }
-
-  // Composite calculation:
-  // If off-page data exists: (On-Page / 100 * 70) + (Off-Page Points [0-30])
-  // If no off-page data: On-Page normalized out of 100
-  let finalScore: number;
-  if (hasOffPageData) {
-    finalScore = Math.round((onPageScore / 100) * 70 + offPagePoints);
-  } else {
-    finalScore = Math.round(onPageScore);
-  }
+  const base = (Math.min(100, Math.max(0, onPageScore)) / 100) * ON_PAGE_BASE_MAX;
+  const finalScore = Math.round(base + offPagePoints);
 
   return {
     finalScore: Math.min(100, Math.max(0, finalScore)),
     onPageScore: Math.round(onPageScore),
     offPageScore: Math.round(offPagePoints),
-    hasOffPageData,
+    pageSignalScore: Math.round(pageSignalScore * 10) / 10,
+    domainSignalScore: Math.round(domainSignalScore * 10) / 10,
+    hasOffPageData: !!offPage,
+    hasDomainData: !!domain,
     checks,
   };
 }

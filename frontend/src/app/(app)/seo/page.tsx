@@ -41,6 +41,7 @@ import {
   type SeoRankedPage,
   type SeoRankingsResponse,
   type SeoOffPageData,
+  type SeoDomainSignalsData,
   type MediaAssetRow,
   type PageManifestItem,
 } from '@/lib/api';
@@ -486,6 +487,17 @@ export default function SeoPage() {
             />
           </div>
           <div className="space-y-4">
+            <DomainSignalsPanel
+              siteId={selectedSiteId || sites[0]?.id || ''}
+              onSaved={(n) => {
+                if (selectedSiteId) loadRankings(selectedSiteId);
+                notifySuccess(
+                  n > 0
+                    ? `Domain signals saved. ${n} page score${n === 1 ? '' : 's'} updated.`
+                    : 'Domain signals saved.',
+                );
+              }}
+            />
             <TasksPanel audit={audit || { site: sites[0] || ({} as any), pages: [] }} />
             <ExternalIntegrations />
           </div>
@@ -1737,6 +1749,231 @@ function ExternalIntegrations() {
           <p className="text-[11px] text-ink-500">Automated Domain Rating & Backlink Sync</p>
           <Chip className="mt-2 border-signal-500/30 text-signal-500">Manual Entry Active</Chip>
         </div>
+      </PanelBody>
+    </Panel>
+  );
+}
+
+/**
+ * Site-wide off-page signals.
+ *
+ * Separate from the per-page off-page dialog because these belong to the
+ * domain: GBP completeness, review volume, citation consistency and site-level
+ * referring domains are identical for every URL, so they lift the whole site's
+ * scores at once rather than one page's.
+ *
+ * Ten optional numbers, filled in as they are verified. Nothing here is fetched
+ * automatically, so verifiedOn matters: a citation count from six months ago is
+ * worse than no number at all.
+ */
+const DOMAIN_SIGNAL_FIELDS: {
+  key: keyof SeoDomainSignalsData;
+  label: string;
+  hint?: string;
+  step?: string;
+}[] = [
+  { key: 'gbpCompleteness', label: 'GBP completeness %', hint: 'Hours, categories, services' },
+  { key: 'gbpReviewCount', label: 'Google reviews' },
+  { key: 'gbpAverageRating', label: 'Average rating', hint: '1.0 to 5.0', step: '0.1' },
+  { key: 'gbpPostsLast30d', label: 'GBP posts (30d)', hint: 'Prominence decays without activity' },
+  { key: 'citationsTotal', label: 'Citations total' },
+  { key: 'citationsNapConsistent', label: 'NAP-consistent', hint: 'Ratio matters more than count' },
+  { key: 'referringDomainsTotal', label: 'Referring domains', hint: 'Site-wide, not per page' },
+  { key: 'toxicDomainCount', label: 'Toxic domains', hint: 'Costs bonus, never below zero' },
+  { key: 'brandMentionsLinked', label: 'Mentions (linked)' },
+  { key: 'brandMentionsUnlinked', label: 'Mentions (unlinked)', hint: 'Your outreach queue' },
+];
+
+function DomainSignalsPanel({
+  siteId,
+  onSaved,
+}: {
+  siteId: string;
+  onSaved: (rescoredPages: number) => void;
+}) {
+  const [data, setData] = useState<SeoDomainSignalsData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    if (!siteId) return;
+    setLoading(true);
+    try {
+      const res = await api.get<SeoDomainSignalsData | null>(
+        `/seo/sites/${siteId}/domain-signals`,
+      );
+      setData(res);
+      if (res) {
+        const next: Record<string, string> = {};
+        for (const f of DOMAIN_SIGNAL_FIELDS) {
+          const v = res[f.key];
+          next[f.key as string] = v === null || v === undefined ? '' : String(v);
+        }
+        setForm(next);
+      }
+    } catch {
+      // A site with no row yet returns null, which is not an error worth showing.
+    } finally {
+      setLoading(false);
+    }
+  }, [siteId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save() {
+    if (!siteId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      // Send only what the operator actually filled in. An empty box stays
+      // absent rather than becoming a zero, which would score as a real
+      // measurement of "we have none of these".
+      const body: Record<string, unknown> = {};
+      for (const f of DOMAIN_SIGNAL_FIELDS) {
+        const raw = form[f.key as string];
+        if (raw !== undefined && raw !== '') body[f.key as string] = Number(raw);
+      }
+      body.verifiedOn = new Date().toISOString();
+
+      const res = await api.put<SeoDomainSignalsData>(
+        `/seo/sites/${siteId}/domain-signals`,
+        body,
+      );
+      setData(res);
+      setOpen(false);
+      onSaved(res.rescoredPages ?? 0);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not save domain signals.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const staleDays = data?.verifiedOn
+    ? Math.floor((Date.now() - new Date(data.verifiedOn).getTime()) / 86400000)
+    : null;
+
+  const filled = DOMAIN_SIGNAL_FIELDS.filter(
+    (f) => data && data[f.key] !== null && data[f.key] !== undefined,
+  );
+
+  return (
+    <Panel>
+      <PanelHeader className="flex items-center justify-between">
+        <PanelTitle>Domain signals</PanelTitle>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-7"
+          onClick={() => setOpen((o) => !o)}
+          disabled={!siteId}
+        >
+          {open ? 'Cancel' : data ? 'Edit' : 'Add'}
+        </Button>
+      </PanelHeader>
+
+      <PanelBody>
+        <p className="mb-3 text-[12px] leading-relaxed text-ink-400">
+          Site-wide, not per page. These lift every page score equally.
+        </p>
+
+        {!open && (
+          <>
+            {loading && <p className="text-[13px] text-ink-500">Loading...</p>}
+
+            {!loading && !data && (
+              <p className="text-[13px] leading-relaxed text-ink-500">
+                Nothing recorded yet. Google reviews and citation consistency are
+                the strongest signals available to an operator based in Srinagar.
+              </p>
+            )}
+
+            {!loading && data && (
+              <>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {filled.map((f) => (
+                    <div
+                      key={String(f.key)}
+                      className="flex items-baseline justify-between gap-2"
+                    >
+                      <dt className="truncate text-[11.5px] text-ink-500">{f.label}</dt>
+                      <dd className="tabular text-[12.5px] font-medium text-ink-100">
+                        {String(data[f.key])}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {filled.length === 0 && (
+                  <p className="text-[13px] text-ink-500">No values recorded yet.</p>
+                )}
+                {staleDays !== null && (
+                  <p
+                    className={`mt-3 text-[11.5px] ${
+                      staleDays > 90 ? 'text-warn-400' : 'text-ink-500'
+                    }`}
+                  >
+                    {staleDays > 90
+                      ? `Verified ${staleDays} days ago. Re-check against the live GBP.`
+                      : `Verified ${staleDays} day${staleDays === 1 ? '' : 's'} ago.`}
+                  </p>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {open && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              {DOMAIN_SIGNAL_FIELDS.map((f) => (
+                <div key={String(f.key)} className="space-y-1">
+                  <Label htmlFor={`ds-${String(f.key)}`} className="text-[11px]">
+                    {f.label}
+                  </Label>
+                  <Input
+                    id={`ds-${String(f.key)}`}
+                    type="number"
+                    min={0}
+                    step={f.step ?? '1'}
+                    value={form[f.key as string] ?? ''}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, [f.key as string]: e.target.value }))
+                    }
+                    className="h-8 text-right"
+                  />
+                  {f.hint && (
+                    <p className="text-[10.5px] leading-tight text-ink-500">{f.hint}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {error && (
+              <p role="alert" className="text-[12px] text-loss-400">
+                {error}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button size="sm" onClick={save} disabled={saving}>
+                {saving ? 'Saving...' : 'Save and rescore'}
+              </Button>
+            </div>
+          </div>
+        )}
       </PanelBody>
     </Panel>
   );

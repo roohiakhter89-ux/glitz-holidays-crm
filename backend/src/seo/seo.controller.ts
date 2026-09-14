@@ -12,6 +12,7 @@ import { SeoService } from './seo.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
 import { UpdateOffPageDto } from './dto/update-offpage.dto';
+import { UpdateDomainSignalsDto } from './dto/update-domain-signals.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { INTERNAL_STAFF } from '../common/access';
 
@@ -61,6 +62,26 @@ export class SeoController {
   @Put('sites/:id/off-page')
   updateOffPage(@Param('id') id: string, @Body() dto: UpdateOffPageDto) {
     return this.seo.updateOffPage(id, dto);
+  }
+
+  /** Site-wide off-page signals: GBP, reviews, citations, referring domains. */
+  @Roles(...INTERNAL_STAFF)
+  @Get('sites/:id/domain-signals')
+  getDomainSignals(@Param('id') id: string) {
+    return this.seo.getDomainSignals(id);
+  }
+
+  /**
+   * Update the site-wide signals. Rescores every audited page, since these
+   * apply to the whole domain rather than one URL.
+   */
+  @Roles(...SEO_WRITE)
+  @Put('sites/:id/domain-signals')
+  updateDomainSignals(
+    @Param('id') id: string,
+    @Body() dto: UpdateDomainSignalsDto,
+  ) {
+    return this.seo.updateDomainSignals(id, dto);
   }
 
   @Roles(...SEO_WRITE)

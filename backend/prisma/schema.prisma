@@ -449,8 +449,63 @@ model SeoSite {
 
   audits SeoAudit[]
   offPageScores SeoOffPage[]
+  domainSignals SeoDomainSignals?
 
   @@index([isActive])
+}
+/// Site-wide off-page signals. One row per site.
+///
+/// SeoOffPage is keyed (siteId, url) and holds PER-PAGE metrics. Google
+/// Business Profile completeness, review volume, citation consistency and
+/// site-level referring domains belong to the DOMAIN, not to any single URL —
+/// storing them per-page would mean copying identical values across all 270
+/// pages and updating every one of them whenever a review lands.
+///
+/// These lift every page's score equally, which is what a stronger domain
+/// actually does.
+model SeoDomainSignals {
+  id     String  @id @default(cuid())
+  siteId String  @unique
+  site   SeoSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  // --- Google Business Profile ---
+  /// 0-100. Completeness of the listing: hours, categories, services, Q&A.
+  gbpCompleteness  Int?
+  /// Total reviews on the profile. Verify against the live GBP, never guess —
+  /// this figure also feeds AggregateRating JSON-LD on the public site.
+  gbpReviewCount   Int?
+  /// 1.0 - 5.0.
+  gbpAverageRating Float?
+  /// Posts published in the trailing 30 days. Local prominence decays without
+  /// activity, so this is a rate, not a total.
+  gbpPostsLast30d  Int?
+
+  // --- Citations / NAP ---
+  /// Directory and local listings carrying the business NAP.
+  citationsTotal         Int?
+  /// Of those, how many match the GBP name/address/phone exactly. The RATIO
+  /// is what matters: inconsistent citations actively confuse local ranking.
+  citationsNapConsistent Int?
+
+  // --- Brand mentions ---
+  brandMentionsLinked   Int?
+  /// Mentions with no link. This is the outreach queue, not a score input.
+  brandMentionsUnlinked Int?
+
+  // --- Site-level authority ---
+  referringDomainsTotal Int?
+  /// Referring domains judged spammy. Costs part of the domain bonus, but the
+  /// contribution is floored at zero so recording spam never drops a page
+  /// below its no-data score.
+  toxicDomainCount      Int?
+
+  /// When a human last checked these against the live sources. Stale numbers
+  /// are worse than none; the dashboard flags anything older than 90 days.
+  verifiedOn DateTime?
+  notes      String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// An audit is a single point-in-time crawl of one page. Multiple pages under
