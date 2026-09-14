@@ -1750,8 +1750,13 @@ function ExternalIntegrations() {
       <PanelBody className="space-y-3">
         <div className="rounded-lg border border-dashed border-ink-800 p-3">
           <p className="text-[12.5px] font-medium text-ink-200">Google Search Console</p>
-          <p className="text-[11px] text-ink-500">Live clicks, impressions, and CTR</p>
-          <Chip className="mt-2 border-warn-500/30 text-warn-500">OAuth Ready</Chip>
+          <p className="text-[11px] text-ink-500">Live clicks, impressions, and CTR synced above</p>
+          <a
+            href="/integrations"
+            className="mt-2 inline-block text-[11px] font-medium text-primary-400 hover:text-primary-300"
+          >
+            Manage Integration →
+          </a>
         </div>
         <div className="rounded-lg border border-dashed border-ink-800 p-3">
           <p className="text-[12.5px] font-medium text-ink-200">Ahrefs / Moz Backlink API</p>
@@ -1996,6 +2001,14 @@ function DomainSignalsPanel({
  * site: the page already ranks, so a title rewrite or one internal link often
  * moves it, rather than needing a new page.
  */
+function safePathname(raw: string): string {
+  try {
+    return new URL(raw).pathname;
+  } catch {
+    return raw;
+  }
+}
+
 function SearchConsolePanel({
   siteId,
   onSynced,
@@ -2037,13 +2050,17 @@ function SearchConsolePanel({
         `/seo/sites/${siteId}/search-console/sync`,
         {},
       );
+      const rescoredMsg =
+        r.rescoredAudits && r.rescoredAudits > 0
+          ? ` (${r.rescoredAudits} page score${r.rescoredAudits === 1 ? '' : 's'} updated)`
+          : '';
       onSynced(
         r.rowsFetched === 0
           ? `No Search Console data for ${r.from} to ${r.to}.`
           : `Synced ${r.rowsFetched.toLocaleString()} rows across ${r.pagesTouched} pages. ` +
               `${r.totalClicks.toLocaleString()} clicks, ` +
               `${r.totalImpressions.toLocaleString()} impressions. ` +
-              `${r.offPageRowsUpdated} CTR values written back to scoring.`,
+              `${r.offPageRowsUpdated} CTR values written back to scoring${rescoredMsg}.`,
       );
       await load();
     } catch (e) {
@@ -2120,7 +2137,7 @@ function SearchConsolePanel({
                   rel="noopener noreferrer"
                   className="mt-0.5 block truncate text-[11px] text-primary-400 hover:text-primary-300"
                 >
-                  {new URL(r.page).pathname}
+                  {safePathname(r.page)}
                 </a>
               </li>
             ))}

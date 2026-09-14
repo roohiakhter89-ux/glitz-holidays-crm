@@ -275,7 +275,7 @@ export type IntegrationTestStatus = 'UNTESTED' | 'OK' | 'FAILED';
 export interface ProviderField {
   key: string;
   label: string;
-  type: 'text' | 'password' | 'url' | 'select';
+  type: 'text' | 'password' | 'url' | 'select' | 'textarea';
   required?: boolean;
   placeholder?: string;
   help?: string;
@@ -993,6 +993,8 @@ export interface SeoSearchConsoleSyncResult {
   totalImpressions: number;
   /** Page CTR values written back into SeoOffPage for scoring. */
   offPageRowsUpdated: number;
+  /** Number of latest page audit scores recomputed and updated. */
+  rescoredAudits?: number;
 }
 
 export interface SeoRankedPage {

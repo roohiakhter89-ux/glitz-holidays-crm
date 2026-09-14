@@ -22,6 +22,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SITE_DOMAIN } from '../common/site';
+import { normalizePageUrl } from './search-console-mapping';
 
 interface PagespeedScores {
   perf?: number;
@@ -200,6 +201,10 @@ export class SeoService {
     const offPageMap = new Map<string, any>();
     for (const op of offPageRecords) {
       offPageMap.set(op.url, op);
+      const norm = normalizePageUrl(op.url);
+      if (norm && norm !== op.url) {
+        offPageMap.set(norm, op);
+      }
     }
 
     // Build unified ranking list
@@ -232,7 +237,7 @@ export class SeoService {
       seenUrls.add(fullUrl);
 
       const audit = latestAuditMap.get(fullUrl);
-      const offPage = offPageMap.get(fullUrl);
+      const offPage = offPageMap.get(fullUrl) ?? offPageMap.get(normalizePageUrl(fullUrl));
 
       rankedList.push({
         url: fullUrl,
@@ -277,7 +282,7 @@ export class SeoService {
       if (seenUrls.has(auditedUrl)) continue;
       seenUrls.add(auditedUrl);
 
-      const offPage = offPageMap.get(auditedUrl);
+      const offPage = offPageMap.get(auditedUrl) ?? offPageMap.get(normalizePageUrl(auditedUrl));
       let parsedPath = auditedUrl;
       try {
         parsedPath = new URL(auditedUrl).pathname;
@@ -401,14 +406,18 @@ export class SeoService {
   /**
    * Recompute the stored score on the latest audit of every page.
    *
-   * Called after a domain-signal change. Only the newest audit per URL is
-   * touched: historic rows are a record of what the score was at the time and
-   * rewriting them would erase the trend the dashboard plots.
+   * Called after a domain-signal change or Search Console sync. Only the newest audit
+   * per URL is touched: historic rows are a record of what the score was at the
+   * time and rewriting them would erase the trend the dashboard plots.
    */
-  private async rescoreAllPages(
+  async rescoreAllPages(
     siteId: string,
-    domain: DomainSignals | null,
+    domain?: DomainSignals | null,
   ): Promise<number> {
+    if (domain === undefined) {
+      domain = await this.getDomainSignals(siteId);
+    }
+
     const audits = await this.prisma.seoAudit.findMany({
       where: { siteId },
       orderBy: { createdAt: 'desc' },
@@ -416,7 +425,14 @@ export class SeoService {
 
     const seen = new Set<string>();
     const offPageRows = await this.prisma.seoOffPage.findMany({ where: { siteId } });
-    const offPageByUrl = new Map(offPageRows.map((r) => [r.url, r]));
+    const offPageByUrl = new Map<string, any>();
+    for (const r of offPageRows) {
+      offPageByUrl.set(r.url, r);
+      const norm = normalizePageUrl(r.url);
+      if (norm && norm !== r.url) {
+        offPageByUrl.set(norm, r);
+      }
+    }
 
     let updated = 0;
     for (const audit of audits) {
@@ -427,9 +443,14 @@ export class SeoService {
       const checks = (audit.checks as any).results as CheckResult[];
       if (!Array.isArray(checks)) continue;
 
+      const offPage =
+        offPageByUrl.get(audit.url) ??
+        offPageByUrl.get(normalizePageUrl(audit.url)) ??
+        null;
+
       const composite = calculateCompositeScore(
         checks,
-        offPageByUrl.get(audit.url) ?? null,
+        offPage,
         {
           perf: audit.perfScore ?? undefined,
           a11y: audit.a11yScore ?? undefined,
@@ -456,9 +477,9 @@ export class SeoService {
    */
   async updateOffPage(siteId: string, dto: UpdateOffPageDto) {
     const site = await this.findSite(siteId);
-    let targetUrl = dto.url;
+    let targetUrl = normalizePageUrl(dto.url);
     try {
-      targetUrl = new URL(dto.url, site.url).toString();
+      targetUrl = normalizePageUrl(new URL(dto.url, site.url).toString());
     } catch {}
 
     const offPage = await this.prisma.seoOffPage.upsert({

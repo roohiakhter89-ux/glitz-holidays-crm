@@ -11,7 +11,7 @@ import type { IntegrationCategory } from '@prisma/client';
  * whole `credentials` blob is AES-encrypted at rest.
  */
 
-export type FieldType = 'text' | 'password' | 'url' | 'select';
+export type FieldType = 'text' | 'password' | 'url' | 'select' | 'textarea';
 
 export interface FieldSpec {
   key: string;
@@ -225,7 +225,7 @@ const analytics: ProviderSpec[] = [
     docsUrl: 'https://support.google.com/webmasters/answer/7687615',
     fields: [
       { key: 'authMethod', label: 'Auth method', type: 'select', required: true, options: ['service_account', 'oauth'], help: 'service_account is simplest: no consent screen and no token to expire. oauth needs the OAuth consent screen published to Production, or Google expires the refresh token after 7 days.' },
-      { key: 'serviceAccountKey', label: 'Service account JSON key', type: 'password', help: 'service_account only. Paste the whole downloaded .json key file, then add its client_email as a user in Search Console under Settings > Users and permissions.' },
+      { key: 'serviceAccountKey', label: 'Service account JSON key', type: 'textarea', placeholder: '{\n  "type": "service_account",\n  "client_email": "...",\n  "private_key": "..."\n}', help: 'service_account only. Paste the whole downloaded .json key file, then add its client_email as a user in Search Console under Settings > Users and permissions.' },
       { key: 'clientId', label: 'OAuth Client ID', type: 'text', help: 'oauth only.' },
       { key: 'clientSecret', label: 'OAuth Client Secret', type: 'password', help: 'oauth only.' },
       { key: 'refreshToken', label: 'Refresh Token', type: 'password', help: 'oauth only. Scope: https://www.googleapis.com/auth/webmasters.readonly' },

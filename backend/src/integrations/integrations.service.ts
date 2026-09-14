@@ -43,12 +43,19 @@ export class IntegrationsService {
     if (!spec) throw new BadRequestException(`Unknown provider: ${dto.provider}`);
     this.validateCreds(spec.fields, dto.credentials);
 
+    let encrypted: string;
+    try {
+      encrypted = encryptSecret(JSON.stringify(dto.credentials));
+    } catch (e: any) {
+      throw new BadRequestException(`Credential encryption error: ${e?.message ?? String(e)}`);
+    }
+
     const row = await this.prisma.integration.create({
       data: {
         provider: spec.id,
         category: spec.category,
         label: dto.label ?? spec.label,
-        credentials: encryptSecret(JSON.stringify(dto.credentials)),
+        credentials: encrypted,
         isActive: dto.isActive ?? true,
         priority: dto.priority ?? 0,
       },
@@ -69,14 +76,23 @@ export class IntegrationsService {
     if (dto.credentials !== undefined) {
       // Merge with existing so a partial edit doesn't lose fields the UI
       // deliberately omitted (blank password inputs on edit).
-      const current = JSON.parse(decryptSecret(exists.credentials)) as Record<string, unknown>;
+      let current: Record<string, unknown> = {};
+      try {
+        current = JSON.parse(decryptSecret(exists.credentials)) as Record<string, unknown>;
+      } catch {
+        current = {};
+      }
       const merged: Record<string, unknown> = { ...current };
       for (const [k, v] of Object.entries(dto.credentials)) {
         if (typeof v === 'string' && v === '') continue; // blank = keep old
         merged[k] = v;
       }
       this.validateCreds(spec.fields, merged);
-      data.credentials = encryptSecret(JSON.stringify(merged));
+      try {
+        data.credentials = encryptSecret(JSON.stringify(merged));
+      } catch (e: any) {
+        throw new BadRequestException(`Credential encryption error: ${e?.message ?? String(e)}`);
+      }
       // Any credential change invalidates a prior OK test.
       data.lastTestStatus = IntegrationTestStatus.UNTESTED;
       data.lastTestMessage = null;
@@ -98,7 +114,27 @@ export class IntegrationsService {
   async test(id: string) {
     const row = await this.prisma.integration.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Integration not found');
-    const creds = JSON.parse(decryptSecret(row.credentials)) as Record<string, unknown>;
+
+    let creds: Record<string, unknown>;
+    try {
+      creds = JSON.parse(decryptSecret(row.credentials)) as Record<string, unknown>;
+    } catch (e: any) {
+      const failMsg = `Could not decrypt stored credentials: ${e?.message ?? String(e)}`;
+      await this.prisma.integration.update({
+        where: { id },
+        data: {
+          lastTestedAt: new Date(),
+          lastTestStatus: IntegrationTestStatus.FAILED,
+          lastTestMessage: failMsg.slice(0, 500),
+        },
+      });
+      return {
+        ...this.publicShape(row),
+        lastTestStatus: IntegrationTestStatus.FAILED,
+        lastTestMessage: failMsg,
+        testResult: { ok: false, message: failMsg },
+      };
+    }
 
     const result = await runProbe(row.provider, creds);
     const updated = await this.prisma.integration.update({

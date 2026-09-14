@@ -9,6 +9,7 @@ import {
   mapRow,
   mapRows,
   normalisePropertyUrl,
+  normalizePageUrl,
   rollupByPage,
   strikingDistance,
 } from './search-console-mapping';
@@ -223,6 +224,62 @@ describe('search console mapping', () => {
     it('returns empty for empty input rather than a broken property string', () => {
       expect(normalisePropertyUrl('')).toBe('');
       expect(normalisePropertyUrl(undefined as any)).toBe('');
+    });
+  });
+
+  describe('normalizePageUrl', () => {
+    it('strips trailing slashes from non-root URLs', () => {
+      expect(normalizePageUrl('https://glitz-holidays.in/packages/from/delhi/')).toBe(
+        'https://glitz-holidays.in/packages/from/delhi',
+      );
+      expect(normalizePageUrl('/packages/from/delhi/')).toBe('/packages/from/delhi');
+    });
+
+    it('preserves root slash', () => {
+      expect(normalizePageUrl('https://glitz-holidays.in/')).toBe('https://glitz-holidays.in/');
+      expect(normalizePageUrl('/')).toBe('/');
+    });
+
+    it('strips query params and hash fragments', () => {
+      expect(normalizePageUrl('https://glitz-holidays.in/packages?utm_source=ads#faq')).toBe(
+        'https://glitz-holidays.in/packages',
+      );
+    });
+
+    it('handles empty or whitespace gracefully', () => {
+      expect(normalizePageUrl('')).toBe('');
+      expect(normalizePageUrl('   ')).toBe('');
+    });
+  });
+
+  describe('rollupByPage', () => {
+    it('merges slash and non-slash variants of the same page', () => {
+      const rows = [
+        {
+          date: '2026-09-10',
+          page: 'https://glitz-holidays.in/packages/from/delhi/',
+          query: 'delhi to srinagar',
+          clicks: 10,
+          impressions: 100,
+          ctr: 10,
+          position: 5,
+        },
+        {
+          date: '2026-09-10',
+          page: 'https://glitz-holidays.in/packages/from/delhi',
+          query: 'delhi to kashmir package',
+          clicks: 5,
+          impressions: 50,
+          ctr: 10,
+          position: 8,
+        },
+      ];
+      const rollups = rollupByPage(rows);
+      expect(rollups.length).toBe(1);
+      expect(rollups[0].page).toBe('https://glitz-holidays.in/packages/from/delhi');
+      expect(rollups[0].clicks).toBe(15);
+      expect(rollups[0].impressions).toBe(150);
+      expect(rollups[0].queryCount).toBe(2);
     });
   });
 

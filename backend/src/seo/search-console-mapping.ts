@@ -173,10 +173,11 @@ export function rollupByPage(rows: SearchAnalyticsRow[]): PageRollup[] {
   >();
 
   for (const r of rows) {
-    let e = acc.get(r.page);
+    const page = normalizePageUrl(r.page) || r.page;
+    let e = acc.get(page);
     if (!e) {
       e = { clicks: 0, impressions: 0, posWeighted: 0, queries: new Set() };
-      acc.set(r.page, e);
+      acc.set(page, e);
     }
     e.clicks += r.clicks;
     e.impressions += r.impressions;
@@ -234,3 +235,30 @@ export function normalisePropertyUrl(input: string): string {
   // covers both http/https and every subdomain.
   return `sc-domain:${s.replace(/^\/+|\/+$/g, '')}`;
 }
+
+/**
+ * Normalise a page URL so that manifest, audit, and Search Console URLs match.
+ *
+ * Trailing slashes on non-root paths are stripped (e.g. `/packages/delhi/` -> `/packages/delhi`).
+ * Root `/` retains its single slash.
+ * Query strings and fragments are stripped for page identity.
+ */
+export function normalizePageUrl(input: string): string {
+  const s = (input ?? '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    if (u.pathname.length > 1 && u.pathname.endsWith('/')) {
+      u.pathname = u.pathname.replace(/\/+$/, '');
+    }
+    u.hash = '';
+    u.search = '';
+    return u.toString();
+  } catch {
+    if (s.length > 1 && s.endsWith('/')) {
+      return s.replace(/\/+$/, '');
+    }
+    return s;
+  }
+}
+

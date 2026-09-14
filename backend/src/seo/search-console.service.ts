@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { searchconsole, type searchconsole_v1 } from '@googleapis/searchconsole';
 import { PrismaService } from '../prisma/prisma.service';
 import { decryptSecret } from '../common/crypto';
+import { SeoService } from './seo.service';
 import {
   MAX_ROW_LIMIT,
   PageRollup,
@@ -11,6 +12,7 @@ import {
   defaultWindow,
   mapRows,
   normalisePropertyUrl,
+  normalizePageUrl,
   rollupByPage,
   strikingDistance,
 } from './search-console-mapping';
@@ -53,13 +55,18 @@ export interface SyncResult {
   totalImpressions: number;
   /** Page-level CTR rows written back to SeoOffPage for scoring. */
   offPageRowsUpdated: number;
+  /** Number of latest page audit scores recomputed and updated. */
+  rescoredAudits: number;
 }
 
 @Injectable()
 export class SearchConsoleService {
   private readonly logger = new Logger(SearchConsoleService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly seo: SeoService,
+  ) {}
 
   // ==========================================================================
   // Credentials
@@ -95,9 +102,8 @@ export class SearchConsoleService {
     // operator-facing reason rather than deep inside the Google client.
     try {
       resolveAuthConfig(creds);
-    } catch (e) {
-      if (e instanceof SearchConsoleAuthError) throw new BadRequestException(e.message);
-      throw e;
+    } catch (e: any) {
+      throw new BadRequestException(e?.message ?? 'Invalid Search Console configuration.');
     }
     return creds;
   }
@@ -229,6 +235,28 @@ export class SearchConsoleService {
     let totalClicks = 0;
     let totalImpressions = 0;
 
+    const fromDate = new Date(`${from}T00:00:00.000Z`);
+    const toDate = new Date(`${to}T23:59:59.999Z`);
+
+    // Pre-load all existing natural keys in the date window for this site.
+    // This reduces thousands of sequential roundtrips to 1 bulk read.
+    const existingRows = await this.prisma.seoSearchAnalytics.findMany({
+      where: {
+        siteId,
+        date: { gte: fromDate, lte: toDate },
+      },
+      select: { id: true, date: true, page: true, query: true },
+    });
+
+    const existingMap = new Map<string, string>();
+    for (const e of existingRows) {
+      const k = `${e.date.toISOString().slice(0, 10)}|${e.page}|${e.query}`;
+      existingMap.set(k, e.id);
+    }
+
+    const updates: { id: string; data: any }[] = [];
+    const creates: any[] = [];
+
     for (const r of rows) {
       totalClicks += r.clicks;
       totalImpressions += r.impressions;
@@ -241,33 +269,48 @@ export class SearchConsoleService {
         position: r.position,
       };
 
-      // Upsert on the natural key. Every component is NOT NULL, so unlike
-      // AdSpend's key this genuinely dedupes on re-sync.
-      const existing = await this.prisma.seoSearchAnalytics.findUnique({
-        where: {
-          siteId_date_page_query: { siteId, date, page: r.page, query: r.query },
-        },
-        select: { id: true },
-      });
-
-      if (existing) {
-        await this.prisma.seoSearchAnalytics.update({ where: { id: existing.id }, data });
-        updated++;
+      const k = `${r.date}|${r.page}|${r.query}`;
+      const existingId = existingMap.get(k);
+      if (existingId) {
+        updates.push({ id: existingId, data });
       } else {
-        await this.prisma.seoSearchAnalytics.create({
-          data: { siteId, date, page: r.page, query: r.query, ...data },
-        });
-        created++;
+        creates.push({ siteId, date, page: r.page, query: r.query, ...data });
       }
     }
+
+    // Execute in chunks via transactions to prevent connection exhaustion
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      await this.prisma.$transaction(
+        chunk.map((u) =>
+          this.prisma.seoSearchAnalytics.update({ where: { id: u.id }, data: u.data }),
+        ),
+      );
+    }
+    updated = updates.length;
+
+    for (let i = 0; i < creates.length; i += CHUNK_SIZE) {
+      const chunk = creates.slice(i, i + CHUNK_SIZE);
+      await this.prisma.seoSearchAnalytics.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      });
+    }
+    created = creates.length;
 
     const rollups = rollupByPage(rows);
     const offPageRowsUpdated = await this.writeBackCtr(siteId, rollups);
 
+    // Rescore all page audits on this site so the newly synced CTR data
+    // immediately updates leaderboard scores.
+    const rescoredAudits = await this.seo.rescoreAllPages(siteId);
+
     this.logger.log(
       `Search Console sync ${from}..${to} property=${property}: ${rows.length} rows ` +
         `(${created} new, ${updated} updated), ${rollups.length} pages, ` +
-        `${totalClicks} clicks / ${totalImpressions} impressions`,
+        `${totalClicks} clicks / ${totalImpressions} impressions, ` +
+        `${rescoredAudits} audits rescored`,
     );
 
     return {
@@ -281,6 +324,7 @@ export class SearchConsoleService {
       totalClicks,
       totalImpressions,
       offPageRowsUpdated,
+      rescoredAudits,
     };
   }
 
@@ -297,9 +341,11 @@ export class SearchConsoleService {
       // A page with no impressions has no meaningful CTR to record.
       if (r.impressions <= 0) continue;
 
+      const targetUrl = normalizePageUrl(r.page) || r.page;
+
       await this.prisma.seoOffPage.upsert({
-        where: { siteId_url: { siteId, url: r.page } },
-        create: { siteId, url: r.page, searchConsoleCtr: r.ctr },
+        where: { siteId_url: { siteId, url: targetUrl } },
+        create: { siteId, url: targetUrl, searchConsoleCtr: r.ctr },
         update: { searchConsoleCtr: r.ctr },
       });
       n++;
@@ -367,8 +413,13 @@ export class SearchConsoleService {
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - days);
 
+    const targetUrl = normalizePageUrl(page) || page;
+    const variants = Array.from(
+      new Set([page, targetUrl, targetUrl.endsWith('/') ? targetUrl.slice(0, -1) : `${targetUrl}/`]),
+    );
+
     const rows = await this.prisma.seoSearchAnalytics.findMany({
-      where: { siteId, page, date: { gte: since } },
+      where: { siteId, page: { in: variants }, date: { gte: since } },
       orderBy: { impressions: 'desc' },
     });
 

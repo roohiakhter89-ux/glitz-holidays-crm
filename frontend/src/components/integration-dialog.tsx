@@ -78,6 +78,19 @@ export function IntegrationDialog({
             throw new ApiError(`Missing required field: ${f.label}`, 400);
           }
         }
+        if (provider.id === 'google_search_console') {
+          if (values.authMethod === 'service_account' && !credentials.serviceAccountKey) {
+            throw new ApiError('Missing required field: Service account JSON key', 400);
+          }
+          if (values.authMethod === 'oauth') {
+            for (const k of ['clientId', 'clientSecret', 'refreshToken']) {
+              if (!credentials[k]) {
+                const spec = provider.fields.find((f) => f.key === k);
+                throw new ApiError(`Missing required field: ${spec?.label ?? k}`, 400);
+              }
+            }
+          }
+        }
         await api.post('/integrations', body);
       }
       setOpen(false);
@@ -137,7 +150,20 @@ export function IntegrationDialog({
                 Credentials
               </p>
               <div className="space-y-3">
-                {provider.fields.map((f) => (
+                {provider.fields
+                  .filter((f) => {
+                    if (provider.id === 'google_search_console') {
+                      const method = values.authMethod;
+                      if (f.key === 'serviceAccountKey') {
+                        return method === 'service_account';
+                      }
+                      if (['clientId', 'clientSecret', 'refreshToken'].includes(f.key)) {
+                        return method === 'oauth';
+                      }
+                    }
+                    return true;
+                  })
+                  .map((f) => (
                   <div key={f.key} className="space-y-1">
                     <Label htmlFor={`i-${f.key}`}>
                       {f.label}
@@ -156,6 +182,22 @@ export function IntegrationDialog({
                           <option key={o} value={o}>{o}</option>
                         ))}
                       </Select>
+                    ) : f.type === 'textarea' ? (
+                      <textarea
+                        id={`i-${f.key}`}
+                        rows={4}
+                        value={values[f.key] ?? ''}
+                        onChange={(e) =>
+                          setValues((v) => ({ ...v, [f.key]: e.target.value }))
+                        }
+                        placeholder={
+                          editing && editing.keysOnFile.includes(f.key)
+                            ? '•••••• (leave blank to keep)'
+                            : f.placeholder
+                        }
+                        spellCheck={false}
+                        className="w-full rounded-md border border-ink-700 bg-ink-900/60 px-3 py-2 font-mono text-[12px] leading-relaxed text-ink-100 placeholder:text-ink-500 focus:border-signal-500 focus:outline-none focus:ring-1 focus:ring-signal-500"
+                      />
                     ) : (
                       <Input
                         id={`i-${f.key}`}
