@@ -39,7 +39,7 @@ function isResponse(x: Response | { error: string }): x is Response {
 async function readTextSafe(res: Response): Promise<string> {
   try {
     const t = await res.text();
-    return t.slice(0, 300);
+    return t.slice(0, 1000);
   } catch {
     return '';
   }
@@ -375,7 +375,25 @@ async function probeSearchConsole(c: any): Promise<ProbeResult> {
   );
   if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
   if (!r.ok) {
-    return { ok: false, message: `Search Console API HTTP ${r.status}: ${await readTextSafe(r)}` };
+    const raw = await readTextSafe(r);
+    try {
+      const errObj = JSON.parse(raw);
+      const msg = errObj?.error?.message;
+      if (typeof msg === 'string') {
+        if (msg.includes('has not been used in project') || msg.includes('disabled')) {
+          const matchUrl = msg.match(/https:\/\/[^\s]+/);
+          const link = matchUrl ? matchUrl[0] : 'https://console.cloud.google.com/apis/library/searchconsole.googleapis.com';
+          return {
+            ok: false,
+            message: `Google Search Console API is not enabled in Google Cloud. Click here to enable it: ${link} then test again.`,
+          };
+        }
+        return { ok: false, message: `Search Console API error: ${msg}` };
+      }
+    } catch {
+      // Fall through to raw text
+    }
+    return { ok: false, message: `Search Console API HTTP ${r.status}: ${raw}` };
   }
 
   let urls: string[] = [];
