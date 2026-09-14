@@ -125,7 +125,7 @@ export default function AttributionPage() {
       setError(
         e instanceof ApiError
           ? e.message
-          : 'Could not reach Google Ads. Check the integration under Settings.',
+          : 'Could not reach Google Ads. Check the integration under Integrations → Ads platforms.',
       );
     } finally {
       setSyncing(false);

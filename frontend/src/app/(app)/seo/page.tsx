@@ -2050,7 +2050,7 @@ function SearchConsolePanel({
       setError(
         e instanceof ApiError
           ? e.message
-          : 'Could not reach Search Console. Check the integration under Settings.',
+          : 'Could not reach Search Console. Check the integration under Integrations → Search & analytics.',
       );
     } finally {
       setSyncing(false);
@@ -2091,7 +2091,7 @@ function SearchConsolePanel({
 
         {!loading && rows.length === 0 && (
           <p className="text-[13px] leading-relaxed text-ink-500">
-            Nothing synced yet. Connect Google Search Console under Settings, then
+            Nothing synced yet. Connect Google Search Console under Integrations → Search & analytics, then
             press Sync. Data lags about three days.
           </p>
         )}

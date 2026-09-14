@@ -8,6 +8,9 @@
  * often the account/self lookup. We don't spend real tokens or money.
  */
 
+import { buildAuthClient, describeTokenError, resolveAuthConfig } from '../seo/search-console-auth';
+import { normalisePropertyUrl } from '../seo/search-console-mapping';
+
 export interface ProbeResult {
   ok: boolean;
   message: string;
@@ -340,69 +343,71 @@ async function probeGoogleAds(c: any): Promise<ProbeResult> {
 
 
 async function probeSearchConsole(c: any): Promise<ProbeResult> {
-  for (const k of ['clientId', 'clientSecret', 'refreshToken']) {
-    if (!c[k]) return { ok: false, message: `${k} is required.` };
+  // Configuration problems (no method chosen, wrong file pasted) return before
+  // any network call, with the reason an operator can act on.
+  let config;
+  try {
+    config = resolveAuthConfig(c);
+  } catch (e: any) {
+    return { ok: false, message: e?.message ?? String(e) };
   }
 
-  // Step 1 - can the refresh token still mint an access token?
-  const tokenRes = await safeFetch('https://www.googleapis.com/oauth2/v3/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: c.clientId,
-      client_secret: c.clientSecret,
-      refresh_token: c.refreshToken,
-    }).toString(),
-  });
-  if (!isResponse(tokenRes)) return { ok: false, message: `Network: ${tokenRes.error}` };
-  if (!tokenRes.ok) {
-    return { ok: false, message: `OAuth refused the refresh token: ${await readTextSafe(tokenRes)}` };
-  }
-
+  // Step 1 - can these credentials mint an access token at all? This is what
+  // separates a bad key or expired refresh token from a permissions problem.
   let accessToken = '';
   try {
-    accessToken = (await tokenRes.json()).access_token ?? '';
-  } catch {
-    return { ok: false, message: 'OAuth response was not JSON.' };
+    const t = await buildAuthClient(config).getAccessToken();
+    accessToken = t?.token ?? '';
+  } catch (e) {
+    return { ok: false, message: describeTokenError(e, config) };
   }
-  if (!accessToken) return { ok: false, message: 'OAuth response carried no access_token.' };
+  if (!accessToken) return { ok: false, message: 'Google returned no access token.' };
 
-  // Step 2 - does the token actually reach a Search Console property? Listing
-  // sites is the cheapest authenticated call and it also catches the most
-  // common misconfiguration: correct credentials, wrong property string.
-  const r = await safeFetch('https://www.googleapis.com/webmasters/v3/sites', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  }, 12000);
+  const who = config.mode === 'service_account' ? config.clientEmail : 'this Google account';
+
+  // Step 2 - does that identity reach a Search Console property? Listing sites
+  // is the cheapest authenticated call, and it catches the most common setup
+  // gap: valid credentials that were never added to the property.
+  const r = await safeFetch(
+    'https://www.googleapis.com/webmasters/v3/sites',
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+    12000,
+  );
   if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
   if (!r.ok) {
     return { ok: false, message: `Search Console API HTTP ${r.status}: ${await readTextSafe(r)}` };
   }
 
+  let urls: string[] = [];
   try {
     const data = await r.json();
-    const entries: any[] = data.siteEntry ?? [];
-    const urls: string[] = entries.map((e) => e.siteUrl);
-    if (urls.length === 0) {
-      return {
-        ok: false,
-        message: 'Credentials valid, but this Google account has no Search Console properties.',
-      };
-    }
-    const wanted = String(c.siteUrl ?? '').trim();
-    if (wanted && !urls.includes(wanted)) {
-      return {
-        ok: false,
-        message: `Authenticated, but "${wanted}" is not in this account. Available: ${urls.slice(0, 4).join(', ')}`,
-      };
-    }
-    return {
-      ok: true,
-      message: `Search Console verified - ${urls.length} propertie(s): ${urls.slice(0, 3).join(', ')}${urls.length > 3 ? '...' : ''}`,
-    };
+    urls = (data.siteEntry ?? []).map((e: any) => e.siteUrl).filter(Boolean);
   } catch {
-    return { ok: true, message: 'Search Console credentials verified.' };
+    return { ok: false, message: 'Search Console returned a response that was not JSON.' };
   }
+
+  if (urls.length === 0) {
+    return {
+      ok: false,
+      message:
+        config.mode === 'service_account'
+          ? `Authenticated as ${config.clientEmail}, but it has no Search Console properties. In Search Console open Settings > Users and permissions > Add user, add ${config.clientEmail}, then test again.`
+          : 'Authenticated, but this Google account has no Search Console properties.',
+    };
+  }
+
+  const wanted = normalisePropertyUrl(String(c.siteUrl ?? ''));
+  if (wanted && !urls.includes(wanted)) {
+    return {
+      ok: false,
+      message: `Authenticated as ${who}, but "${wanted}" is not one of its properties. Available: ${urls.slice(0, 4).join(', ')}`,
+    };
+  }
+
+  return {
+    ok: true,
+    message: `Search Console verified as ${who}: ${urls.length} ${urls.length === 1 ? 'property' : 'properties'} (${urls.slice(0, 3).join(', ')}${urls.length > 3 ? ', ...' : ''}).`,
+  };
 }
 
 // ── Registry ────────────────────────────────────────────────────────────────

@@ -93,7 +93,7 @@ export class GoogleAdsService {
 
     if (!row) {
       throw new BadRequestException(
-        'No active Google Ads integration. Add one under Settings → Integrations first.',
+        'No active Google Ads integration. Add one under Integrations → Ads platforms first.',
       );
     }
 
@@ -102,7 +102,7 @@ export class GoogleAdsService {
       creds = JSON.parse(decryptSecret(row.credentials)) as GoogleAdsCredentials;
     } catch {
       throw new BadRequestException(
-        'Stored Google Ads credentials could not be decrypted. Re-enter them under Settings → Integrations.',
+        'Stored Google Ads credentials could not be decrypted. Re-enter them under Integrations → Ads platforms.',
       );
     }
 

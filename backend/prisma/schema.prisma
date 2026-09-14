@@ -1265,6 +1265,9 @@ enum IntegrationCategory {
   AI
   ADS
   SOCIAL
+  /// Search Console, and later GA4. Separate from ADS because nothing here
+  /// spends money; filed under ADS it was listed as an "Ads platform".
+  ANALYTICS
 }
 
 enum IntegrationTestStatus {

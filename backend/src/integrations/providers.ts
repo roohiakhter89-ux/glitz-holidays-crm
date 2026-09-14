@@ -208,22 +208,28 @@ const ads: ProviderSpec[] = [
     hasTest: true,
   },
   {
-    id: 'google_search_console', label: 'Google Search Console', category: 'ADS',
-    docsUrl: 'https://developers.google.com/webmaster-tools/v1/prereqs',
-    fields: [
-      { key: 'clientId', label: 'OAuth Client ID', type: 'text', required: true },
-      { key: 'clientSecret', label: 'OAuth Client Secret', type: 'password', required: true },
-      { key: 'refreshToken', label: 'Refresh Token', type: 'password', required: true, help: 'Needs the webmasters.readonly scope.' },
-      { key: 'siteUrl', label: 'Property', type: 'text', required: true, placeholder: 'sc-domain:glitz-holidays.in', help: 'Domain property (sc-domain:example.com) or URL-prefix property (https://example.com/). These are different properties with different data.' },
-    ],
-    hasTest: true,
-  },
-  {
     id: 'meta_ads', label: 'Meta Ads', category: 'ADS',
     docsUrl: 'https://developers.facebook.com/docs/marketing-api/',
     fields: [
       { key: 'accessToken', label: 'Long-Lived Access Token', type: 'password', required: true },
       { key: 'adAccountId', label: 'Ad Account ID', type: 'text', required: true, placeholder: 'act_...' },
+    ],
+    hasTest: true,
+  },
+];
+
+// ── Search & analytics ───────────────────────────────────────────────────
+const analytics: ProviderSpec[] = [
+  {
+    id: 'google_search_console', label: 'Google Search Console', category: 'ANALYTICS',
+    docsUrl: 'https://support.google.com/webmasters/answer/7687615',
+    fields: [
+      { key: 'authMethod', label: 'Auth method', type: 'select', required: true, options: ['service_account', 'oauth'], help: 'service_account is simplest: no consent screen and no token to expire. oauth needs the OAuth consent screen published to Production, or Google expires the refresh token after 7 days.' },
+      { key: 'serviceAccountKey', label: 'Service account JSON key', type: 'password', help: 'service_account only. Paste the whole downloaded .json key file, then add its client_email as a user in Search Console under Settings > Users and permissions.' },
+      { key: 'clientId', label: 'OAuth Client ID', type: 'text', help: 'oauth only.' },
+      { key: 'clientSecret', label: 'OAuth Client Secret', type: 'password', help: 'oauth only.' },
+      { key: 'refreshToken', label: 'Refresh Token', type: 'password', help: 'oauth only. Scope: https://www.googleapis.com/auth/webmasters.readonly' },
+      { key: 'siteUrl', label: 'Property', type: 'text', required: true, placeholder: 'sc-domain:glitz-holidays.in', help: 'Domain property (sc-domain:example.com) or URL-prefix property (https://example.com/). They are different properties holding different data.' },
     ],
     hasTest: true,
   },
@@ -296,6 +302,7 @@ export const PROVIDERS: ProviderSpec[] = [
   ...paymentInternational,
   ...ai,
   ...ads,
+  ...analytics,
   ...social,
 ];
 

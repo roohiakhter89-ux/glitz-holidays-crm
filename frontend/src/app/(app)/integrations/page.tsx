@@ -27,17 +27,18 @@ import { IntegrationDialog } from '@/components/integration-dialog';
 import { relativeDate } from '@/lib/format';
 
 /**
- * One page, four tabs — payments (domestic + international live on the same
- * tab), AI, ads, social. Each tab lists configured rows and offers the
- * catalog of providers not yet added.
+ * One page, five tabs: payments (domestic and international share a tab), AI,
+ * ads, search and analytics, social. Each tab lists configured rows and offers
+ * the catalog of providers not yet added.
  */
 
-type Tab = 'PAYMENTS' | 'AI' | 'ADS' | 'SOCIAL';
+type Tab = 'PAYMENTS' | 'AI' | 'ADS' | 'ANALYTICS' | 'SOCIAL';
 
 const TAB_LABELS: Record<Tab, string> = {
   PAYMENTS: 'Payments',
   AI: 'AI models',
   ADS: 'Ads platforms',
+  ANALYTICS: 'Search & analytics',
   SOCIAL: 'Social media',
 };
 
@@ -45,6 +46,7 @@ const TAB_CATEGORIES: Record<Tab, IntegrationCategory[]> = {
   PAYMENTS: ['PAYMENT_DOMESTIC', 'PAYMENT_INTERNATIONAL'],
   AI: ['AI'],
   ADS: ['ADS'],
+  ANALYTICS: ['ANALYTICS'],
   SOCIAL: ['SOCIAL'],
 };
 
@@ -287,6 +289,7 @@ export default function IntegrationsPage() {
                         {p.category === 'PAYMENT_INTERNATIONAL' && 'International gateway'}
                         {p.category === 'AI' && 'LLM provider'}
                         {p.category === 'ADS' && 'Ads platform'}
+                        {p.category === 'ANALYTICS' && 'Search & analytics'}
                         {p.category === 'SOCIAL' && 'Social platform'}
                       </p>
                     </div>

@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { IntegrationCategory } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SEARCH_CONSOLE_PROVIDER, SearchConsoleService } from './search-console.service';
 
@@ -37,7 +36,6 @@ export class SearchConsoleSyncJob {
 
     const configured = await this.prisma.integration.count({
       where: {
-        category: IntegrationCategory.ADS,
         provider: SEARCH_CONSOLE_PROVIDER,
         isActive: true,
       },

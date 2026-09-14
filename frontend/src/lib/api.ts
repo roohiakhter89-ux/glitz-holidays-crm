@@ -267,7 +267,8 @@ export type IntegrationCategory =
   | 'PAYMENT_INTERNATIONAL'
   | 'AI'
   | 'ADS'
-  | 'SOCIAL';
+  | 'SOCIAL'
+  | 'ANALYTICS';
 
 export type IntegrationTestStatus = 'UNTESTED' | 'OK' | 'FAILED';
 

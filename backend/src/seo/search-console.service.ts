@@ -1,7 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { IntegrationCategory } from '@prisma/client';
 import { searchconsole, type searchconsole_v1 } from '@googleapis/searchconsole';
-import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
 import { decryptSecret } from '../common/crypto';
 import {
@@ -16,6 +14,12 @@ import {
   rollupByPage,
   strikingDistance,
 } from './search-console-mapping';
+import {
+  RawSearchConsoleCredentials,
+  SearchConsoleAuthError,
+  buildAuthClient,
+  resolveAuthConfig,
+} from './search-console-auth';
 
 /**
  * Google Search Console reporting.
@@ -34,15 +38,8 @@ import {
 
 export const SEARCH_CONSOLE_PROVIDER = 'google_search_console';
 
-/** Read-only is all this needs; never request write scope for reporting. */
-export const SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly'];
-
-export interface SearchConsoleCredentials {
-  clientId: string;
-  clientSecret: string;
-  refreshToken: string;
-  siteUrl?: string;
-}
+/** Stored credential blob. Auth method rules live in search-console-auth.ts. */
+export type SearchConsoleCredentials = RawSearchConsoleCredentials;
 
 export interface SyncResult {
   property: string;
@@ -70,8 +67,9 @@ export class SearchConsoleService {
 
   async resolveCredentials(): Promise<SearchConsoleCredentials> {
     const row = await this.prisma.integration.findFirst({
+      // Filtered by provider alone, so the lookup does not depend on which
+      // category the row is filed under or on migration order during a deploy.
       where: {
-        category: IntegrationCategory.ADS,
         provider: SEARCH_CONSOLE_PROVIDER,
         isActive: true,
       },
@@ -80,7 +78,7 @@ export class SearchConsoleService {
 
     if (!row) {
       throw new BadRequestException(
-        'No active Google Search Console integration. Add one under Settings -> Integrations first.',
+        'No active Google Search Console integration. Add one under Integrations → Search & analytics first.',
       );
     }
 
@@ -89,26 +87,27 @@ export class SearchConsoleService {
       creds = JSON.parse(decryptSecret(row.credentials)) as SearchConsoleCredentials;
     } catch {
       throw new BadRequestException(
-        'Stored Search Console credentials could not be decrypted. Re-enter them under Settings -> Integrations.',
+        'Stored Search Console credentials could not be decrypted. Re-enter them under Integrations → Search & analytics.',
       );
     }
 
-    for (const k of ['clientId', 'clientSecret', 'refreshToken'] as const) {
-      if (!creds[k]) throw new BadRequestException(`Search Console integration is missing ${k}.`);
+    // Validate the auth method up front so a misconfigured row fails with the
+    // operator-facing reason rather than deep inside the Google client.
+    try {
+      resolveAuthConfig(creds);
+    } catch (e) {
+      if (e instanceof SearchConsoleAuthError) throw new BadRequestException(e.message);
+      throw e;
     }
     return creds;
   }
 
   /**
-   * Authenticated client. The library refreshes the access token itself from
-   * the refresh token, so there is no token cache to manage here.
+   * Authenticated client for whichever auth method the integration uses. Both
+   * the service account and OAuth clients refresh their own access tokens.
    */
   private client(creds: SearchConsoleCredentials): searchconsole_v1.Searchconsole {
-    const auth = new OAuth2Client({
-      clientId: creds.clientId,
-      clientSecret: creds.clientSecret,
-    });
-    auth.setCredentials({ refresh_token: creds.refreshToken, scope: SCOPES.join(' ') });
+    const auth = buildAuthClient(resolveAuthConfig(creds));
     return searchconsole({ version: 'v1', auth });
   }
 
@@ -337,7 +336,7 @@ export class SearchConsoleService {
       { page: string; query: string; clicks: number; impressions: number; posWeighted: number }
     >();
     for (const r of rows) {
-      const k = `${r.page} ${r.query}`;
+      const k = JSON.stringify([r.page, r.query]);
       let e = acc.get(k);
       if (!e) {
         e = { page: r.page, query: r.query, clicks: 0, impressions: 0, posWeighted: 0 };
@@ -411,11 +410,18 @@ export class SearchConsoleService {
     const status = e?.code ?? e?.response?.status;
     const msg = e?.response?.data?.error?.message ?? e?.message ?? String(e);
 
+    if (e?.response?.data?.error === 'invalid_grant' || /invalid_grant/.test(String(msg))) {
+      return (
+        'Google rejected the refresh token (invalid_grant). If the OAuth consent screen is in ' +
+        'Testing, refresh tokens expire after 7 days: publish it to Production, then generate a ' +
+        'new refresh token.'
+      );
+    }
     if (status === 403) {
       return `Search Console denied access (403): ${msg}. Check the property string matches exactly, including the trailing slash on a URL-prefix property.`;
     }
     if (status === 401) {
-      return `Search Console rejected the credentials (401): ${msg}. The refresh token may have been revoked.`;
+      return `Search Console rejected the credentials (401): ${msg}. Re-test the integration under Integrations → Search & analytics.`;
     }
     if (status === 429) {
       return `Search Console rate limit hit (429): ${msg}. The daily cap is 50,000 rows per site.`;
