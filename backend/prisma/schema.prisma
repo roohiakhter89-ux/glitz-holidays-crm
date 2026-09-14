@@ -451,6 +451,7 @@ model SeoSite {
   offPageScores SeoOffPage[]
   domainSignals SeoDomainSignals?
   searchAnalytics SeoSearchAnalytics[]
+  searchDimensions SeoSearchDimensionDaily[]
 
   @@index([isActive])
 }
@@ -500,6 +501,40 @@ model SeoSearchAnalytics {
   @@index([siteId, page])
   @@index([siteId, position])
 }
+/// Search Console totals by one dimension per day: the whole site, each page,
+/// each device and each country.
+///
+/// Separate from SeoSearchAnalytics because Google omits anonymized queries from
+/// any breakdown by query while still counting them in totals, so site and page
+/// figures added up from query rows come out too low. These rows come from pulls
+/// without the query dimension, and they are what the dashboard headlines use.
+///
+/// Totals are aggregated by property and page rows by page, so page rows are
+/// not expected to add up to the site row.
+model SeoSearchDimensionDaily {
+  id     String  @id @default(cuid())
+  siteId String
+  site   SeoSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  date      DateTime
+  /// site | page | device | country
+  dimension String
+  /// '' for site; page URL; DESKTOP, MOBILE or TABLET; ISO 3166-1 alpha-3 code.
+  key       String
+
+  clicks      Int   @default(0)
+  impressions Int   @default(0)
+  /// PERCENT, 0-100.
+  ctr         Float @default(0)
+  position    Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, date, dimension, key], map: "SeoSearchDimensionDaily_natural_key")
+  @@index([siteId, dimension, date])
+}
+
 
 /// Site-wide off-page signals. One row per site.
 ///

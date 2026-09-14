@@ -7,7 +7,7 @@ import { SEARCH_CONSOLE_PROVIDER, SearchConsoleService } from './search-console.
  * Nightly Search Console pull.
  *
  * Runs at 05:00, an hour after the Google Ads sync, so the two do not compete
- * for the same window. Re-pulls a rolling 28 days rather than just the newest
+ * for the same window. Re-pulls a rolling 56 days (the current and previous 28-day windows the dashboard compares) rather than just the newest
  * day: Search Console restates recent figures, and the sync is keyed on
  * (siteId, date, page, query) so re-pulling updates in place.
  *
@@ -49,7 +49,7 @@ export class SearchConsoleSyncJob {
     try {
       for (const site of sites) {
         try {
-          const r = await this.searchConsole.sync(site.id, { days: 28 });
+          const r = await this.searchConsole.sync(site.id, { days: 56 });
           this.logger.log(
             `Search Console nightly sync ${site.url}: ${r.rowsFetched} rows, ` +
               `${r.totalClicks} clicks, ${r.pagesTouched} pages, ` +

@@ -53,6 +53,7 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Chip } from '@/components/ui/badge';
+import { SearchPerformance } from '@/components/seo/search-performance';
 import {
   Dialog,
   DialogClose,
@@ -60,7 +61,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-type ActiveTab = 'rankings' | 'audits' | 'media';
+type ActiveTab = 'rankings' | 'search' | 'audits' | 'media';
 
 export default function SeoPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('rankings');
@@ -424,6 +425,18 @@ export default function SeoPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab('search')}
+            className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'search'
+                ? 'border-signal-500 text-signal-500'
+                : 'border-transparent text-ink-400 hover:text-ink-200'
+            }`}
+          >
+            <TrendingUp className="size-4" />
+            Search Performance
+          </button>
+
+          <button
             onClick={() => setActiveTab('media')}
             className={`pb-3 text-[13.5px] font-medium transition-colors border-b-2 flex items-center gap-2 ${
               activeTab === 'media'
@@ -464,6 +477,17 @@ export default function SeoPage() {
           onEditOffPage={(page) => setSelectedPageForOffPage(page)}
           onViewChecklist={(page) => setSelectedPageForChecklist(page)}
           busy={busy === 'auditPage'}
+        />
+      )}
+
+      {/* TAB: SEARCH PERFORMANCE (Google Search Console) */}
+      {activeTab === 'search' && (
+        <SearchPerformance
+          siteId={selectedSiteId || sites[0]?.id || ''}
+          onSynced={(summary) => {
+            if (selectedSiteId) loadRankings(selectedSiteId);
+            notifySuccess(summary);
+          }}
         />
       )}
 
@@ -871,6 +895,28 @@ function PageRankRow({
           )}
           {p.words && <span>📝 {p.words} words</span>}
         </div>
+        {p.search && (
+          <div
+            className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-ink-400"
+            title="Google Search Console, last 28 days"
+          >
+            <span className="font-medium text-ink-500">Search:</span>
+            <span className="tabular">{p.search.impressions.toLocaleString()} impr</span>
+            <span className="tabular">{p.search.clicks.toLocaleString()} clicks</span>
+            {p.search.position > 0 && <span className="tabular">pos {p.search.position.toFixed(1)}</span>}
+            {p.search.clicksDelta.pct !== null && (
+              <span className={`tabular ${p.search.clicksDelta.pct >= 0 ? 'text-healthy-400' : 'text-loss-400'}`}>
+                {p.search.clicksDelta.pct > 0 ? '+' : ''}
+                {p.search.clicksDelta.pct}%
+              </span>
+            )}
+            {p.search.issueCount > 0 && (
+              <span className="rounded border border-warn-500/40 bg-warn-500/10 px-1 text-warn-400">
+                {p.search.issueCount} {p.search.issueCount === 1 ? 'issue' : 'issues'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Col 4: Algorithm Score */}

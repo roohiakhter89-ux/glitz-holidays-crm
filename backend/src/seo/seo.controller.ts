@@ -17,6 +17,8 @@ import { UpdateOffPageDto } from './dto/update-offpage.dto';
 import { UpdateDomainSignalsDto } from './dto/update-domain-signals.dto';
 import { SyncSearchConsoleDto } from './dto/sync-search-console.dto';
 import { SearchConsoleService } from './search-console.service';
+import { SearchInsightsService } from './search-insights.service';
+import { attachSearchData } from './search-console-insights';
 import { Roles } from '../common/decorators/roles.decorator';
 import { INTERNAL_STAFF } from '../common/access';
 
@@ -27,6 +29,7 @@ export class SeoController {
   constructor(
     private readonly seo: SeoService,
     private readonly searchConsole: SearchConsoleService,
+    private readonly insights: SearchInsightsService,
   ) {}
 
   @Roles(...SEO_WRITE)
@@ -61,8 +64,17 @@ export class SeoController {
 
   @Roles(...INTERNAL_STAFF)
   @Get('sites/:id/rankings')
-  getPageRankings(@Param('id') id: string) {
-    return this.seo.getPageRankings(id);
+  async getPageRankings(@Param('id') id: string) {
+    const rankings = await this.seo.getPageRankings(id);
+    // Search Console figures are attached for display and added as tasks only.
+    // They never change the score, so leaderboard scores stay stable while
+    // Google's numbers move day to day. Without synced data this is a no-op.
+    try {
+      const report = await this.insights.report(id, 28);
+      return attachSearchData(rankings as any, report);
+    } catch {
+      return rankings;
+    }
   }
 
   @Roles(...SEO_WRITE)
@@ -147,6 +159,17 @@ export class SeoController {
       limit: limit ? parseInt(limit, 10) : undefined,
       minImpressions: minImpressions ? parseInt(minImpressions, 10) : undefined,
     });
+  }
+
+  /**
+   * Dashboard report: totals and trends against the previous period, top pages
+   * and queries, devices, countries and diagnosed issues. Built from stored
+   * rows, so it uses no Search Console quota.
+   */
+  @Roles(...INTERNAL_STAFF)
+  @Get('sites/:id/search-console/report')
+  searchConsoleReport(@Param('id') id: string, @Query('days') days?: string) {
+    return this.insights.report(id, days ? parseInt(days, 10) : 28);
   }
 
   /** Stored Search Console performance for one page. */

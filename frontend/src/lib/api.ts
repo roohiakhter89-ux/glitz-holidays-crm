@@ -995,6 +995,106 @@ export interface SeoSearchConsoleSyncResult {
   offPageRowsUpdated: number;
   /** Number of latest page audit scores recomputed and updated. */
   rescoredAudits?: number;
+  /** Site, page, device and country totals stored. */
+  dimensionRows?: number;
+}
+
+// ---- Search Console dashboard ------------------------------------------------
+
+export type SearchIssueType =
+  | 'cannibalisation'
+  | 'low_ctr'
+  | 'striking_distance'
+  | 'declining_page'
+  | 'position_drop'
+  | 'lost_query'
+  | 'off_target'
+  | 'no_visibility'
+  | 'new_query';
+
+export type SearchSeverity = 'high' | 'medium' | 'low' | 'info';
+
+export interface SearchMetric {
+  clicks: number;
+  impressions: number;
+  /** PERCENT, 0-100. */
+  ctr: number;
+  position: number;
+}
+
+export interface SearchDelta {
+  abs: number;
+  pct: number | null;
+}
+
+export interface SearchIssuePage {
+  url: string;
+  path: string;
+  clicks: number;
+  impressions: number;
+  position: number;
+  share: number;
+}
+
+export interface SearchIssue {
+  id: string;
+  type: SearchIssueType;
+  severity: SearchSeverity;
+  title: string;
+  url: string | null;
+  path: string | null;
+  query: string | null;
+  pages?: SearchIssuePage[];
+  metrics: Record<string, number | string | null>;
+  action: string;
+  impact: number;
+}
+
+export interface SearchEntityRow {
+  key: string;
+  url?: string;
+  path?: string | null;
+  label: string;
+  current: SearchMetric;
+  previous: SearchMetric;
+  clicksDelta: SearchDelta;
+  positionDelta: number | null;
+  brand?: boolean;
+}
+
+export interface SearchReport {
+  days: number;
+  siteHost: string;
+  windows: { current: { from: string; to: string }; previous: { from: string; to: string } };
+  hasData: boolean;
+  hasPrevious: boolean;
+  lastSyncedAt?: string | null;
+  overview: {
+    current: SearchMetric;
+    previous: SearchMetric;
+    delta: { clicks: SearchDelta; impressions: SearchDelta; ctr: number | null; position: number | null };
+  };
+  series: { date: string; clicks: number; impressions: number; prevClicks: number | null; prevImpressions: number | null }[];
+  ctrBenchmarks: Record<string, number | null>;
+  topPages: SearchEntityRow[];
+  topQueries: SearchEntityRow[];
+  devices: SearchEntityRow[];
+  countries: SearchEntityRow[];
+  brand: { terms: string[]; brand: SearchMetric; nonBrand: SearchMetric };
+  issues: SearchIssue[];
+  issueCounts: Record<SearchIssueType, number>;
+  notes: string[];
+}
+
+/** Search Console figures attached to a page in the rankings table. */
+export interface SeoPageSearch {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  clicksDelta: SearchDelta;
+  positionDelta: number | null;
+  issueCount: number;
 }
 
 export interface SeoRankedPage {
@@ -1021,6 +1121,8 @@ export interface SeoRankedPage {
   tasks: { id: string; severity: 'pass' | 'warn' | 'fail'; label: string; task: string; category?: string }[];
   errors: string | null;
   offPage: SeoOffPageData | null;
+  /** Search Console figures for the current 28 days, or null when none are synced. */
+  search?: SeoPageSearch | null;
 }
 
 export interface SeoRankingsResponse {

@@ -262,3 +262,79 @@ export function normalizePageUrl(input: string): string {
   }
 }
 
+/** One day of a date x <dimension> pull. `key` is '' for the site-level pull. */
+export interface DimensionDailyRow {
+  date: string;
+  key: string;
+  clicks: number;
+  impressions: number;
+  /** PERCENT, 0-100. */
+  ctr: number;
+  position: number;
+}
+
+/**
+ * Map a pull made WITHOUT the query dimension: date alone for site totals, or
+ * date plus one of page, device or country.
+ *
+ * These exist because Google omits anonymized queries from any breakdown by
+ * query while still counting them in totals, so site and page figures must come
+ * from pulls that do not group by query.
+ *
+ * Page keys are normalised so a trailing-slash variant lands on the same key.
+ */
+export function mapDimensionRows(rows: unknown, dimensions: readonly string[]): DimensionDailyRow[] {
+  if (!Array.isArray(rows)) return [];
+  const dateIdx = dimensions.indexOf('date');
+  const keyIdx = dimensions.findIndex((d) => d !== 'date');
+  const isPage = keyIdx !== -1 && dimensions[keyIdx] === 'page';
+  const out: DimensionDailyRow[] = [];
+
+  for (const raw of rows as any[]) {
+    const keys: unknown[] = Array.isArray(raw?.keys) ? raw.keys : [];
+    const date = dateIdx === -1 ? '' : String(keys[dateIdx] ?? '');
+    if (!date) continue;
+
+    let key = keyIdx === -1 ? '' : String(keys[keyIdx] ?? '').slice(0, MAX_PAGE_LEN);
+    if (keyIdx !== -1 && !key) continue;
+    if (isPage) key = normalizePageUrl(key) || key;
+
+    out.push({
+      date,
+      key,
+      clicks: Math.round(num(raw.clicks)),
+      impressions: Math.round(num(raw.impressions)),
+      ctr: ctrToPercent(raw.ctr),
+      position: Math.round(num(raw.position) * 100) / 100,
+    });
+  }
+  return out;
+}
+
+/**
+ * Collapse rows sharing a date and key, which happens once page URLs are
+ * normalised. CTR is recomputed from the totals and position is weighted by
+ * impressions, rather than averaging the two rows.
+ */
+export function mergeDimensionRows(rows: DimensionDailyRow[]): DimensionDailyRow[] {
+  const acc = new Map<string, { date: string; key: string; clicks: number; impressions: number; posWeighted: number }>();
+  for (const r of rows) {
+    const k = JSON.stringify([r.date, r.key]);
+    let e = acc.get(k);
+    if (!e) {
+      e = { date: r.date, key: r.key, clicks: 0, impressions: 0, posWeighted: 0 };
+      acc.set(k, e);
+    }
+    e.clicks += r.clicks;
+    e.impressions += r.impressions;
+    e.posWeighted += r.position * r.impressions;
+  }
+  return [...acc.values()].map((e) => ({
+    date: e.date,
+    key: e.key,
+    clicks: e.clicks,
+    impressions: e.impressions,
+    ctr: e.impressions > 0 ? Math.round((e.clicks / e.impressions) * 100 * 100) / 100 : 0,
+    position: e.impressions > 0 ? Math.round((e.posWeighted / e.impressions) * 100) / 100 : 0,
+  }));
+}

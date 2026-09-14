@@ -3,6 +3,7 @@ import { searchconsole, type searchconsole_v1 } from '@googleapis/searchconsole'
 import { PrismaService } from '../prisma/prisma.service';
 import { decryptSecret } from '../common/crypto';
 import { SeoService } from './seo.service';
+import { SearchInsightsService } from './search-insights.service';
 import {
   MAX_ROW_LIMIT,
   PageRollup,
@@ -10,7 +11,10 @@ import {
   SearchAnalyticsRow,
   assertIsoDate,
   defaultWindow,
+  DimensionDailyRow,
+  mapDimensionRows,
   mapRows,
+  mergeDimensionRows,
   normalisePropertyUrl,
   normalizePageUrl,
   rollupByPage,
@@ -57,6 +61,8 @@ export interface SyncResult {
   offPageRowsUpdated: number;
   /** Number of latest page audit scores recomputed and updated. */
   rescoredAudits: number;
+  /** Site, page, device and country totals stored (pulls without the query dimension). */
+  dimensionRows: number;
 }
 
 @Injectable()
@@ -66,6 +72,7 @@ export class SearchConsoleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly seo: SeoService,
+    private readonly insights: SearchInsightsService,
   ) {}
 
   // ==========================================================================
@@ -224,7 +231,8 @@ export class SearchConsoleService {
       );
     }
 
-    const window = defaultWindow(opts.days ?? 28);
+    // 56 days by default: the current and previous 28-day windows the dashboard compares.
+    const window = defaultWindow(opts.days ?? 56);
     const from = opts.from ?? window.from;
     const to = opts.to ?? window.to;
 
@@ -299,12 +307,28 @@ export class SearchConsoleService {
     }
     created = creates.length;
 
+    // Totals without the query dimension. Google leaves anonymized queries out
+    // of any breakdown by query, so site and page figures summed from the rows
+    // above would come out too low.
+    const DIMENSION_PULLS: { dimension: string; dimensions: string[] }[] = [
+      { dimension: 'site', dimensions: ['date'] },
+      { dimension: 'page', dimensions: ['date', 'page'] },
+      { dimension: 'device', dimensions: ['date', 'device'] },
+      { dimension: 'country', dimensions: ['date', 'country'] },
+    ];
+    let dimensionRows = 0;
+    for (const pull of DIMENSION_PULLS) {
+      const pulled = await this.fetchDimensionRows(property, from, to, pull.dimensions);
+      dimensionRows += await this.upsertDimensionRows(siteId, pull.dimension, from, to, pulled);
+    }
+
     const rollups = rollupByPage(rows);
     const offPageRowsUpdated = await this.writeBackCtr(siteId, rollups);
 
     // Rescore all page audits on this site so the newly synced CTR data
     // immediately updates leaderboard scores.
     const rescoredAudits = await this.seo.rescoreAllPages(siteId);
+    this.insights.invalidate(siteId);
 
     this.logger.log(
       `Search Console sync ${from}..${to} property=${property}: ${rows.length} rows ` +
@@ -325,7 +349,106 @@ export class SearchConsoleService {
       totalImpressions,
       offPageRowsUpdated,
       rescoredAudits,
+      dimensionRows,
     };
+  }
+
+  /**
+   * Fetch a pull without the query dimension: site totals (date only), or date
+   * plus page, device or country. Paginates past the response cap like fetchRows.
+   */
+  async fetchDimensionRows(
+    property: string,
+    from: string,
+    to: string,
+    dimensions: string[],
+  ): Promise<DimensionDailyRow[]> {
+    assertIsoDate(from);
+    assertIsoDate(to);
+    const creds = await this.resolveCredentials();
+    const api = this.client(creds);
+
+    const out: DimensionDailyRow[] = [];
+    let startRow = 0;
+    for (;;) {
+      let res;
+      try {
+        res = await api.searchanalytics.query({
+          siteUrl: property,
+          requestBody: {
+            startDate: from,
+            endDate: to,
+            dimensions,
+            rowLimit: MAX_ROW_LIMIT,
+            startRow,
+            dataState: 'final',
+            type: 'web',
+          },
+        });
+      } catch (e: any) {
+        throw new BadRequestException(this.explain(e));
+      }
+      out.push(...mapDimensionRows(res.data.rows, dimensions));
+      const returned = res.data.rows?.length ?? 0;
+      if (returned < MAX_ROW_LIMIT) break;
+      startRow += returned;
+    }
+    // Normalised page URLs can map two rows onto one key; merge before storing.
+    return mergeDimensionRows(out);
+  }
+
+  /** Bulk upsert, same pattern as the query rows: one read, chunked writes. */
+  private async upsertDimensionRows(
+    siteId: string,
+    dimension: string,
+    from: string,
+    to: string,
+    rows: DimensionDailyRow[],
+  ): Promise<number> {
+    if (rows.length === 0) return 0;
+
+    const existing = await this.prisma.seoSearchDimensionDaily.findMany({
+      where: {
+        siteId,
+        dimension,
+        date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) },
+      },
+      select: { id: true, date: true, key: true },
+    });
+    const ids = new Map<string, string>();
+    for (const e of existing) ids.set(JSON.stringify([e.date.toISOString().slice(0, 10), e.key]), e.id);
+
+    const updates: { id: string; data: { clicks: number; impressions: number; ctr: number; position: number } }[] = [];
+    const creates: {
+      siteId: string;
+      dimension: string;
+      date: Date;
+      key: string;
+      clicks: number;
+      impressions: number;
+      ctr: number;
+      position: number;
+    }[] = [];
+
+    for (const r of rows) {
+      const data = { clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position };
+      const id = ids.get(JSON.stringify([r.date, r.key]));
+      if (id) updates.push({ id, data });
+      else creates.push({ siteId, dimension, date: new Date(`${r.date}T00:00:00.000Z`), key: r.key, ...data });
+    }
+
+    const CHUNK = 100;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      await this.prisma.$transaction(
+        updates
+          .slice(i, i + CHUNK)
+          .map((u) => this.prisma.seoSearchDimensionDaily.update({ where: { id: u.id }, data: u.data })),
+      );
+    }
+    for (let i = 0; i < creates.length; i += CHUNK) {
+      await this.prisma.seoSearchDimensionDaily.createMany({ data: creates.slice(i, i + CHUNK), skipDuplicates: true });
+    }
+    return rows.length;
   }
 
   /**
