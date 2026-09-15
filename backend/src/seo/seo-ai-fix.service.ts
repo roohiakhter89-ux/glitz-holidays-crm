@@ -264,14 +264,14 @@ Every itinerary is 100% customizable to your family's pace, fitness levels, and 
           suggestion: `<!-- Visual Byline Component -->
 <div className="flex items-center gap-3 py-4 my-6 border-y border-slate-200">
   <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center font-bold text-emerald-800">
-    ZL
+    SH
   </div>
   <div>
     <p className="text-xs font-semibold text-slate-900">
-      Curated by <span className="text-emerald-700">Zahoor Lone</span> · Senior Kashmir Destination Specialist
+      Curated by <a href="https://shahid.co.in" target="_blank" rel="noopener noreferrer" className="text-emerald-700 underline font-bold">Shahid</a> · 15+ Years in Travel & Travel Tech
     </p>
     <p className="text-[11px] text-slate-500">
-      12+ years organizing verified Himalayan tours at Glitz Holidays. Last updated: ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+      Founder, Glitz Holidays · Verified Destination & Travel-Tech Specialist (shahid.co.in). Last verified: ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
     </p>
   </div>
 </div>
@@ -280,12 +280,16 @@ Every itinerary is 100% customizable to your family's pace, fitness levels, and 
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "TravelAgency",
-  "name": "Glitz Holidays",
-  "founder": {
+  "@type": "TouristTrip",
+  "name": "${destination} Tour Package",
+  "author": {
     "@type": "Person",
-    "name": "Zahoor Lone",
-    "jobTitle": "Himalayan Travel Specialist & Managing Director"
+    "name": "Shahid",
+    "jobTitle": "Founder & Travel Technologist",
+    "url": "https://shahid.co.in",
+    "sameAs": [
+      "https://shahid.co.in"
+    ]
   }
 }
 </script>`,

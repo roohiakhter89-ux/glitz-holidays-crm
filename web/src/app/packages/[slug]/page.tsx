@@ -106,12 +106,16 @@ export default async function PackageDetail({ params }: { params: Params }) {
       image: [p.image],
       author: {
         '@type': 'Person',
-        name: 'Zahoor Lone',
-        jobTitle: 'Lead Kashmir Destination Specialist & Ground Operations',
+        name: 'Shahid',
+        jobTitle: 'Founder & Lead Travel Technologist',
+        url: 'https://shahid.co.in',
+        sameAs: ['https://shahid.co.in'],
         worksFor: {
           '@type': 'Organization',
           name: SITE.name,
         },
+        description:
+          'Travel technologist with 15+ years of experience designing authentic Kashmir, Ladakh, and Himalayan itineraries.',
       },
       dateModified: '2026-04-01',
       offers: {
@@ -194,14 +198,23 @@ export default async function PackageDetail({ params }: { params: Params }) {
             <div data-reveal className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-paper-300 bg-paper-50/80 px-4 py-3 text-[12.5px] text-ink-600">
               <div className="flex items-center gap-3">
                 <div className="grid size-8 place-items-center rounded-full bg-gold-400 font-bold text-ink-950 text-[12px] shadow-sm">
-                  ZL
+                  SH
                 </div>
                 <div>
                   <p className="font-semibold text-ink-900 leading-none">
-                    Curated by Zahoor Lone
+                    Curated by{' '}
+                    <a
+                      href="https://shahid.co.in"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink-950 underline decoration-gold-400 underline-offset-2 transition-colors hover:text-gold-700"
+                    >
+                      Shahid
+                    </a>{' '}
+                    <span className="font-normal text-[11.5px] text-ink-500">· 15+ Years Travel & Tech Experience</span>
                   </p>
                   <p className="text-[11px] text-ink-500 mt-0.5">
-                    Lead Kashmir Destination Specialist & Ground Operations
+                    Founder, Glitz Holidays · Verified Destination & Travel-Tech Specialist (<a href="https://shahid.co.in" target="_blank" rel="noopener noreferrer" className="hover:text-gold-600">shahid.co.in</a>)
                   </p>
                 </div>
               </div>

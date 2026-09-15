@@ -91,7 +91,8 @@ describe('SeoAiFixService', () => {
 
       expect(res.checkId).toBe('author');
       expect(res.fixType).toBe('editorial');
-      expect(res.suggestion).toContain('Zahoor Lone');
+      expect(res.suggestion).toContain('Shahid');
+      expect(res.suggestion).toContain('shahid.co.in');
       expect(res.suggestion).toContain('schema.org');
     });
   });
