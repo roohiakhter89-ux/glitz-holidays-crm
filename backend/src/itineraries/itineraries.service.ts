@@ -172,7 +172,7 @@ export class ItinerariesService {
     const it = await this.prisma.itinerary.findUnique({
       where: { id },
       include: {
-        lead: { select: { id: true, name: true, phone: true, email: true } },
+        lead: { select: { id: true, name: true, phone: true, email: true, destination: true, travelDate: true } },
         options: {
           orderBy: { sortOrder: 'asc' },
         },

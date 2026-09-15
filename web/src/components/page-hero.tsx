@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ChevronRight } from 'lucide-react';
 
 /**
@@ -13,6 +14,8 @@ export function PageHero({
   title,
   lede,
   background = DEFAULT_HERO_BG,
+  heroImage,
+  heroImageAlt,
   crumbs,
   children,
   tall = false,
@@ -21,13 +24,29 @@ export function PageHero({
   title: React.ReactNode;
   lede?: string;
   background?: string;
+  heroImage?: string;
+  heroImageAlt?: string;
   crumbs?: { label: string; href?: string }[];
   children?: React.ReactNode;
   tall?: boolean;
 }) {
   return (
     <section className="relative isolate overflow-hidden">
-      <div aria-hidden className="absolute inset-0 -z-20 bg-cover bg-center" style={{ background: background || DEFAULT_HERO_BG }} />
+      {heroImage ? (
+        <div className="absolute inset-0 -z-20 overflow-hidden">
+          <Image
+            src={heroImage}
+            alt={heroImageAlt || (typeof title === 'string' ? title : 'Glitz Holidays Kashmir')}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover opacity-25 brightness-90"
+          />
+          <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink-950/80 via-ink-950/60 to-ink-950/90" />
+        </div>
+      ) : (
+        <div aria-hidden className="absolute inset-0 -z-20 bg-cover bg-center" style={{ background: background || DEFAULT_HERO_BG }} />
+      )}
       <div
         aria-hidden
         className="blob -z-10 left-[8%] top-[10%] h-[340px] w-[340px]"

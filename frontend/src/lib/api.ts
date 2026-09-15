@@ -538,7 +538,14 @@ export interface ItineraryDetail {
   inclusions: string | null;
   exclusions: string | null;
   createdAt: string;
-  lead: { id: string; name: string; phone: string; email: string | null };
+  lead: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string | null;
+    destination?: string | null;
+    travelDate?: string | null;
+  };
   options: ItineraryOptionRow[];
   days: ItineraryDayRow[];
 }

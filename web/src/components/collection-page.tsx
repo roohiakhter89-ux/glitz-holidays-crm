@@ -95,6 +95,8 @@ export function CollectionPage({ c }: { c: Collection }) {
           { label: c.crumbLabel },
         ]}
         background={TONE_HERO[c.tone]}
+        heroImage={packages[0]?.image}
+        heroImageAlt={`${c.h1} — Glitz Holidays`}
       >
         <FactStrip
           facts={[

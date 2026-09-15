@@ -32,4 +32,21 @@ describe('MlForecastingService', () => {
     expect(m1.marginAdvice).toBeDefined();
     expect(m1.marginAdvice.recommendedMarginPercent).toBeGreaterThanOrEqual(10);
   });
+
+  it('evaluates dynamic margin for specific dates and destinations', () => {
+    // Peak winter Gulmarg (December/January)
+    const peakWinter = service.getDynamicMarginForDate('2026-01-15', 'Gulmarg Snow');
+    expect(peakWinter.strategy).toBe('PREMIUM_SURGE');
+    expect(peakWinter.recommendedMarginPercent).toBe(22);
+    expect(peakWinter.surgePercentage).toBeGreaterThanOrEqual(35);
+
+    // Spring bloom (April)
+    const springBloom = service.getDynamicMarginForDate('2026-04-10', 'Srinagar');
+    expect(springBloom.strategy).toBe('PREMIUM_SURGE');
+    expect(springBloom.recommendedMarginPercent).toBe(22);
+
+    // Off peak / moderate
+    const offPeak = service.getDynamicMarginForDate('2026-09-15', 'Kashmir');
+    expect(offPeak.recommendedMarginPercent).toBe(18);
+  });
 });

@@ -52,4 +52,16 @@ export class MlController {
   getClusters() {
     return this.clustering.getTravelerClusters();
   }
+
+  /**
+   * Real-time dynamic pricing and surge margin evaluation for quotes and itinerary builder.
+   */
+  @Roles(...INTERNAL_STAFF)
+  @Get('dynamic-margin')
+  getDynamicMargin(
+    @Query('date') date?: string,
+    @Query('destination') destination?: string,
+  ) {
+    return this.forecasting.getDynamicMarginForDate(date, destination);
+  }
 }

@@ -15,6 +15,7 @@ import { Actor, canAssignLeads, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
 import { AttributionService } from '../attribution/attribution.service';
 import { AssignmentService } from './assignment.service';
+import { LeadNurturingService } from './lead-nurturing.service';
 
 /** Extra request context the controller extracts (not client-supplied). */
 export interface CaptureContext {
@@ -60,6 +61,7 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly attribution: AttributionService,
     private readonly assignment: AssignmentService,
+    private readonly nurturing: LeadNurturingService,
     @Inject(forwardRef(() => IntegrationsService))
     private readonly integrations: IntegrationsService,
     @Inject(forwardRef(() => WhatsAppService))
@@ -255,9 +257,23 @@ export class LeadsService {
             },
           });
         }
-      } catch (err) {
-        this.logger.warn(`Auto-assignment error for lead ${lead.id}: ${err.message}`);
+      } catch (err: any) {
+        this.logger.warn(`Auto-assignment error for lead ${lead.id}: ${err?.message || err}`);
       }
+    }
+
+    // Automated Speed-to-Lead WhatsApp Nurturing (<1 minute acknowledgment)
+    try {
+      await this.nurturing.dispatchInstantAcknowledgment({
+        id: lead.id,
+        name: lead.name,
+        phone: lead.phone,
+        destination: lead.destination,
+        score: lead.score,
+        source: lead.source,
+      });
+    } catch (err: any) {
+      this.logger.warn(`Speed-to-lead nurturing trigger failed: ${err?.message || err}`);
     }
 
     return { duplicate: false, leadId: lead.id, score };

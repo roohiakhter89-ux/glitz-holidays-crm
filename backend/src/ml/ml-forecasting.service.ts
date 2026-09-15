@@ -196,4 +196,76 @@ export class MlForecastingService {
       operationalAlerts,
     };
   }
+
+  /**
+   * Evaluates dynamic pricing margin advice for a specific travel date and destination.
+   * Useful for real-time quoting in the Itinerary Tier Builder.
+   */
+  getDynamicMarginForDate(
+    travelDateInput?: Date | string | null,
+    destination?: string | null,
+  ) {
+    let date = new Date();
+    if (travelDateInput) {
+      const parsed = new Date(travelDateInput);
+      if (!isNaN(parsed.getTime())) {
+        date = parsed;
+      }
+    }
+
+    const monthIndex = date.getMonth() + 1;
+    const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+    const seasonal = this.KASHMIR_SEASONALITY_WEIGHTS[monthIndex] || {
+      factor: 1.0,
+      tag: 'Standard Tourism Period',
+    };
+
+    let demandIndex = seasonal.factor;
+
+    // Destination-specific fine-tuning
+    const destLower = (destination || '').toLowerCase();
+    if (destLower.includes('gulmarg') && (monthIndex === 12 || monthIndex === 1 || monthIndex === 2)) {
+      demandIndex += 0.15; // Gulmarg peak winter snow extra surge
+    } else if (destLower.includes('ladakh') && (monthIndex >= 6 && monthIndex <= 8)) {
+      demandIndex += 0.15; // Ladakh summer passes extra surge
+    }
+
+    demandIndex = Math.round(demandIndex * 100) / 100;
+    const surgePercentage = Math.max(0, Math.round((demandIndex - 1.0) * 100));
+
+    if (demandIndex >= 1.35) {
+      return {
+        recommendedMarginPercent: 22,
+        demandIndex,
+        surgePercentage,
+        strategy: 'PREMIUM_SURGE' as const,
+        badge: `🔥 Peak Surge (+${surgePercentage}%)`,
+        headline: `High Demand Surge in ${monthName}`,
+        seasonTag: seasonal.tag,
+        actionableAdvice: `High seasonal occupancy. Recommend 20–25% margin (suggested: 22%).`,
+      };
+    } else if (demandIndex >= 1.1) {
+      return {
+        recommendedMarginPercent: 18,
+        demandIndex,
+        surgePercentage,
+        strategy: 'OPTIMAL_STANDARD' as const,
+        badge: `⚡ Steady Season (+${surgePercentage}%)`,
+        headline: `Steady Demand in ${monthName}`,
+        seasonTag: seasonal.tag,
+        actionableAdvice: `Optimal steady market. Recommend standard 16–18% margin (suggested: 18%).`,
+      };
+    } else {
+      return {
+        recommendedMarginPercent: 12,
+        demandIndex,
+        surgePercentage: 0,
+        strategy: 'VOLUME_PROMOTIONAL' as const,
+        badge: `❄️ Value Season`,
+        headline: `Moderate / Off-Peak in ${monthName}`,
+        seasonTag: seasonal.tag,
+        actionableAdvice: `Hotel tariffs discounted. Recommend 12% promotional margin to maximize conversions.`,
+      };
+    }
+  }
 }

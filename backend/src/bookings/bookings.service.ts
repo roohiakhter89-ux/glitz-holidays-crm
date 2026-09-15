@@ -21,10 +21,14 @@ import { computeBookingFinancials, deriveStatus } from './booking-math';
 import { Actor, canSeeAllLeads } from '../common/access';
 import { toDateOrNull } from '../common/dates';
 import { withNumberRetry } from '../common/sequence';
+import { OfflineConversionsService } from '../attribution/offline-conversions.service';
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly offlineConversions: OfflineConversionsService,
+  ) {}
 
   // --- access scoping ------------------------------------------------------
   //
@@ -199,6 +203,25 @@ export class BookingsService {
         content: `Booking ${booking.bookingNumber} confirmed — sell ${totalSell}, est. cost ${totalNet}`,
       },
     });
+
+    // Closed-loop offline conversion upload for ad algorithms (Google Ads & Meta CAPI)
+    try {
+      await this.offlineConversions.uploadBookingConversion({
+        bookingId: booking.id,
+        bookingNumber: booking.bookingNumber,
+        totalSell: booking.totalSell,
+        lead: {
+          id: lead.id,
+          name: lead.name,
+          phone: lead.phone,
+          email: lead.email,
+          gclid: lead.gclid,
+          fbclid: lead.fbclid,
+        },
+      });
+    } catch {
+      // Non-blocking: failure in external attribution upload never blocks confirmed bookings
+    }
 
     return booking;
   }

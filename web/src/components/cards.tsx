@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowUpRight, Clock, MapPin, Star } from 'lucide-react';
 import type { Destination } from '@/lib/destinations';
 import { TONE_BG } from '@/lib/destinations';
@@ -9,17 +10,26 @@ import type { Review } from '@/lib/reviews';
 /* ---------------------------------------------------------------- destination */
 
 export function DestinationCard({ d, tall = false }: { d: Destination; tall?: boolean }) {
-  const bg = d.image ? `url("${d.image}")` : TONE_BG[d.tone];
-
   return (
     <Link
       href={`/destinations/${d.slug}`}
       className="lift zoom-wrap edge-gold group relative block overflow-hidden rounded-2xl shadow-md"
     >
       <div
-        className={`zoom relative bg-cover bg-center ${tall ? 'aspect-[3/4.4]' : 'aspect-[4/5]'}`}
-        style={{ backgroundImage: bg }}
-      />
+        className={`zoom relative overflow-hidden ${tall ? 'aspect-[3/4.4]' : 'aspect-[4/5]'}`}
+      >
+        {d.image ? (
+          <Image
+            src={d.image}
+            alt={`${d.name} Tour Packages & Travel Guide — Glitz Holidays`}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          />
+        ) : (
+          <div className="size-full" style={{ background: TONE_BG[d.tone] }} />
+        )}
+      </div>
       {/* legibility scrim, separate layer so the zoom doesn't stretch it */}
       <div
         aria-hidden
@@ -56,15 +66,22 @@ export function DestinationCard({ d, tall = false }: { d: Destination; tall?: bo
 /* -------------------------------------------------------------------- package */
 
 export function PackageCard({ p }: { p: Pkg }) {
-  const bg = p.image ? `url("${p.image}")` : TONE_BG[p.tone];
-
   return (
     <article className="lift edge-gold group relative flex flex-col overflow-hidden rounded-2xl border border-paper-200 bg-white shadow-sm">
       <Link href={`/packages/${p.slug}`} className="zoom-wrap relative block">
-        <div
-          className="zoom aspect-[16/10] bg-cover bg-center"
-          style={{ backgroundImage: bg }}
-        />
+        <div className="zoom aspect-[16/10] relative overflow-hidden">
+          {p.image ? (
+            <Image
+              src={p.image}
+              alt={`${p.name} — ${p.nights} Nights ${p.days} Days ${p.destinationName} Tour Package by Glitz Holidays`}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            />
+          ) : (
+            <div className="size-full" style={{ background: TONE_BG[p.tone] }} />
+          )}
+        </div>
         <div
           aria-hidden
           className="absolute inset-0 bg-gradient-to-t from-ink-950/70 to-transparent"

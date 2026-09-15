@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Check, X, Clock, MapPin, CalendarDays, Users, ArrowUpRight, Bed, Utensils } from 'lucide-react';
+import { Check, X, Clock, MapPin, CalendarDays, Users, ArrowUpRight, Bed, Utensils, AlertTriangle } from 'lucide-react';
 import { PACKAGES, getPackage, packagesFor } from '@/lib/packages';
 import { COLLECTIONS, getCollection } from '@/lib/collections';
 import { ORIGIN_CITIES } from '@/lib/origin-cities';
@@ -103,6 +103,17 @@ export default async function PackageDetail({ params }: { params: Params }) {
           },
         })),
       },
+      image: [p.image],
+      author: {
+        '@type': 'Person',
+        name: 'Zahoor Lone',
+        jobTitle: 'Lead Kashmir Destination Specialist & Ground Operations',
+        worksFor: {
+          '@type': 'Organization',
+          name: SITE.name,
+        },
+      },
+      dateModified: '2026-04-01',
       offers: {
         '@type': 'Offer',
         price: p.priceFrom,
@@ -146,6 +157,8 @@ export default async function PackageDetail({ params }: { params: Params }) {
           { label: p.name },
         ]}
         background={TONE_HERO[p.tone]}
+        heroImage={p.image}
+        heroImageAlt={`${p.name} — ${p.nights} Nights ${p.days} Days ${p.destinationName} Tour Package`}
       >
         <FactStrip
           facts={[
@@ -175,6 +188,29 @@ export default async function PackageDetail({ params }: { params: Params }) {
                   )}
                 </span>
               ))}
+            </div>
+
+            {/* E-E-A-T Author Byline and Content Freshness */}
+            <div data-reveal className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-paper-300 bg-paper-50/80 px-4 py-3 text-[12.5px] text-ink-600">
+              <div className="flex items-center gap-3">
+                <div className="grid size-8 place-items-center rounded-full bg-gold-400 font-bold text-ink-950 text-[12px] shadow-sm">
+                  ZL
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900 leading-none">
+                    Curated by Zahoor Lone
+                  </p>
+                  <p className="text-[11px] text-ink-500 mt-0.5">
+                    Lead Kashmir Destination Specialist & Ground Operations
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11.5px] text-ink-500">
+                <span>Verified for 2026:</span>
+                <time dateTime="2026-04-01" className="font-medium text-ink-800">
+                  April 2026 Season
+                </time>
+              </div>
             </div>
 
             <div data-reveal className="mt-6 flex flex-wrap gap-x-7 gap-y-3 text-[13px] text-ink-600">
@@ -278,6 +314,41 @@ export default async function PackageDetail({ params }: { params: Params }) {
                   We list exclusions plainly rather than burying them. If something
                   here matters to you, ask &mdash; most can be added to the quote.
                 </p>
+              </div>
+            </section>
+
+            {/* ───────────── honest travel advisory / who this trip is not for */}
+            <section className="mt-14 rounded-2xl border border-amber-200 bg-amber-50/70 p-6 md:p-8" data-reveal>
+              <div className="flex items-start gap-4">
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-800">
+                  <AlertTriangle className="size-5" strokeWidth={2.2} />
+                </div>
+                <div>
+                  <p className="kicker !text-amber-800">Honest Travel Advisory</p>
+                  <h2 className="display text-[22px] font-semibold text-ink-900 mt-1">
+                    Who this {p.name} itinerary is NOT for
+                  </h2>
+                  <p className="mt-2 text-[14px] leading-relaxed text-ink-700">
+                    We believe in transparent expectations before booking rather than surprises after landing. This trip may not suit you if:
+                  </p>
+                  <ul className="mt-4 space-y-2.5 text-[13.5px] text-ink-800">
+                    <li className="flex items-start gap-2.5">
+                      <span className="text-amber-700 font-bold">•</span>
+                      <span><strong>High-speed checklist travelers:</strong> Mountain roads in Kashmir & Ladakh follow natural terrain with winter/monsoon checkpoints; rushing 4 towns into 3 days leads to road fatigue.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="text-amber-700 font-bold">•</span>
+                      <span><strong>Expecting metro-style high-speed 5G everywhere:</strong> In remote mountain passes (Sonmarg glaciers, Nubra, higher Gulmarg), only postpaid BSNL, Airtel, and Jio SIMs operate reliably. Prepaid SIMs from other states do not work in J&K.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="text-amber-700 font-bold">•</span>
+                      <span><strong>Strict elevator dependency:</strong> Traditional heritage houseboats on Dal Lake and boutique mountain cottages feature classic wooden steps without elevators.</span>
+                    </li>
+                  </ul>
+                  <p className="mt-4 text-[12px] text-ink-600 border-t border-amber-200/80 pt-3">
+                    💡 If any of these apply to your party, speak to us! We happily adapt the route, select barrier-free hotels, or allocate additional buffer days.
+                  </p>
+                </div>
               </div>
             </section>
 

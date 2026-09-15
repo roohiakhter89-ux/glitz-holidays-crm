@@ -12,6 +12,8 @@ import {
   MapPin,
   Users2,
   CalendarCheck,
+  Sparkles,
+  TrendingUp,
 } from 'lucide-react';
 import {
   DndContext,
@@ -61,6 +63,17 @@ import { RatePicker } from '@/components/rate-picker';
  * Every mutation refetches — the server is the source of truth for
  * sort orders and day numbers so a two-tab concurrent edit stays coherent.
  */
+export interface MlMarginAdvice {
+  recommendedMarginPercent: number;
+  demandIndex: number;
+  surgePercentage: number;
+  strategy: 'PREMIUM_SURGE' | 'OPTIMAL_STANDARD' | 'VOLUME_PROMOTIONAL';
+  badge: string;
+  headline: string;
+  seasonTag: string;
+  actionableAdvice: string;
+}
+
 export default function ItineraryEditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -68,6 +81,7 @@ export default function ItineraryEditorPage() {
   const [it, setIt] = useState<ItineraryDetail | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
+  const [mlAdvice, setMlAdvice] = useState<MlMarginAdvice | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +102,19 @@ export default function ItineraryEditorPage() {
         const rec = data.options.find((o) => o.isRecommended) ?? data.options[0];
         return rec?.id ?? null;
       });
+
+      // Fetch dynamic ML margin recommendation based on travel date and destination
+      const travelDate = data.lead?.travelDate || data.days[0]?.date || undefined;
+      const destination = data.lead?.destination || undefined;
+      const q = new URLSearchParams();
+      if (travelDate) q.set('date', travelDate);
+      if (destination) q.set('destination', destination);
+      try {
+        const advice = await api.get<MlMarginAdvice>(`/ml/dynamic-margin?${q.toString()}`);
+        setMlAdvice(advice);
+      } catch {
+        // Safe fallback if ML is unavailable
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load itinerary.');
     } finally {
@@ -213,6 +240,10 @@ export default function ItineraryEditorPage() {
         options={it.options}
         activeId={activeOptionId}
         busy={busy}
+        mlAdvice={mlAdvice}
+        onApplyMlMargin={(optionId, margin) =>
+          mutate(() => api.patch(`/itineraries/options/${optionId}`, { markupPercent: margin }))
+        }
         onSelect={setActiveOptionId}
         onAdd={() =>
           mutate(async () => {
@@ -992,10 +1023,14 @@ function TiersStrip({
   onMarkRecommended,
   onDelete,
   onBook,
+  mlAdvice,
+  onApplyMlMargin,
 }: {
   options: ItineraryOptionRow[];
   activeId: string | null;
   busy: boolean;
+  mlAdvice?: MlMarginAdvice | null;
+  onApplyMlMargin?: (optionId: string, margin: number) => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onDuplicate: (id: string, currentName: string) => void;
@@ -1014,8 +1049,47 @@ function TiersStrip({
     setRenamingId(null);
   }
 
+  const activeOption = options.find((o) => o.id === activeId) ?? null;
+
   return (
-    <div className="mt-4 flex flex-wrap items-stretch gap-2">
+    <div className="mt-4 space-y-2.5">
+      {mlAdvice && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-500/30 bg-brand-500/10 px-4 py-3 text-[12.5px]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/20 px-2.5 py-0.5 font-semibold text-brand-300">
+              <TrendingUp className="size-3.5 text-brand-400" />
+              {mlAdvice.badge}
+            </span>
+            <span className="text-ink-200">
+              <strong>{mlAdvice.seasonTag}</strong> · Demand Index: <strong>{mlAdvice.demandIndex}x</strong>
+            </span>
+            <span className="hidden text-ink-400 sm:inline">|</span>
+            <span className="text-ink-300">
+              ML Target Margin: <strong className="text-brand-300">{mlAdvice.recommendedMarginPercent}%</strong>
+            </span>
+          </div>
+
+          {activeOption && onApplyMlMargin && (
+            <div className="flex items-center gap-3">
+              <span className="text-[11.5px] text-ink-400">
+                Current {activeOption.name} Margin:{' '}
+                <strong>{activeOption.marginPercent !== null ? `${Math.round(activeOption.marginPercent)}%` : 'Default'}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => onApplyMlMargin(activeOption.id, mlAdvice.recommendedMarginPercent)}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-[11.5px] font-semibold text-ink-950 shadow-sm transition-all hover:bg-brand-400 disabled:opacity-50"
+              >
+                <Sparkles className="size-3" />
+                Apply {mlAdvice.recommendedMarginPercent}% Margin
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-stretch gap-2">
       {options
         .slice()
         .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -1138,6 +1212,7 @@ function TiersStrip({
         <Plus className="mr-1.5 inline size-4" strokeWidth={1.75} />
         Add tier
       </button>
+      </div>
     </div>
   );
 }
