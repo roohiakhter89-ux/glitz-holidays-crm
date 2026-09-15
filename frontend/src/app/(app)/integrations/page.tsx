@@ -58,6 +58,26 @@ export default function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyTestId, setBusyTestId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const rawTab = (params.get('tab') || params.get('category') || '').toUpperCase();
+    if (rawTab === 'ANALYTICS' || rawTab === 'SEARCH' || rawTab === 'SEO') {
+      setTab('ANALYTICS');
+    } else if (rawTab in TAB_LABELS) {
+      setTab(rawTab as Tab);
+    }
+  }, []);
+
+  const selectTab = (t: Tab) => {
+    setTab(t);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', t.toLowerCase());
+      window.history.replaceState(null, '', url.toString());
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -129,7 +149,7 @@ export default function IntegrationsPage() {
           return (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => selectTab(t)}
               className={
                 on
                   ? 'rounded-full border border-signal-500 bg-signal-500/12 px-3 py-1.5 text-[12px] font-medium text-signal-600'

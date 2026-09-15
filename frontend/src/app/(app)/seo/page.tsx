@@ -1798,7 +1798,7 @@ function ExternalIntegrations() {
           <p className="text-[12.5px] font-medium text-ink-200">Google Search Console</p>
           <p className="text-[11px] text-ink-500">Live clicks, impressions, and CTR synced above</p>
           <a
-            href="/integrations"
+            href="/integrations?tab=analytics"
             className="mt-2 inline-block text-[11px] font-medium text-primary-400 hover:text-primary-300"
           >
             Manage Integration →

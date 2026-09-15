@@ -53,8 +53,7 @@ export class SearchConsoleSyncJob {
           this.logger.log(
             `Search Console nightly sync ${site.url}: ${r.rowsFetched} rows, ` +
               `${r.totalClicks} clicks, ${r.pagesTouched} pages, ` +
-              `${r.offPageRowsUpdated} CTR values written back, ` +
-              `${r.rescoredAudits} audits rescored`,
+              `${r.offPageRowsUpdated} CTR values written back`,
           );
         } catch (e: any) {
           // One misconfigured property must not stop the others.
