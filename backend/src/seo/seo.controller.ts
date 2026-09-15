@@ -20,6 +20,7 @@ import { SyncSearchConsoleDto } from './dto/sync-search-console.dto';
 import { SearchConsoleService } from './search-console.service';
 import { SearchInsightsService } from './search-insights.service';
 import { attachSearchData } from './search-console-insights';
+import { IndexNowService } from './indexnow.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { INTERNAL_STAFF } from '../common/access';
 
@@ -32,6 +33,7 @@ export class SeoController {
     private readonly audits: SeoAuditService,
     private readonly searchConsole: SearchConsoleService,
     private readonly insights: SearchInsightsService,
+    private readonly indexNow: IndexNowService,
   ) {}
 
   /** Start a full audit of every active site. Returns immediately; poll each site's status. */
@@ -194,5 +196,28 @@ export class SeoController {
       url,
       days ? parseInt(days, 10) : undefined,
     );
+  }
+
+  // ---- IndexNow (Bing & Yandex Instant Indexing) ----------------------------
+
+  /** Status of IndexNow integration (configured, host, key preview). */
+  @Roles(...INTERNAL_STAFF)
+  @Get('indexnow/status')
+  indexNowStatus() {
+    return this.indexNow.getStatus();
+  }
+
+  /** Submit specific list of URLs to IndexNow (Bing & Yandex). */
+  @Roles(...SEO_WRITE)
+  @Post('indexnow/submit')
+  indexNowSubmit(@Body() body: { urls: string[] }) {
+    return this.indexNow.submitUrls(body.urls);
+  }
+
+  /** Submit all published pages from sitemap & manifest to IndexNow in batch. */
+  @Roles(...SEO_WRITE)
+  @Post('indexnow/submit-all')
+  indexNowSubmitAll() {
+    return this.indexNow.submitAllPages();
   }
 }

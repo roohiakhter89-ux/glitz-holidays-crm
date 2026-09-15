@@ -31,6 +31,9 @@ import {
   BookOpen,
   Eye,
   CheckCheck,
+  Zap,
+  Loader2,
+  Send,
 } from 'lucide-react';
 import {
   api,
@@ -482,13 +485,18 @@ export default function SeoPage() {
 
       {/* TAB: SEARCH PERFORMANCE (Google Search Console) */}
       {activeTab === 'search' && (
-        <SearchPerformance
-          siteId={selectedSiteId || sites[0]?.id || ''}
-          onSynced={(summary) => {
-            if (selectedSiteId) loadRankings(selectedSiteId);
-            notifySuccess(summary);
-          }}
-        />
+        <div className="space-y-6">
+          <SearchPerformance
+            siteId={selectedSiteId || sites[0]?.id || ''}
+            onSynced={(summary) => {
+              if (selectedSiteId) loadRankings(selectedSiteId);
+              notifySuccess(summary);
+            }}
+          />
+          <div className="max-w-2xl">
+            <IndexNowPanel onNotified={notifySuccess} />
+          </div>
+        </div>
       )}
 
       {/* TAB 2: MEDIA LIBRARY */}
@@ -532,7 +540,7 @@ export default function SeoPage() {
               }}
             />
             <TasksPanel audit={audit || { site: sites[0] || ({} as any), pages: [] }} />
-            <ExternalIntegrations />
+            <ExternalIntegrations onNotified={notifySuccess} />
           </div>
         </div>
       )}
@@ -1787,30 +1795,231 @@ function TasksPanel({ audit }: { audit: SeoAuditResponse }) {
   );
 }
 
-function ExternalIntegrations() {
+function IndexNowPanel({ onNotified }: { onNotified?: (msg: string) => void }) {
+  const [status, setStatus] = useState<{
+    configured: boolean;
+    host?: string;
+    keyLocation?: string;
+    keyPreview?: string;
+    isActive?: boolean;
+  } | null>(null);
+  const [submittingAll, setSubmittingAll] = useState(false);
+  const [singleUrl, setSingleUrl] = useState('');
+  const [submittingSingle, setSubmittingSingle] = useState(false);
+  const [resultMsg, setResultMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const s = await api.get<{
+        configured: boolean;
+        host?: string;
+        keyLocation?: string;
+        keyPreview?: string;
+        isActive?: boolean;
+      }>('/seo/indexnow/status');
+      setStatus(s);
+    } catch {
+      setStatus({ configured: false, isActive: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  const submitAllPages = async () => {
+    setSubmittingAll(true);
+    setResultMsg(null);
+    try {
+      const res = await api.post<{ ok: boolean; submitted: number; message: string }>('/seo/indexnow/submit-all', {});
+      const msg = `✓ ${res.submitted} published pages submitted to IndexNow (Bing, Yandex, Seznam)`;
+      setResultMsg({ ok: true, text: msg });
+      if (onNotified) onNotified(msg);
+    } catch (e: any) {
+      const err = e instanceof ApiError ? e.message : 'Submission failed.';
+      setResultMsg({ ok: false, text: `✗ ${err}` });
+    } finally {
+      setSubmittingAll(false);
+    }
+  };
+
+  const submitSingleUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!singleUrl.trim()) return;
+    setSubmittingSingle(true);
+    setResultMsg(null);
+    try {
+      const res = await api.post<{ ok: boolean; submitted: number; message: string }>('/seo/indexnow/submit', {
+        urls: [singleUrl.trim()],
+      });
+      const msg = `✓ "${singleUrl.trim()}" submitted to IndexNow`;
+      setResultMsg({ ok: true, text: msg });
+      if (onNotified) onNotified(msg);
+      setSingleUrl('');
+    } catch (e: any) {
+      const err = e instanceof ApiError ? e.message : 'Submission failed.';
+      setResultMsg({ ok: false, text: `✗ ${err}` });
+    } finally {
+      setSubmittingSingle(false);
+    }
+  };
+
   return (
-    <Panel>
-      <PanelHeader>
-        <PanelTitle>External Providers</PanelTitle>
-      </PanelHeader>
-      <PanelBody className="space-y-3">
-        <div className="rounded-lg border border-dashed border-ink-800 p-3">
-          <p className="text-[12.5px] font-medium text-ink-200">Google Search Console</p>
-          <p className="text-[11px] text-ink-500">Live clicks, impressions, and CTR synced above</p>
+    <Panel className="border-signal-500/30 bg-ink-950">
+      <PanelHeader className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Zap className="size-4 text-signal-500" />
+          <PanelTitle>IndexNow Real-Time Indexing</PanelTitle>
+        </div>
+        {status?.configured ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-healthy-500/40 bg-healthy-500/10 px-2 py-0.5 text-[10.5px] text-healthy-400">
+            <CheckCircle2 className="size-3" />
+            Active ({status.host})
+          </span>
+        ) : (
           <a
             href="/integrations?tab=analytics"
-            className="mt-2 inline-block text-[11px] font-medium text-primary-400 hover:text-primary-300"
+            className="text-[11px] text-primary-400 hover:text-primary-300 underline"
           >
-            Manage Integration →
+            Configure →
           </a>
+        )}
+      </PanelHeader>
+      <PanelBody className="space-y-3">
+        <p className="text-[11.5px] text-ink-400 leading-relaxed">
+          Instantly push pages to Bing, Yandex, Seznam and partner search engines within minutes of publishing.
+        </p>
+
+        {status?.configured && (
+          <div className="rounded-lg border border-ink-800 bg-ink-900/60 p-2.5 text-[11px] space-y-1">
+            <div className="flex items-center justify-between text-ink-400">
+              <span>Domain: <strong className="text-ink-200">{status.host}</strong></span>
+              <span>Key: <code className="text-signal-400 font-mono text-[10.5px]">{status.keyPreview}</code></span>
+            </div>
+            <div className="flex items-center gap-2 text-ink-500 text-[10.5px]">
+              <span>Key Verification:</span>
+              <a
+                href={status.keyLocation || `https://${status.host}/indexnow.txt`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-400 hover:underline inline-flex items-center gap-0.5"
+              >
+                {status.keyLocation ? new URL(status.keyLocation).pathname : '/indexnow.txt'}
+                <ExternalLink className="size-2.5 ml-0.5" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {resultMsg && (
+          <div
+            className={`rounded-md border p-2.5 text-[11.5px] ${
+              resultMsg.ok
+                ? 'border-healthy-500/40 bg-healthy-500/10 text-healthy-400'
+                : 'border-loss-500/40 bg-loss-500/10 text-loss-400'
+            }`}
+          >
+            {resultMsg.text}
+          </div>
+        )}
+
+        <div className="pt-1">
+          <Button
+            size="sm"
+            onClick={submitAllPages}
+            disabled={submittingAll || !status?.configured}
+            className="w-full gap-2 text-[12px]"
+          >
+            {submittingAll ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                Submitting All Pages…
+              </>
+            ) : (
+              <>
+                <Zap className="size-3.5 text-signal-500" />
+                Push All Pages to IndexNow (Bing & Yandex)
+              </>
+            )}
+          </Button>
         </div>
-        <div className="rounded-lg border border-dashed border-ink-800 p-3">
-          <p className="text-[12.5px] font-medium text-ink-200">Ahrefs / Moz Backlink API</p>
-          <p className="text-[11px] text-ink-500">Automated Domain Rating & Backlink Sync</p>
-          <Chip className="mt-2 border-signal-500/30 text-signal-500">Manual Entry Active</Chip>
-        </div>
+
+        <form onSubmit={submitSingleUrl} className="flex gap-2 pt-1">
+          <Input
+            value={singleUrl}
+            onChange={(e) => setSingleUrl(e.target.value)}
+            placeholder="e.g. /packages/classic-kashmir"
+            className="h-8 text-[12px] bg-ink-900 border-ink-800"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            disabled={submittingSingle || !singleUrl.trim() || !status?.configured}
+            className="h-8 text-[11.5px] px-3 shrink-0"
+          >
+            {submittingSingle ? <Loader2 className="size-3 animate-spin" /> : 'Push URL'}
+          </Button>
+        </form>
       </PanelBody>
     </Panel>
+  );
+}
+
+function ExternalIntegrations({ onNotified }: { onNotified?: (msg: string) => void }) {
+  return (
+    <div className="space-y-4">
+      <IndexNowPanel onNotified={onNotified} />
+
+      <Panel>
+        <PanelHeader>
+          <PanelTitle>Other Search & Analytics Providers</PanelTitle>
+        </PanelHeader>
+        <PanelBody className="space-y-3">
+          <div className="rounded-lg border border-dashed border-ink-800 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[12.5px] font-medium text-ink-200">Google Search Console</p>
+              <Chip className="border-healthy-500/30 text-healthy-400">Active</Chip>
+            </div>
+            <p className="text-[11px] text-ink-500 mt-0.5">Live clicks, impressions, and CTR synced to performance tab</p>
+            <a
+              href="/integrations?tab=analytics"
+              className="mt-2 inline-block text-[11px] font-medium text-primary-400 hover:text-primary-300"
+            >
+              Manage Integration →
+            </a>
+          </div>
+
+          <div className="rounded-lg border border-dashed border-ink-800 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[12.5px] font-medium text-ink-200">Google Indexing API</p>
+              <Chip className="border-signal-500/30 text-signal-400">Ready</Chip>
+            </div>
+            <p className="text-[11px] text-ink-500 mt-0.5">Google Cloud Service Account for immediate URL notification</p>
+            <a
+              href="/integrations?tab=analytics"
+              className="mt-2 inline-block text-[11px] font-medium text-primary-400 hover:text-primary-300"
+            >
+              Manage Credentials →
+            </a>
+          </div>
+
+          <div className="rounded-lg border border-dashed border-ink-800 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[12.5px] font-medium text-ink-200">DataForSEO / Ahrefs</p>
+              <Chip className="border-signal-500/30 text-signal-500">Manual Entry Active</Chip>
+            </div>
+            <p className="text-[11px] text-ink-500 mt-0.5">Domain Rating & Backlink Authority sync</p>
+            <a
+              href="/integrations?tab=analytics"
+              className="mt-2 inline-block text-[11px] font-medium text-primary-400 hover:text-primary-300"
+            >
+              Configure API →
+            </a>
+          </div>
+        </PanelBody>
+      </Panel>
+    </div>
   );
 }
 
