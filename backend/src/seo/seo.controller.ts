@@ -21,6 +21,7 @@ import { SearchConsoleService } from './search-console.service';
 import { SearchInsightsService } from './search-insights.service';
 import { attachSearchData } from './search-console-insights';
 import { IndexNowService } from './indexnow.service';
+import { SeoAiFixService } from './seo-ai-fix.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { INTERNAL_STAFF } from '../common/access';
 
@@ -34,6 +35,7 @@ export class SeoController {
     private readonly searchConsole: SearchConsoleService,
     private readonly insights: SearchInsightsService,
     private readonly indexNow: IndexNowService,
+    private readonly aiFix: SeoAiFixService,
   ) {}
 
   /** Start a full audit of every active site. Returns immediately; poll each site's status. */
@@ -219,5 +221,26 @@ export class SeoController {
   @Post('indexnow/submit-all')
   indexNowSubmitAll() {
     return this.indexNow.submitAllPages();
+  }
+
+  // ---- SEO AI Auto-Fix Engine -----------------------------------------------
+
+  /** Generate targeted SEO fix (copy, JSX image code, metadata, or schema) using AI. */
+  @Roles(...INTERNAL_STAFF)
+  @Post('ai-fix')
+  generateAiFix(
+    @Body()
+    body: {
+      checkId: string;
+      label?: string;
+      detail?: string;
+      task?: string;
+      url: string;
+      pageTitle?: string;
+      targetKeyword?: string;
+      currentContent?: string;
+    },
+  ) {
+    return this.aiFix.generateFix(body);
   }
 }

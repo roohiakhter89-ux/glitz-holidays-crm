@@ -530,6 +530,87 @@ async function probeDataForSEO(c: any): Promise<ProbeResult> {
   return { ok: false, message: `DataForSEO HTTP ${r.status}: ${await readTextSafe(r)}` };
 }
 
+async function probeGoogleAnalytics4(c: any): Promise<ProbeResult> {
+  const propId = String(c.propertyId ?? '').trim();
+  const raw = String(c.serviceAccountKey ?? '').trim();
+  if (!propId) return { ok: false, message: 'GA4 Property ID is required.' };
+  if (!raw) return { ok: false, message: 'Service account JSON key is empty.' };
+
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { ok: false, message: 'Service account key is not valid JSON.' };
+  }
+  if (!data?.client_email || !data?.private_key) {
+    return { ok: false, message: 'JSON key is missing client_email or private_key.' };
+  }
+
+  try {
+    const auth = new JWT({
+      email: data.client_email,
+      key: data.private_key,
+      scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+    });
+    const token = await auth.getAccessToken();
+    if (!token?.token) return { ok: false, message: 'Google returned no access token for GA4.' };
+
+    const r = await safeFetch(
+      `https://analyticsdata.googleapis.com/v1beta/properties/${encodeURIComponent(propId)}:runReport`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dateRanges: [{ startDate: 'today', endDate: 'today' }],
+          metrics: [{ name: 'activeUsers' }],
+          limit: 1,
+        }),
+      },
+    );
+
+    if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+    if (r.ok) {
+      return {
+        ok: true,
+        message: `Connected to GA4 Property "${propId}" as ${data.client_email}. Analytics API active.`,
+      };
+    }
+    const text = await readTextSafe(r);
+    try {
+      const json = JSON.parse(text);
+      if (json?.error?.message) {
+        return { ok: false, message: `GA4 Data API: ${json.error.message}` };
+      }
+    } catch {}
+    return { ok: false, message: `GA4 API HTTP ${r.status}: ${text}` };
+  } catch (e: any) {
+    return { ok: false, message: `Authentication failed: ${e?.message ?? String(e)}` };
+  }
+}
+
+async function probeMicrosoftClarity(c: any): Promise<ProbeResult> {
+  const projectId = String(c.projectId ?? '').trim();
+  if (!projectId) return { ok: false, message: 'Clarity Project ID is required.' };
+  if (!/^[a-zA-Z0-9_-]{5,32}$/.test(projectId)) {
+    return { ok: false, message: 'Clarity Project ID format is invalid (expected 5-32 alphanumeric characters).' };
+  }
+
+  const r = await safeFetch(`https://www.clarity.ms/tag/${encodeURIComponent(projectId)}`, {
+    method: 'GET',
+  });
+  if (!isResponse(r)) return { ok: false, message: `Network: ${r.error}` };
+  if (r.ok || r.status === 200 || r.status === 304) {
+    return {
+      ok: true,
+      message: `Microsoft Clarity project "${projectId}" verified. Heatmaps and session recordings ready.`,
+    };
+  }
+  return { ok: false, message: `Clarity responded with HTTP ${r.status}. Check your Project ID.` };
+}
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 type Probe = (creds: any) => Promise<ProbeResult>;
@@ -556,6 +637,8 @@ const PROBES: Record<string, Probe> = {
   google_search_console: probeSearchConsole,
   google_indexing: probeGoogleIndexing,
   google_pagespeed: probePageSpeed,
+  google_analytics_4: probeGoogleAnalytics4,
+  microsoft_clarity: probeMicrosoftClarity,
   indexnow: probeIndexNow,
   google_business_profile: probeGoogleBusinessProfile,
   dataforseo: probeDataForSEO,

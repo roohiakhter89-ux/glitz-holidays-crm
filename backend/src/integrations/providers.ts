@@ -278,6 +278,25 @@ const analytics: ProviderSpec[] = [
     ],
     hasTest: true,
   },
+  {
+    id: 'google_analytics_4', label: 'Google Analytics 4 (GA4)', category: 'ANALYTICS',
+    docsUrl: 'https://developers.google.com/analytics/devguides/reporting/data/v1',
+    fields: [
+      { key: 'propertyId', label: 'GA4 Property ID', type: 'text', required: true, placeholder: '123456789', help: '100% Free official API. Found in GA4 Admin > Property Settings > Property Details (numeric ID).' },
+      { key: 'serviceAccountKey', label: 'Service Account JSON Key', type: 'textarea', required: true, placeholder: '{\n  "type": "service_account",\n  "client_email": "...",\n  "private_key": "..."\n}', help: 'Paste your Google Cloud Service Account JSON key. Add its client_email as a Viewer in GA4 Property Access Management.' },
+      { key: 'measurementId', label: 'Measurement ID (Data Stream)', type: 'text', placeholder: 'G-XXXXXXXXXX', help: 'Optional: Found in Admin > Data Streams for web tracking verification.' },
+    ],
+    hasTest: true,
+  },
+  {
+    id: 'microsoft_clarity', label: 'Microsoft Clarity', category: 'ANALYTICS',
+    docsUrl: 'https://learn.microsoft.com/en-us/clarity/',
+    fields: [
+      { key: 'projectId', label: 'Clarity Project ID', type: 'text', required: true, placeholder: 'abcdef1234', help: '100% Free Forever with unlimited heatmaps and recordings. Found in clarity.microsoft.com project settings.' },
+      { key: 'apiToken', label: 'API Export Token (Optional)', type: 'password', help: 'Optional API token for session insights export from Clarity Settings > API.' },
+    ],
+    hasTest: true,
+  },
 ];
 
 // ── Social ──────────────────────────────────────────────────────────────────

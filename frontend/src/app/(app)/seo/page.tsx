@@ -1502,7 +1502,7 @@ function PageChecklistDialog({
               </h3>
               <ul className="divide-y divide-ink-800/60 border border-ink-800 rounded-lg overflow-hidden bg-ink-950">
                 {checks.map((c, i) => (
-                  <CheckRow key={i} check={c} />
+                  <CheckRow key={i} check={c} page={page} />
                 ))}
               </ul>
             </div>
@@ -1571,30 +1571,161 @@ function ScoreRing({
   );
 }
 
-function CheckRow({ check: c }: { check: SeoCheck }) {
+interface SeoAiFixResult {
+  checkId: string;
+  label: string;
+  fixType: 'copy' | 'code' | 'meta' | 'editorial';
+  headline: string;
+  rationale: string;
+  suggestion: string;
+  instructions: string[];
+}
+
+function CheckRow({ check: c, page }: { check: SeoCheck; page: SeoRankedPage }) {
   const Icon = c.severity === 'pass' ? CheckCircle2 : c.severity === 'warn' ? AlertTriangle : XCircle;
   const tone =
     c.severity === 'pass' ? 'text-healthy-500' :
     c.severity === 'warn' ? 'text-warn-500' : 'text-loss-500';
+
+  const [aiFix, setAiFix] = useState<SeoAiFixResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleFixWithAi() {
+    if (aiFix) {
+      setAiFix(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post<SeoAiFixResult>('/seo/ai-fix', {
+        checkId: c.id,
+        label: c.label,
+        detail: c.detail,
+        task: c.task,
+        url: page.path || page.url,
+        pageTitle: page.title,
+        targetKeyword: page.targetKeyword,
+      });
+      setAiFix(res);
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : 'Could not generate AI fix.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleCopy() {
+    if (!aiFix?.suggestion) return;
+    navigator.clipboard.writeText(aiFix.suggestion);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const isFailingOrWarning = c.severity !== 'pass';
+
   return (
-    <li className="flex items-start gap-3 px-4 py-2.5">
-      <Icon className={`mt-0.5 size-3.5 shrink-0 ${tone}`} strokeWidth={1.75} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between">
-          <p className="text-[12.5px] font-medium text-ink-100">
-            {c.label}
-          </p>
-          <span className="text-[10px] text-ink-500 font-mono">
-            {c.score ?? (c.severity === 'pass' ? c.weight : c.severity === 'warn' ? c.weight * 0.5 : 0)}/{c.weight} pts
-          </span>
+    <li className="px-4 py-3 space-y-2">
+      <div className="flex items-start gap-3">
+        <Icon className={`mt-0.5 size-3.5 shrink-0 ${tone}`} strokeWidth={1.75} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[12.5px] font-medium text-ink-100">
+              {c.label}
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              {isFailingOrWarning && (
+                <button
+                  type="button"
+                  onClick={handleFixWithAi}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/25 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                  title="Generate instant resolution for this check using AI"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-3 animate-spin text-amber-400" />
+                      <span>Generating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-3 text-amber-400" />
+                      <span>{aiFix ? 'Hide AI Fix' : 'Fix with AI'}</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <span className="text-[10px] text-ink-500 font-mono">
+                {c.score ?? (c.severity === 'pass' ? c.weight : c.severity === 'warn' ? c.weight * 0.5 : 0)}/{c.weight} pts
+              </span>
+            </div>
+          </div>
+          {c.detail && <p className="text-[11px] text-ink-400 mt-0.5">{c.detail}</p>}
+          {c.task && (
+            <p className="mt-1 text-[11px] leading-relaxed text-warn-500 bg-warn-500/10 rounded px-2 py-1">
+              💡 {c.task}
+            </p>
+          )}
+          {error && <p className="mt-1 text-[11px] text-loss-400">{error}</p>}
         </div>
-        {c.detail && <p className="text-[11px] text-ink-400 mt-0.5">{c.detail}</p>}
-        {c.task && (
-          <p className="mt-1 text-[11px] leading-relaxed text-warn-500 bg-warn-500/10 rounded px-2 py-1">
-            💡 {c.task}
-          </p>
-        )}
       </div>
+
+      {aiFix && (
+        <div className="ml-6.5 mt-2 rounded-lg border border-amber-500/30 bg-ink-900/90 p-3.5 space-y-2.5 text-left text-xs shadow-inner">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center size-5 rounded bg-amber-500/20 text-amber-400">
+                <Sparkles className="size-3" />
+              </span>
+              <p className="font-semibold text-amber-300 text-[12px]">{aiFix.headline}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiFix(null)}
+              className="text-[10px] text-ink-500 hover:text-ink-300 px-1.5 py-0.5 rounded border border-ink-800"
+            >
+              Dismiss
+            </button>
+          </div>
+
+          {aiFix.rationale && (
+            <p className="text-[11px] text-ink-300 leading-relaxed bg-ink-950/70 p-2.5 rounded border border-ink-800/80">
+              <strong className="text-ink-100 font-medium">Why Google ranks this: </strong>
+              {aiFix.rationale}
+            </p>
+          )}
+
+          <div className="relative rounded-md border border-ink-800 bg-black/80 p-3 font-mono text-[11px] text-ink-100 overflow-x-auto">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-ink-800/60 text-[10px] text-ink-400">
+              <span className="uppercase font-sans tracking-wide text-ink-400 font-semibold">{aiFix.fixType} Solution</span>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] transition-colors"
+              >
+                {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
+                {copied ? 'Copied to Clipboard!' : 'Copy Code / Text'}
+              </button>
+            </div>
+            <pre className="whitespace-pre-wrap font-mono leading-relaxed text-emerald-300/90 text-[11.5px]">
+              {aiFix.suggestion}
+            </pre>
+          </div>
+
+          {aiFix.instructions && aiFix.instructions.length > 0 && (
+            <div className="space-y-1 pt-1 text-[10.5px] text-ink-400">
+              <p className="font-medium text-ink-300 text-[11px]">Implementation Checklist:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {aiFix.instructions.map((inst, idx) => (
+                  <li key={idx} className="leading-normal">{inst}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </li>
   );
 }
