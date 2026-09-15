@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/input';
 import { Chip } from '@/components/ui/badge';
 import { ScoreMeter } from '@/components/margin-ribbon';
 import { Timeline } from '@/components/timeline';
+import { MlLeadScoreCard } from '@/components/leads/ml-lead-score-card';
 import { Clock, Flame } from 'lucide-react';
 import {
   ACTIVITY_TYPES,
@@ -348,6 +349,14 @@ export default function LeadDetailPage() {
 
         {/* Right: the facts */}
         <div className="min-w-0 space-y-4">
+          <MlLeadScoreCard
+            leadId={lead.id}
+            initialScore={lead.score}
+            onScored={(newScore) => {
+              setLead((prev) => (prev ? { ...prev, score: newScore } : prev));
+            }}
+          />
+
           <Panel>
             <PanelHeader>
               <PanelTitle>Stage</PanelTitle>

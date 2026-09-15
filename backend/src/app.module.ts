@@ -24,6 +24,7 @@ import { StorageModule } from './storage/storage.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { SocialModule } from './social/social.module';
 import { MediaModule } from './media/media.module';
+import { MlModule } from './ml/ml.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -55,6 +56,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     MarketingModule,
     SocialModule,
     MediaModule,
+    MlModule,
   ],
   providers: [
     // Order: rate limit -> authenticate -> authorize.

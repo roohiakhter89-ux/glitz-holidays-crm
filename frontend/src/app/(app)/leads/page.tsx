@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, X, Inbox, Flame, Clock, Trash2, Users } from 'lucide-react';
+import { Search, X, Inbox, Flame, Clock, Trash2, Users, Sparkles } from 'lucide-react';
 import { api, ApiError, tokenStore, type LeadRow, type Paged, type UserRow } from '@/lib/api';
 import { Panel } from '@/components/ui/panel';
 import { Input } from '@/components/ui/input';
@@ -131,6 +131,12 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button asChild variant="secondary" size="sm" className="gap-1.5 border-signal-500/30 text-signal-400 hover:text-signal-300">
+            <Link href="/reports/ml">
+              <Sparkles className="size-3.5" />
+              ML Forecast
+            </Link>
+          </Button>
           <DateRangePicker value={range} onChange={(r) => { setRange(r); setPage(1); }} />
           <ImportLeadsDialog onImported={load} />
           <ApprovalsDialog onResolved={load} />
@@ -372,7 +378,22 @@ export default function LeadsPage() {
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    <ScoreMeter score={lead.score} />
+                    <div className="flex items-center gap-2">
+                      <ScoreMeter score={lead.score} />
+                      {lead.score >= 75 ? (
+                        <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          🔥 Hot
+                        </span>
+                      ) : lead.score >= 50 ? (
+                        <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-signal-500/15 text-signal-400 border border-signal-500/30">
+                          ⚡ Warm
+                        </span>
+                      ) : lead.score >= 30 ? (
+                        <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-ink-800 text-ink-300 border border-ink-700">
+                          ❄️ Cool
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="tabular px-5 py-3 text-right text-[12px] text-ink-500">
                     {relativeDate(lead.createdAt)}
