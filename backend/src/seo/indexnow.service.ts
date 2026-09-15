@@ -183,8 +183,25 @@ export class IndexNowService {
     }
 
     if (res.status === 403) {
+      try {
+        const parsed = JSON.parse(responseText);
+        if (parsed.errorCode === 'SiteVerificationNotCompleted') {
+          throw new BadRequestException(
+            'Site verification in progress with IndexNow: The key file is live at ' +
+              keyLocation +
+              ', and IndexNow is validating it. Bulk indexing will be active in 5-10 minutes.',
+          );
+        }
+        if (parsed.message) {
+          throw new BadRequestException('IndexNow HTTP 403: ' + parsed.message);
+        }
+      } catch (e: any) {
+        if (e instanceof BadRequestException) throw e;
+      }
       throw new BadRequestException(
-        'IndexNow Key Forbidden (HTTP 403): The key file at ' + keyLocation + ' was not verified. Ensure the key file is live on your domain.',
+        'IndexNow Key Forbidden (HTTP 403): The key file at ' +
+          keyLocation +
+          ' was not verified. Ensure the key file is live on your domain.',
       );
     }
 
